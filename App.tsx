@@ -4,7 +4,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Slide, StyleLibraryItem, DebugSession, Template } from './types';
 import Header from './components/Header';
 import Editor from './components/Editor';
-import DeckUploader from './components/DeckUploader';
+import GenerationModeSelector from './components/GenerationModeSelector';
 import PresentationView from './components/PresentationView';
 import SessionInspectorPanel from './components/SessionInspectorPanel';
 import StyleLibraryPanel from './components/StyleLibraryPanel';
@@ -460,8 +460,8 @@ const App: React.FC = () => {
           </>
         ) : (
           <div className="flex-grow flex items-center justify-center p-4">
-            <DeckUploader 
-                onDeckUpload={handleDeckUpload} 
+            <GenerationModeSelector
+                onDeckUpload={handleDeckUpload}
                 styleLibrary={styleLibrary}
                 isTestMode={isTestMode}
             />
