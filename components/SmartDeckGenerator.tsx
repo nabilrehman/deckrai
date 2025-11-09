@@ -4,7 +4,7 @@ import GenerationPlanProposal, { GenerationPlan } from './GenerationPlanProposal
 import FloatingActionBubble from './FloatingActionBubble';
 import EnhancedThemePreviewSelector from './EnhancedThemePreviewSelector';
 import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationContext } from '../services/intelligentGeneration';
-import { createSlideFromPrompt } from '../services/geminiService';
+import { createSlideFromPrompt, findBestStyleReferenceFromPrompt } from '../services/geminiService';
 import { detectVibeFromNotes, getDesignerStylesForVibe, getDesignerStyleById, generateStylePromptModifier, PresentationVibe } from '../services/vibeDetection';
 
 interface SmartDeckGeneratorProps {
@@ -191,20 +191,28 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
       // Get designer style
       const designerStyle = getDesignerStyleById(designerStyleId);
 
-      // Determine reference slides to cycle through
-      let referenceSlides: string[] = [];
+      // Build style library for AI Style Scout
+      let styleLibraryForScout: StyleLibraryItem[] = [];
 
       // Priority 1: Use preview slides from selected designer (user's visual choice)
       if (previewSlides.length > 0) {
-        referenceSlides = previewSlides;
+        styleLibraryForScout = previewSlides.map((src, idx) => ({
+          id: `preview-${idx}`,
+          src,
+          name: `Preview ${idx + 1}`
+        }));
       }
       // Priority 2: Use all slides from style library (supports PDF multi-page uploads)
       else if (styleLibrary.length > 0) {
-        referenceSlides = styleLibrary.map(item => item.src);
+        styleLibraryForScout = styleLibrary;
       }
       // Priority 3: Use uploaded style reference (single slide)
       else if (uploadedStyleReference) {
-        referenceSlides = [uploadedStyleReference.src];
+        styleLibraryForScout = [{
+          id: 'uploaded',
+          src: uploadedStyleReference.src,
+          name: uploadedStyleReference.name
+        }];
       }
 
       // Add designer-specific prompt modifier
@@ -226,9 +234,15 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
 
           setProgressText(`Creating slide ${slideNumber} of ${totalSlides}...`);
 
-          // Cycle through reference slides - use different reference for each slide
-          const referenceIndex = (slideNumber - 1) % Math.max(referenceSlides.length, 1);
-          const referenceSrc = referenceSlides.length > 0 ? referenceSlides[referenceIndex] : null;
+          // Use AI Style Scout to pick the best reference for this specific slide
+          let referenceSrc: string | null = null;
+          if (styleLibraryForScout.length > 0) {
+            const bestReference = await findBestStyleReferenceFromPrompt(
+              description,
+              styleLibraryForScout
+            );
+            referenceSrc = bestReference?.src || null;
+          }
 
           // Apply designer style modifier to prompt
           const finalPrompt = description + stylePromptModifier;
@@ -324,20 +338,28 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
       // Only generate NEW slides
       const newDescriptions = slideDescriptions.slice(generatedSlides.length);
 
-      // Determine reference slides to cycle through
-      let referenceSlides: string[] = [];
+      // Build style library for AI Style Scout
+      let styleLibraryForScout: StyleLibraryItem[] = [];
 
       // Priority 1: Use preview slides if available
       if (selectedPreviewSlides.length > 0) {
-        referenceSlides = selectedPreviewSlides;
+        styleLibraryForScout = selectedPreviewSlides.map((src, idx) => ({
+          id: `preview-${idx}`,
+          src,
+          name: `Preview ${idx + 1}`
+        }));
       }
       // Priority 2: Use all slides from style library (supports PDF multi-page uploads)
       else if (styleLibrary.length > 0) {
-        referenceSlides = styleLibrary.map(item => item.src);
+        styleLibraryForScout = styleLibrary;
       }
       // Priority 3: Use uploaded style reference (single slide)
       else if (uploadedStyleReference) {
-        referenceSlides = [uploadedStyleReference.src];
+        styleLibraryForScout = [{
+          id: 'uploaded',
+          src: uploadedStyleReference.src,
+          name: uploadedStyleReference.name
+        }];
       }
 
       const newSlides: Slide[] = [];
@@ -345,9 +367,15 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
         const slideNumber = generatedSlides.length + i + 1;
         setProgressText(`Creating slide ${slideNumber}...`);
 
-        // Cycle through reference slides - use different reference for each slide
-        const referenceIndex = (slideNumber - 1) % Math.max(referenceSlides.length, 1);
-        const referenceSrc = referenceSlides.length > 0 ? referenceSlides[referenceIndex] : null;
+        // Use AI Style Scout to pick the best reference for this specific slide
+        let referenceSrc: string | null = null;
+        if (styleLibraryForScout.length > 0) {
+          const bestReference = await findBestStyleReferenceFromPrompt(
+            newDescriptions[i],
+            styleLibraryForScout
+          );
+          referenceSrc = bestReference?.src || null;
+        }
 
         // Apply designer style modifier if available
         let finalPrompt = newDescriptions[i];
