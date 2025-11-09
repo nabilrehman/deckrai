@@ -70,11 +70,12 @@ npm run build
 https://deckr-app-948199894623.us-central1.run.app
 
 ## Latest Revision
-- Revision: `deckr-app-00018-gm6`
+- Revision: `deckr-app-00019-lg7`
 - Deployed: Successfully
-- Changes: Added Smart AI Generation with Planning Agent pattern - GenerationModeSelector, SmartDeckGenerator, audience-aware and style-aware generation with incremental build
+- Changes: Added Visual Theme Preview Selection - Users now see 3 sample slides in different themes BEFORE full generation. Prevents wasted generation by letting users pick their favorite visual style first.
 
 ## Previous Revisions
+- `deckr-app-00018-gm6` - Added Smart AI Generation with Planning Agent pattern - GenerationModeSelector, SmartDeckGenerator, audience-aware and style-aware generation with incremental build
 - `deckr-app-00017-wfk` - Created .gcloudignore file to ensure .env and .env.production files are uploaded to Cloud Build (fixes API key missing error)
 - `deckr-app-00015-7qr` - Added .env.production file (first attempt to fix API key)
 - `deckr-app-00013-tbs` - Reduced free plan deck limit from 5 to 3 decks per month
