@@ -101,3 +101,62 @@ https://deckr-app-948199894623.us-central1.run.app
 ## Why Two API Keys?
 - **Firebase API Key** (`AIzaSyAZ_o...`): Used for Firebase Auth, Firestore, and Storage
 - **Gemini API Key** (`AIzaSyDP6j...`): Used for AI slide generation with Google Gemini
+
+## 🔒 API Key Security Best Practices
+
+### Firebase API Key (Public - OK to be in git)
+- **Location**: `config/firebase.ts` (hardcoded, public in GitHub)
+- **Status**: ✅ Safe to be public
+- **Why**: Firebase web API keys are designed to be included in client-side code
+- **Security**: Comes from Firebase Security Rules, NOT from hiding the key
+- **Protection**: Add HTTP referrer restrictions in GCP Console to limit domains
+- **Rules**:
+  - Users can only read/write their own data (firestore.rules)
+  - Users can only access their own files (storage.rules)
+
+### Gemini API Key (Private - NEVER commit)
+- **Location**: `.env` and `.env.production` (local only, gitignored)
+- **Status**: ✅ Protected (not in git)
+- **Why**: Can incur charges if exposed to public use
+- **Security**: Keep in .env files, never commit to git
+- **Deployment**: Cloud Run uses local .env files during build
+- **Regeneration**: If exposed, regenerate immediately at https://aistudio.google.com/app/apikey
+
+### .env File Protection
+- ✅ `.env` files are in `.gitignore`
+- ✅ Only `.env.example` is committed (template without real keys)
+- ✅ Cloud Run deployment uses local .env files (not from git)
+- ⚠️ Never run `git add .env` - gitignore will protect you
+
+### Security Checklist Before Each Commit
+```bash
+# Always check before pushing:
+git status | grep ".env"  # Should only show .env.example (if anything)
+git ls-files | grep ".env"  # Should only show .env.example
+
+# If you accidentally staged .env:
+git rm --cached .env .env.production
+```
+
+### Adding API Key Restrictions (Recommended)
+
+**Firebase Web API Key Restrictions:**
+1. Go to: https://console.cloud.google.com/apis/credentials?project=deckr-477706
+2. Find the Firebase web key (starts with AIzaSyAZ_o...)
+3. Add HTTP referrers:
+   - `https://deckrai.com/*`
+   - `https://*.deckrai.com/*`
+   - `https://deckr-app-948199894623.us-central1.run.app/*`
+   - `http://localhost:5173/*`
+   - `http://localhost:4173/*`
+4. Restrict to APIs:
+   - Identity Toolkit API
+   - Firebase Authentication API
+   - Cloud Firestore API
+   - Firebase Storage API
+
+**Gemini API Key Restrictions:**
+1. Go to: https://aistudio.google.com/app/apikey
+2. Currently no referrer restrictions available for Gemini API
+3. Keep the key private in .env files (only protection)
+4. Monitor usage regularly: https://console.cloud.google.com/apis/api/generativelanguage.googleapis.com/metrics?project=deckr-477706
