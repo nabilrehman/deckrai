@@ -1,0 +1,30 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper function to check if user is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user owns the resource
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Deck images - users can read/write their own deck images
+    match /decks/{userId}/{deckId}/{allPaths=**} {
+      allow read: if isSignedIn();  // Any authenticated user can read (for viewing shared decks in future)
+      allow write: if isOwner(userId);  // Only owner can write
+      allow delete: if isOwner(userId);  // Only owner can delete
+    }
+
+    // Style library images - users can read/write their own style library
+    match /styleLibrary/{userId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId);
+      allow delete: if isOwner(userId);
+    }
+  }
+}

@@ -1,0 +1,37 @@
+import { Template } from '../types';
+
+export const TEMPLATES: Template[] = [
+  {
+    id: 'bigquery-ml-deck',
+    name: 'BigQuery ML Deck',
+    previewSrc: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/01.png',
+    pages: [
+      { name: '01 Title Page', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/01.png' },
+      { name: '02 Agenda', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/02.png' },
+      { name: '03 ML Workflow', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/03.png' },
+      { name: '04 BQML with SQL', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/04.png' },
+      { name: '05 Demo', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/05.png' },
+      { name: '06 Cold Start Case', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/06.png' },
+      { name: '07 Warm Start Case', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/07.png' },
+      { name: '08 Recommendations', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/08.png' },
+      { name: '09 Enterprise Benefits', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/09.png' },
+      { name: '10 Predictive ML Use Cases', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/10.png' },
+      { name: '11 Structured Data Models', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/11.png' },
+      { name: '12 Contribution Analysis', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/12.png' },
+      { name: '13 GenAI with BQML', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/13.png' },
+      { name: '14 Gemini in BigQuery', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/14.png' },
+      { name: '15 GenAI Use Cases', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/15.png' },
+      { name: '16 Wide LLM Choice', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/16.png' },
+      { name: '17 Embedding Generation', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/17.png' },
+      { name: '18 RAG and Entity Resolution', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/18.png' },
+      { name: '19 BQML Interfaces', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/19.png' },
+      { name: '20 Customer Stories', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/20.png' },
+      { name: '21 Widely Used', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/21.png' },
+      { name: '22 Customer 1 - Media', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/22.png' },
+      { name: '23 Customer 2 - Retail', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/23.png' },
+      { name: '24 Customer 3 - SaaS', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/24.png' },
+      { name: '25 Customer 4 - Logistics', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/25.png' },
+      { name: '26 Get Started', src: 'https://storage.googleapis.com/maker-suite-media/short-editor-guides/bqml-deck/26.png' },
+    ],
+  },
+];
