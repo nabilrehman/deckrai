@@ -1,5 +1,30 @@
 # Deckr.ai Deployment Information
 
+## Repository
+- GitHub: https://github.com/nabilrehman/deckrai
+- Production Branch: `main`
+- Current Working Branch: `feature/updates`
+
+## Branching Workflow
+```bash
+# Check current branch
+git branch --show-current
+
+# Switch to main
+git checkout main
+
+# Create new feature branch
+git checkout -b feature/your-feature-name
+
+# Push feature branch to GitHub
+git push -u origin feature/your-feature-name
+
+# Merge feature to main (when ready)
+git checkout main
+git merge feature/your-feature-name
+git push origin main
+```
+
 ## GCP Project Details
 - Project ID: `deckr-477706`
 - Region: `us-central1`
