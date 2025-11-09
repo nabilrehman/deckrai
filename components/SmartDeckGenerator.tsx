@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Slide, StyleLibraryItem } from '../types';
 import GenerationPlanProposal, { GenerationPlan } from './GenerationPlanProposal';
 import FloatingActionBubble from './FloatingActionBubble';
+import ThemePreviewSelector from './ThemePreviewSelector';
 import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationContext } from '../services/intelligentGeneration';
 import { createSlideFromPrompt } from '../services/geminiService';
 
@@ -65,6 +66,11 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [generationPlan, setGenerationPlan] = useState<GenerationPlan | null>(null);
   const [showPlanProposal, setShowPlanProposal] = useState(false);
+
+  // Theme Preview state
+  const [showThemePreview, setShowThemePreview] = useState(false);
+  const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
+  const [selectedThemePreview, setSelectedThemePreview] = useState<string | null>(null);
 
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -131,12 +137,26 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
   }, [rawNotes]);
 
   /**
-   * Step 2: User approves plan - start generation
+   * Step 2: User approves plan - show theme preview
    */
   const handleApprovePlan = useCallback(async () => {
     if (!generationPlan) return;
 
+    // Close plan proposal and show theme preview
     setShowPlanProposal(false);
+    setShowThemePreview(true);
+  }, [generationPlan]);
+
+  /**
+   * Step 3: User selects theme - start generation
+   */
+  const handleSelectTheme = useCallback(async (themeId: string, previewSrc: string) => {
+    setSelectedTheme(themeId);
+    setSelectedThemePreview(previewSrc);
+    setShowThemePreview(false);
+
+    if (!generationPlan) return;
+
     setIsGenerating(true);
     setError(null);
     setGenerationProgress(0);
@@ -164,14 +184,27 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
 
       // Get style reference
       let referenceSrc: string | null = null;
-      if (uploadedStyleReference) {
+
+      // Priority 1: Use selected theme preview as reference (user's visual choice)
+      if (selectedThemePreview) {
+        referenceSrc = selectedThemePreview;
+      }
+      // Priority 2: Use uploaded style reference
+      else if (uploadedStyleReference) {
         referenceSrc = uploadedStyleReference.src;
-      } else if (selectedStyleId) {
+      }
+      // Priority 3: Use style library item
+      else if (selectedStyleId) {
         const selectedItem = styleLibrary.find((item) => item.id === selectedStyleId);
         if (selectedItem) {
           referenceSrc = selectedItem.src;
         }
       }
+
+      // Add theme-specific prompt modifier
+      const themePromptModifier = selectedTheme
+        ? `\n\nVISUAL STYLE REQUIREMENT: Generate this slide in ${selectedTheme} style. Match the visual aesthetic, color scheme, layout, and design pattern of the reference image exactly.`
+        : '';
 
       // Generate slides in batches
       const BATCH_SIZE = 3;
@@ -187,9 +220,12 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
 
           setProgressText(`Creating slide ${slideNumber} of ${totalSlides}...`);
 
+          // Apply theme modifier to prompt
+          const finalPrompt = description + themePromptModifier;
+
           const { images } = await createSlideFromPrompt(
             referenceSrc,
-            description,
+            finalPrompt,
             false,
             [],
             undefined,
@@ -226,7 +262,7 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
     } finally {
       setIsGenerating(false);
     }
-  }, [generationPlan, rawNotes, styleLibrary, selectedStyleId, uploadedStyleReference, isTestMode, onDeckUpload]);
+  }, [generationPlan, rawNotes, styleLibrary, selectedStyleId, uploadedStyleReference, isTestMode, onDeckUpload, selectedTheme, selectedThemePreview]);
 
   /**
    * Step 3: User modifies plan
@@ -247,6 +283,13 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
     setShowPlanProposal(false);
     setGenerationPlan(null);
   }, []);
+
+  /**
+   * Step 5: User skips theme preview - use default (no theme)
+   */
+  const handleSkipThemePreview = useCallback(() => {
+    handleSelectTheme('', '');
+  }, [handleSelectTheme]);
 
   /**
    * Incremental generation from action bubble
@@ -485,6 +528,16 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
           onApprove={handleApprovePlan}
           onModify={handleModifyPlan}
           onReject={handleRejectPlan}
+        />
+      )}
+
+      {/* Theme Preview Selector */}
+      {showThemePreview && generationPlan && (
+        <ThemePreviewSelector
+          samplePrompt={`Create a professional presentation slide about: ${rawNotes.substring(0, 200)}...`}
+          styleReference={uploadedStyleReference?.src || (selectedStyleId ? styleLibrary.find(item => item.id === selectedStyleId)?.src || null : null)}
+          onSelectTheme={handleSelectTheme}
+          onSkip={handleSkipThemePreview}
         />
       )}
 
