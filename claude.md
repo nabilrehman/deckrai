@@ -70,11 +70,16 @@ npm run build
 https://deckr-app-948199894623.us-central1.run.app
 
 ## Latest Revision
-- Revision: `deckr-app-00020-gkp`
+- Revision: `deckr-app-00021-nnb`
 - Deployed: Successfully
-- Changes: Enhanced Theme Preview with Content-Aware Designer Styles - AI detects presentation vibe (startup/corporate/creative/technical/educational/sales) from notes, shows 3 contextually-appropriate designer styles, each generating 3 sample slides (9 total). Users pick their favorite designer to see consistent visual styling.
+- Changes: Content-Aware Designer Styles + Reference Slide Cycling Fix
+  - AI detects presentation vibe from notes (startup/corporate/creative/technical/educational/sales)
+  - Shows 3 contextually-appropriate designer styles, each generating 3 sample slides (9 total)
+  - Users pick their favorite designer for consistent visual styling across full deck
+  - **BUG FIX**: Reference slides now cycle properly - when PDF with multiple pages is uploaded, each generated slide uses a different page as reference (not just first page)
 
 ## Previous Revisions
+- `deckr-app-00020-gkp` - Enhanced Theme Preview with Content-Aware Designer Styles
 - `deckr-app-00019-lg7` - Added Visual Theme Preview Selection - Users now see 3 sample slides in different themes BEFORE full generation
 - `deckr-app-00018-gm6` - Added Smart AI Generation with Planning Agent pattern - GenerationModeSelector, SmartDeckGenerator, audience-aware and style-aware generation with incremental build
 - `deckr-app-00017-wfk` - Created .gcloudignore file to ensure .env and .env.production files are uploaded to Cloud Build (fixes API key missing error)
