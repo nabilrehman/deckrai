@@ -2,9 +2,10 @@ import React, { useState, useCallback } from 'react';
 import { Slide, StyleLibraryItem } from '../types';
 import GenerationPlanProposal, { GenerationPlan } from './GenerationPlanProposal';
 import FloatingActionBubble from './FloatingActionBubble';
-import ThemePreviewSelector from './ThemePreviewSelector';
+import EnhancedThemePreviewSelector from './EnhancedThemePreviewSelector';
 import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationContext } from '../services/intelligentGeneration';
 import { createSlideFromPrompt } from '../services/geminiService';
+import { detectVibeFromNotes, getDesignerStylesForVibe, getDesignerStyleById, generateStylePromptModifier, PresentationVibe } from '../services/vibeDetection';
 
 interface SmartDeckGeneratorProps {
   onDeckUpload: (slides: Slide[]) => void;
@@ -69,8 +70,9 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
 
   // Theme Preview state
   const [showThemePreview, setShowThemePreview] = useState(false);
-  const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
-  const [selectedThemePreview, setSelectedThemePreview] = useState<string | null>(null);
+  const [selectedDesignerStyleId, setSelectedDesignerStyleId] = useState<string | null>(null);
+  const [selectedPreviewSlides, setSelectedPreviewSlides] = useState<string[]>([]);
+  const [detectedVibe, setDetectedVibe] = useState<PresentationVibe | null>(null);
 
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -97,6 +99,10 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
     setError(null);
 
     try {
+      // Detect presentation vibe from notes
+      const vibe = detectVibeFromNotes(rawNotes);
+      setDetectedVibe(vibe);
+
       // AI analyzes notes and provides recommendations
       const analysis = await analyzeNotesAndAskQuestions(rawNotes);
 
@@ -140,19 +146,19 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
    * Step 2: User approves plan - show theme preview
    */
   const handleApprovePlan = useCallback(async () => {
-    if (!generationPlan) return;
+    if (!generationPlan || !detectedVibe) return;
 
     // Close plan proposal and show theme preview
     setShowPlanProposal(false);
     setShowThemePreview(true);
-  }, [generationPlan]);
+  }, [generationPlan, detectedVibe]);
 
   /**
-   * Step 3: User selects theme - start generation
+   * Step 3: User selects designer - start generation
    */
-  const handleSelectTheme = useCallback(async (themeId: string, previewSrc: string) => {
-    setSelectedTheme(themeId);
-    setSelectedThemePreview(previewSrc);
+  const handleSelectDesigner = useCallback(async (designerStyleId: string, previewSlides: string[]) => {
+    setSelectedDesignerStyleId(designerStyleId);
+    setSelectedPreviewSlides(previewSlides);
     setShowThemePreview(false);
 
     if (!generationPlan) return;
@@ -182,28 +188,28 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
         slidesToGenerate = slidesToGenerate.slice(0, 5);
       }
 
-      // Get style reference
-      let referenceSrc: string | null = null;
+      // Get designer style
+      const designerStyle = getDesignerStyleById(designerStyleId);
 
-      // Priority 1: Use selected theme preview as reference (user's visual choice)
-      if (selectedThemePreview) {
-        referenceSrc = selectedThemePreview;
+      // Determine reference slides to cycle through
+      let referenceSlides: string[] = [];
+
+      // Priority 1: Use preview slides from selected designer (user's visual choice)
+      if (previewSlides.length > 0) {
+        referenceSlides = previewSlides;
       }
-      // Priority 2: Use uploaded style reference
+      // Priority 2: Use all slides from style library (supports PDF multi-page uploads)
+      else if (styleLibrary.length > 0) {
+        referenceSlides = styleLibrary.map(item => item.src);
+      }
+      // Priority 3: Use uploaded style reference (single slide)
       else if (uploadedStyleReference) {
-        referenceSrc = uploadedStyleReference.src;
-      }
-      // Priority 3: Use style library item
-      else if (selectedStyleId) {
-        const selectedItem = styleLibrary.find((item) => item.id === selectedStyleId);
-        if (selectedItem) {
-          referenceSrc = selectedItem.src;
-        }
+        referenceSlides = [uploadedStyleReference.src];
       }
 
-      // Add theme-specific prompt modifier
-      const themePromptModifier = selectedTheme
-        ? `\n\nVISUAL STYLE REQUIREMENT: Generate this slide in ${selectedTheme} style. Match the visual aesthetic, color scheme, layout, and design pattern of the reference image exactly.`
+      // Add designer-specific prompt modifier
+      const stylePromptModifier = designerStyle
+        ? generateStylePromptModifier(designerStyle)
         : '';
 
       // Generate slides in batches
@@ -220,8 +226,12 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
 
           setProgressText(`Creating slide ${slideNumber} of ${totalSlides}...`);
 
-          // Apply theme modifier to prompt
-          const finalPrompt = description + themePromptModifier;
+          // Cycle through reference slides - use different reference for each slide
+          const referenceIndex = (slideNumber - 1) % Math.max(referenceSlides.length, 1);
+          const referenceSrc = referenceSlides.length > 0 ? referenceSlides[referenceIndex] : null;
+
+          // Apply designer style modifier to prompt
+          const finalPrompt = description + stylePromptModifier;
 
           const { images } = await createSlideFromPrompt(
             referenceSrc,
@@ -262,10 +272,10 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
     } finally {
       setIsGenerating(false);
     }
-  }, [generationPlan, rawNotes, styleLibrary, selectedStyleId, uploadedStyleReference, isTestMode, onDeckUpload, selectedTheme, selectedThemePreview]);
+  }, [generationPlan, rawNotes, styleLibrary, selectedStyleId, uploadedStyleReference, isTestMode, onDeckUpload]);
 
   /**
-   * Step 3: User modifies plan
+   * Step 4: User modifies plan
    */
   const handleModifyPlan = useCallback((modifiedPlan: Partial<GenerationPlan>) => {
     if (!generationPlan) return;
@@ -277,7 +287,7 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
   }, [generationPlan]);
 
   /**
-   * Step 4: User rejects plan - start over
+   * Step 5: User rejects plan - start over
    */
   const handleRejectPlan = useCallback(() => {
     setShowPlanProposal(false);
@@ -285,11 +295,11 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
   }, []);
 
   /**
-   * Step 5: User skips theme preview - use default (no theme)
+   * Step 6: User skips theme preview - use default (no designer style)
    */
   const handleSkipThemePreview = useCallback(() => {
-    handleSelectTheme('', '');
-  }, [handleSelectTheme]);
+    handleSelectDesigner('', []);
+  }, [handleSelectDesigner]);
 
   /**
    * Incremental generation from action bubble
@@ -314,15 +324,20 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
       // Only generate NEW slides
       const newDescriptions = slideDescriptions.slice(generatedSlides.length);
 
-      // Get style reference
-      let referenceSrc: string | null = null;
-      if (uploadedStyleReference) {
-        referenceSrc = uploadedStyleReference.src;
-      } else if (selectedStyleId) {
-        const selectedItem = styleLibrary.find((item) => item.id === selectedStyleId);
-        if (selectedItem) {
-          referenceSrc = selectedItem.src;
-        }
+      // Determine reference slides to cycle through
+      let referenceSlides: string[] = [];
+
+      // Priority 1: Use preview slides if available
+      if (selectedPreviewSlides.length > 0) {
+        referenceSlides = selectedPreviewSlides;
+      }
+      // Priority 2: Use all slides from style library (supports PDF multi-page uploads)
+      else if (styleLibrary.length > 0) {
+        referenceSlides = styleLibrary.map(item => item.src);
+      }
+      // Priority 3: Use uploaded style reference (single slide)
+      else if (uploadedStyleReference) {
+        referenceSlides = [uploadedStyleReference.src];
       }
 
       const newSlides: Slide[] = [];
@@ -330,9 +345,22 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
         const slideNumber = generatedSlides.length + i + 1;
         setProgressText(`Creating slide ${slideNumber}...`);
 
+        // Cycle through reference slides - use different reference for each slide
+        const referenceIndex = (slideNumber - 1) % Math.max(referenceSlides.length, 1);
+        const referenceSrc = referenceSlides.length > 0 ? referenceSlides[referenceIndex] : null;
+
+        // Apply designer style modifier if available
+        let finalPrompt = newDescriptions[i];
+        if (selectedDesignerStyleId) {
+          const designerStyle = getDesignerStyleById(selectedDesignerStyleId);
+          if (designerStyle) {
+            finalPrompt += generateStylePromptModifier(designerStyle);
+          }
+        }
+
         const { images } = await createSlideFromPrompt(
           referenceSrc,
-          newDescriptions[i],
+          finalPrompt,
           false,
           [],
           undefined,
@@ -531,13 +559,19 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
         />
       )}
 
-      {/* Theme Preview Selector */}
-      {showThemePreview && generationPlan && (
-        <ThemePreviewSelector
-          samplePrompt={`Create a professional presentation slide about: ${rawNotes.substring(0, 200)}...`}
+      {/* Enhanced Theme Preview Selector with Designer Styles */}
+      {showThemePreview && generationPlan && detectedVibe && (
+        <EnhancedThemePreviewSelector
+          designerStyles={getDesignerStylesForVibe(detectedVibe)}
+          samplePrompts={[
+            `Create a title slide introducing: ${rawNotes.substring(0, 100)}`,
+            `Create a content slide explaining the main concept from: ${rawNotes.substring(100, 250)}`,
+            `Create a closing slide summarizing: ${rawNotes.substring(0, 150)}`
+          ]}
           styleReference={uploadedStyleReference?.src || (selectedStyleId ? styleLibrary.find(item => item.id === selectedStyleId)?.src || null : null)}
-          onSelectTheme={handleSelectTheme}
+          onSelectDesigner={handleSelectDesigner}
           onSkip={handleSkipThemePreview}
+          detectedVibe={detectedVibe}
         />
       )}
 
