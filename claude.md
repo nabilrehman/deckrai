@@ -52,6 +52,14 @@ npm run build
 ```
 
 ## Recent Changes
+- **Smart AI Generation with Planning Agent pattern**
+  - GenerationModeSelector: Toggle between Smart AI and Classic modes
+  - SmartDeckGenerator: AI-powered generation with context awareness
+  - Planning Agent workflow: AI analyzes → proposes plan → user approves → generates
+  - Incremental generation: Start with few slides, build more intelligently
+  - Audience-aware generation (8 audience types)
+  - Style-aware generation (4 presentation styles)
+  - FloatingActionBubble for post-generation actions
 - Removed fake notifications from Header component
 - Implemented sign-out redirect to landing page
 - Firebase authentication with Google and Facebook
@@ -62,11 +70,12 @@ npm run build
 https://deckr-app-948199894623.us-central1.run.app
 
 ## Latest Revision
-- Revision: `deckr-app-00017-wfk`
+- Revision: `deckr-app-00018-gm6`
 - Deployed: Successfully
-- Changes: Created .gcloudignore file to ensure .env and .env.production files are uploaded to Cloud Build (fixes API key missing error)
+- Changes: Added Smart AI Generation with Planning Agent pattern - GenerationModeSelector, SmartDeckGenerator, audience-aware and style-aware generation with incremental build
 
 ## Previous Revisions
+- `deckr-app-00017-wfk` - Created .gcloudignore file to ensure .env and .env.production files are uploaded to Cloud Build (fixes API key missing error)
 - `deckr-app-00015-7qr` - Added .env.production file (first attempt to fix API key)
 - `deckr-app-00013-tbs` - Reduced free plan deck limit from 5 to 3 decks per month
 - `deckr-app-00012-5nb` - Fixed tooltip disappearing issue by adding padding bridge
