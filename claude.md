@@ -70,16 +70,19 @@ npm run build
 https://deckr-app-948199894623.us-central1.run.app
 
 ## Latest Revision
-- Revision: `deckr-app-00023-xpb`
+- Revision: `deckr-app-00025-8mp`
 - Deployed: Successfully
-- Changes: PDF Support + AI Style Scout Integration
-  - **PDF Upload**: SmartDeckGenerator now accepts PDF files as style references (all pages extracted)
-  - **All Pages Imported**: When uploading a PDF, ALL pages are added to style library (not just first page)
-  - **AI Style Scout**: Intelligent reference selection - AI picks the best matching page from library for each slide
-  - **Smart Matching**: Title slides get title references, chart slides get chart references, etc.
-  - Replaces dumb rotation with intelligent AI-powered selection
+- Changes: Image Upload for New Slides + Enhanced Preview Logging
+  - **Image Upload**: Users can now upload images directly when adding new slides (bypasses AI generation)
+  - **Dual Creation Options**: "Add New Slide" modal now offers AI Generation OR Upload Image
+  - **Mutually Exclusive**: Upload disables AI textarea, AI disables upload (prevents confusion)
+  - **Image Preview**: Shows uploaded image preview with Remove/Add buttons
+  - **Enhanced Logging**: Added detailed console logs for preview generation debugging ([Preview Gen] tags)
+  - **Performance Fix**: All preview slides now generate in parallel (not sequential)
 
 ## Previous Revisions
+- `deckr-app-00024-vq8` - Added enhanced logging for preview generation debugging
+- `deckr-app-00023-xpb` - PDF Support + AI Style Scout Integration (all PDF pages imported, intelligent reference selection)
 - `deckr-app-00022-s5k` - Deployed Style Scout integration
 - `deckr-app-00021-nnb` - Content-Aware Designer Styles + Reference Slide Cycling Fix
 - `deckr-app-00020-gkp` - Enhanced Theme Preview with Content-Aware Designer Styles
