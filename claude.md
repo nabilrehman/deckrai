@@ -70,18 +70,24 @@ npm run build
 https://deckr-app-948199894623.us-central1.run.app
 
 ## Latest Revision
-- Revision: `deckr-app-00028-5cv`
+- Revision: `deckr-app-00029-wft`
 - Deployed: Successfully
-- Changes: Redesign Without Style Library + Iterative Editing + Multiple Image Upload
-  - **Redesign Without Style Library**: Redesign feature now works with OR without style library (no requirement!)
-  - **Smart Redesign**: If style library exists → use it; if not → use current slide as reference
-  - **Iterative Editing**: Keep building on a slide - "add chart" → "make it bigger" → "change color"
-  - **Current Slide as Input**: Every edit uses the current slide image as input to Flash model
-  - **Multiple Image Upload**: Upload multiple images at once, each becomes a separate slide
-  - **Grid Preview**: Shows all uploaded images in a grid before adding
-  - **Inpainting Fix**: Added canvas validation to prevent "Invalid base64 image data string" error
+- Changes: Export to Google Slides
+  - **Export to Google Slides Button**: New button in header (next to Download PDF)
+  - **OAuth Integration**: Secure Google authentication for Slides + Drive API access
+  - **Image-by-Image Upload**: Each slide uploaded separately (Google Slides doesn't support PDF import)
+  - **Automatic Presentation Creation**: Creates new Google Slides presentation with all slides
+  - **Smart User Experience**: Progress messages, opens in new tab, copies URL to clipboard
+  - **Session Token Caching**: Remembers authorization to avoid repeated popups
+  - **Error Handling**: Clear messages if export fails or user cancels authorization
+
+**Configuration Required**:
+- OAuth 2.0 Client ID needs to be created in GCP Console
+- Enable Google Slides API and Google Drive API
+- Add redirect URIs for OAuth callback
 
 ## Previous Revisions
+- `deckr-app-00028-5cv` - Redesign Without Style Library + Iterative Editing + Multiple Image Upload
 - `deckr-app-00027-jrr` - Inpainting fix with canvas validation
 - `deckr-app-00026-r4m` - Redesign without style library requirement
 - `deckr-app-00025-8mp` - Image Upload for New Slides + Enhanced Preview Logging
