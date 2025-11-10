@@ -123,6 +123,11 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
   const maskCanvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawing = useRef(false);
 
+  // Box selector state
+  const [selectionBox, setSelectionBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
+
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const imageUploadInputRef = useRef<HTMLInputElement>(null);
 
@@ -526,40 +531,41 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     };
   };
 
+  // Box selector handlers
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    isDrawing.current = true;
-    const canvas = maskCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const { x, y } = getMousePos(canvas, e);
-    if (ctx) {
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-    }
+    if (e.button !== 0 || !imageRef.current) return;
+
+    const rect = imageRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    setIsSelecting(true);
+    setSelectionStart({ x, y });
+    setSelectionBox(null); // Clear previous selection
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDrawing.current) return;
-    const canvas = maskCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const { x, y } = getMousePos(canvas, e);
-    if (ctx) {
-      ctx.lineTo(x, y);
-      ctx.strokeStyle = 'rgba(113, 69, 255, 0.7)';
-      ctx.lineWidth = brushSize;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.stroke();
-    }
+    if (!isSelecting || !selectionStart || !imageRef.current) return;
+
+    const rect = imageRef.current.getBoundingClientRect();
+    const currentX = e.clientX - rect.left;
+    const currentY = e.clientY - rect.top;
+
+    const x = Math.min(selectionStart.x, currentX);
+    const y = Math.min(selectionStart.y, currentY);
+    const width = Math.abs(currentX - selectionStart.x);
+    const height = Math.abs(currentY - selectionStart.y);
+
+    setSelectionBox({ x, y, width, height });
   };
 
   const handleMouseUp = () => {
-    isDrawing.current = false;
+    setIsSelecting(false);
+    setSelectionStart(null);
   };
 
   const handleClearMask = () => {
+    setSelectionBox(null);
     const canvas = maskCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -567,6 +573,94 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
   };
+
+  // Auto-delete selected area on Delete/Backspace
+  const handleDeleteSelection = async () => {
+    if (!selectionBox || !imageRef.current || !currentSrc || isGenerating) return;
+
+    // Create mask from selection box
+    const canvas = maskCanvasRef.current;
+    if (!canvas) return;
+
+    const image = imageRef.current;
+    const imageRect = image.getBoundingClientRect();
+
+    // Set canvas size to match image display size
+    canvas.width = imageRect.width;
+    canvas.height = imageRect.height;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Draw white rectangle for the selected area
+    ctx.fillStyle = 'white';
+    ctx.fillRect(selectionBox.x, selectionBox.y, selectionBox.width, selectionBox.height);
+
+    // Automatically remove the selected area
+    setIsGenerating(true);
+    setError(null);
+
+    const maskDataUrl = canvas.toDataURL('image/png');
+    const initialSteps: ProgressStep[] = [{ text: 'Removing selected area...', status: 'pending' }];
+    setProgressSteps(initialSteps);
+
+    let session: Partial<DebugSession> = {
+      id: `session-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      workflow: 'Inpaint',
+      initialPrompt: 'remove this',
+      initialImage: currentSrc,
+      model: 'gemini-2.5-flash-image',
+      deepMode: isDeepMode,
+    };
+
+    try {
+      const { images, logs, variationPrompts } = await getInpaintingVariations(
+        'remove this area completely',
+        currentSrc,
+        maskDataUrl,
+        isDeepMode,
+        handleProgressUpdate
+      );
+
+      setProgressSteps(prev => prev.map(step => ({ ...step, status: 'complete' })));
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      const context = { workflow: 'Inpaint', userIntentPrompt: 'remove this' };
+      setVariants({ images, prompts: variationPrompts, context });
+      if (isDebugMode) {
+        setDebugLogs(logs);
+      }
+      session = { ...session, status: 'Success', finalImages: images, logs };
+    } catch (err: any) {
+      setError(err.message || 'An unknown error occurred while removing the area.');
+      session = { ...session, status: 'Failed', error: err.message, logs: debugLogs || [], finalImages: [] };
+    } finally {
+      setIsGenerating(false);
+      setIsInpaintingMode(false);
+      setSelectionBox(null);
+      setProgressSteps([]);
+      onAddSessionToHistory(session as DebugSession);
+    }
+  };
+
+  // Keyboard event listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isInpaintingMode || !selectionBox) return;
+
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        e.preventDefault();
+        handleDeleteSelection();
+      } else if (e.key === 'Escape') {
+        setIsInpaintingMode(false);
+        setSelectionBox(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isInpaintingMode, selectionBox, isGenerating]);
 
   const handleGenerateInpainting = async () => {
     if (!inpaintingPrompt.trim() || !maskCanvasRef.current || !currentSrc) {
@@ -1079,46 +1173,51 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
 
   const renderInpaintingEditor = () => (
     <div className="w-full max-w-2xl mx-auto mt-6 flex-shrink-0">
-        <div className="bg-brand-surface p-4 rounded-xl border border-brand-border shadow-card">
-            <label htmlFor="inpainting-prompt" className="text-sm font-medium text-brand-text-secondary block mb-2">
-                Describe the change for the selected area:
-            </label>
-            <textarea
-                id="inpainting-prompt"
-                value={inpaintingPrompt}
-                onChange={(e) => setInpaintingPrompt(e.target.value)}
-                placeholder="e.g., 'add a company logo' or 'remove this text'"
-                className="w-full p-3 text-sm bg-brand-background border border-brand-border rounded-md focus:ring-2 focus:ring-brand-primary transition-all resize-none text-brand-text-primary placeholder-brand-text-tertiary h-20"
-                disabled={isGenerating}
-            />
-             <div className="flex items-center justify-between mt-4">
-                <div className="flex items-center gap-3">
-                    <label htmlFor="brush-size" className="text-sm text-brand-text-secondary">Brush Size:</label>
-                    <input 
-                        type="range" 
-                        id="brush-size" 
-                        min="5" 
-                        max="80" 
-                        value={brushSize} 
-                        onChange={(e) => setBrushSize(Number(e.target.value))}
-                        className="w-32"
-                        disabled={isGenerating}
-                    />
+        <div className="bg-brand-surface p-6 rounded-xl border border-brand-border shadow-card">
+            {/* Instructions */}
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    <div>
+                        <p className="text-sm font-medium text-blue-900 mb-1">How to use:</p>
+                        <ul className="text-sm text-blue-800 space-y-1">
+                            <li>• Click and drag to select an area</li>
+                            <li>• Press <kbd className="px-2 py-0.5 bg-white border border-blue-300 rounded text-xs font-mono">Backspace</kbd> or <kbd className="px-2 py-0.5 bg-white border border-blue-300 rounded text-xs font-mono">Delete</kbd> to remove it</li>
+                            <li>• Press <kbd className="px-2 py-0.5 bg-white border border-blue-300 rounded text-xs font-mono">Esc</kbd> to exit</li>
+                        </ul>
+                    </div>
                 </div>
-                 <button onClick={handleClearMask} disabled={isGenerating} className="px-4 py-2 text-sm text-brand-text-secondary bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50">
-                    Clear Mask
-                </button>
             </div>
-             <div className="flex items-center gap-4 mt-4">
-                <button onClick={() => setIsInpaintingMode(false)} disabled={isGenerating} className="btn btn-secondary w-full">
-                    Cancel
+
+            {/* Selection info */}
+            {selectionBox && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-green-800">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-sm font-medium">Area selected! Press Backspace or Delete to remove.</span>
+                    </div>
+                </div>
+            )}
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-3">
+                <button
+                    onClick={handleClearMask}
+                    disabled={isGenerating || !selectionBox}
+                    className="btn btn-secondary flex-1"
+                >
+                    Clear Selection
                 </button>
                 <button
-                    onClick={handleGenerateInpainting}
-                    disabled={isGenerating || !inpaintingPrompt}
-                    className="btn btn-primary w-full text-base"
+                    onClick={() => { setIsInpaintingMode(false); setSelectionBox(null); }}
+                    disabled={isGenerating}
+                    className="btn btn-secondary flex-1"
                 >
-                     {isGenerating ? <><Spinner size="h-5 w-5" className="-ml-1 mr-3" /> Generating...</> : 'Generate'}
+                    Exit
                 </button>
             </div>
         </div>
@@ -1157,14 +1256,39 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
                 }
 
                 {isInpaintingMode && (
-                    <canvas
-                        ref={maskCanvasRef}
-                        className="absolute top-0 left-0 w-full h-full cursor-crosshair"
-                        onMouseDown={handleMouseDown}
-                        onMouseMove={handleMouseMove}
-                        onMouseUp={handleMouseUp}
-                        onMouseLeave={handleMouseUp}
-                    />
+                    <>
+                        {/* Hidden canvas for mask generation */}
+                        <canvas ref={maskCanvasRef} className="hidden" />
+
+                        {/* Interactive overlay for box selection */}
+                        <div
+                            className="absolute top-0 left-0 w-full h-full cursor-crosshair"
+                            onMouseDown={handleMouseDown}
+                            onMouseMove={handleMouseMove}
+                            onMouseUp={handleMouseUp}
+                            onMouseLeave={handleMouseUp}
+                        >
+                            {/* Selection box visualization */}
+                            {selectionBox && (
+                                <div
+                                    className="absolute border-2 border-blue-500 bg-blue-500/20"
+                                    style={{
+                                        left: `${selectionBox.x}px`,
+                                        top: `${selectionBox.y}px`,
+                                        width: `${selectionBox.width}px`,
+                                        height: `${selectionBox.height}px`,
+                                        pointerEvents: 'none',
+                                    }}
+                                >
+                                    {/* Corner handles */}
+                                    <div className="absolute -top-1 -left-1 w-3 h-3 bg-blue-500 border border-white rounded-full" />
+                                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 border border-white rounded-full" />
+                                    <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-blue-500 border border-white rounded-full" />
+                                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 border border-white rounded-full" />
+                                </div>
+                            )}
+                        </div>
+                    </>
                 )}
                  {!isInpaintingMode && !isImagenSelected && !creationModeInfo && (
                     <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
