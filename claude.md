@@ -70,17 +70,21 @@ npm run build
 https://deckr-app-948199894623.us-central1.run.app
 
 ## Latest Revision
-- Revision: `deckr-app-00025-8mp`
+- Revision: `deckr-app-00028-5cv`
 - Deployed: Successfully
-- Changes: Image Upload for New Slides + Enhanced Preview Logging
-  - **Image Upload**: Users can now upload images directly when adding new slides (bypasses AI generation)
-  - **Dual Creation Options**: "Add New Slide" modal now offers AI Generation OR Upload Image
-  - **Mutually Exclusive**: Upload disables AI textarea, AI disables upload (prevents confusion)
-  - **Image Preview**: Shows uploaded image preview with Remove/Add buttons
-  - **Enhanced Logging**: Added detailed console logs for preview generation debugging ([Preview Gen] tags)
-  - **Performance Fix**: All preview slides now generate in parallel (not sequential)
+- Changes: Redesign Without Style Library + Iterative Editing + Multiple Image Upload
+  - **Redesign Without Style Library**: Redesign feature now works with OR without style library (no requirement!)
+  - **Smart Redesign**: If style library exists → use it; if not → use current slide as reference
+  - **Iterative Editing**: Keep building on a slide - "add chart" → "make it bigger" → "change color"
+  - **Current Slide as Input**: Every edit uses the current slide image as input to Flash model
+  - **Multiple Image Upload**: Upload multiple images at once, each becomes a separate slide
+  - **Grid Preview**: Shows all uploaded images in a grid before adding
+  - **Inpainting Fix**: Added canvas validation to prevent "Invalid base64 image data string" error
 
 ## Previous Revisions
+- `deckr-app-00027-jrr` - Inpainting fix with canvas validation
+- `deckr-app-00026-r4m` - Redesign without style library requirement
+- `deckr-app-00025-8mp` - Image Upload for New Slides + Enhanced Preview Logging
 - `deckr-app-00024-vq8` - Added enhanced logging for preview generation debugging
 - `deckr-app-00023-xpb` - PDF Support + AI Style Scout Integration (all PDF pages imported, intelligent reference selection)
 - `deckr-app-00022-s5k` - Deployed Style Scout integration
