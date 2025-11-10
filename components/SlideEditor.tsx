@@ -4,6 +4,7 @@ import { getGenerativeVariations, getPersonalizationPlan, getPersonalizedVariati
 import VariantSelector from './VariantSelector';
 import DebugLogViewer from './DebugLogViewer';
 import PersonalizationReviewModal from './PersonalizationReviewModal';
+import AnchoredChatBubble from './AnchoredChatBubble';
 
 interface ActiveSlideViewProps {
   slide: Slide;
@@ -123,6 +124,10 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
 
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const imageUploadInputRef = useRef<HTMLInputElement>(null);
+
+  // Anchored AI Chat state
+  const [anchoredChatPosition, setAnchoredChatPosition] = useState<{ x: number; y: number } | null>(null);
+  const [isChatRefining, setIsChatRefining] = useState(false);
 
   const currentSrc = !creationModeInfo ? slide.history[slide.history.length - 1] : null;
   const hasHistory = !creationModeInfo && slide.history.length > 1;
@@ -630,6 +635,75 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     }
   };
 
+  // Anchored AI Chat handlers
+  const handleSlideClick = (e: React.MouseEvent<HTMLImageElement>) => {
+    // Don't open chat if in inpainting mode or if image generation is in progress
+    if (isInpaintingMode || isGenerating || creationModeInfo) return;
+
+    // Get click position relative to the viewport
+    const clickX = e.clientX;
+    const clickY = e.clientY;
+
+    setAnchoredChatPosition({ x: clickX, y: clickY });
+  };
+
+  const handleChatSubmit = async (message: string) => {
+    if (!message.trim() || !currentSrc) return;
+
+    setIsChatRefining(true);
+    setError(null);
+
+    let session: Partial<DebugSession> = {
+      timestamp: Date.now(),
+      slideId: slide.id,
+      slideNumber: slides.findIndex(s => s.id === slide.id) + 1,
+      prompt: message,
+      model: selectedModel,
+      workflow: 'Edit',
+      logs: [],
+      status: 'In Progress',
+      finalImages: [],
+    };
+
+    try {
+      // Use the existing inpainting/variation API
+      // This will maintain the visual style automatically
+      const { images, prompts: variationPrompts, logs } = await getGenerativeVariations(
+        selectedModel,
+        message,
+        currentSrc,
+        isDeepMode,
+        handleProgressUpdate
+      );
+
+      if (images.length > 0) {
+        const context = { workflow: 'Edit', userIntentPrompt: message, model: selectedModel, deepMode: isDeepMode };
+        setVariants({ images, prompts: variationPrompts, context });
+        onSuccessfulSingleSlideEdit(context);
+
+        if (isDebugMode) {
+          setDebugLogs(logs);
+        }
+        session = { ...session, status: 'Success', finalImages: images, logs };
+      }
+
+      // Close the chat after successful submission
+      setAnchoredChatPosition(null);
+
+    } catch (err: any) {
+      setError(err.message || 'An unknown error occurred while refining the slide.');
+      session = { ...session, status: 'Failed', error: err.message, logs: [], finalImages: [] };
+    } finally {
+      setIsChatRefining(false);
+      setProgressSteps([]);
+      onAddSessionToHistory(session as DebugSession);
+    }
+  };
+
+  const handleCloseChat = () => {
+    setAnchoredChatPosition(null);
+  };
+
 
   // Intent detection helper
   const detectIntent = (text: string): 'edit' | 'personalize' | 'redesign' | null => {
@@ -1016,7 +1090,8 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
                             ref={imageRef}
                             src={currentSrc}
                             alt={slide.name}
-                            className={`object-contain w-full h-full transition-all select-none ${isInpaintingMode ? 'cursor-crosshair' : (isImagenSelected ? '' : 'group-hover:scale-[1.02]')}`}
+                            onClick={handleSlideClick}
+                            className={`object-contain w-full h-full transition-all select-none ${isInpaintingMode ? 'cursor-crosshair' : (isImagenSelected ? '' : 'group-hover:scale-[1.02] cursor-pointer')}`}
                             draggable={false}
                         />
                     )
@@ -1075,6 +1150,14 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
         )}
         {debugLogs && (
             <DebugLogViewer logs={debugLogs} onClose={() => setDebugLogs(null)} />
+        )}
+        {anchoredChatPosition && (
+            <AnchoredChatBubble
+                position={anchoredChatPosition}
+                onClose={handleCloseChat}
+                onSubmit={handleChatSubmit}
+                isLoading={isChatRefining}
+            />
         )}
     </>
   );
