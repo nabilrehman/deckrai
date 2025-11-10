@@ -70,15 +70,18 @@ npm run build
 https://deckr-app-948199894623.us-central1.run.app
 
 ## Latest Revision
-- Revision: `deckr-app-00021-nnb`
+- Revision: `deckr-app-00023-xpb`
 - Deployed: Successfully
-- Changes: Content-Aware Designer Styles + Reference Slide Cycling Fix
-  - AI detects presentation vibe from notes (startup/corporate/creative/technical/educational/sales)
-  - Shows 3 contextually-appropriate designer styles, each generating 3 sample slides (9 total)
-  - Users pick their favorite designer for consistent visual styling across full deck
-  - **BUG FIX**: Reference slides now cycle properly - when PDF with multiple pages is uploaded, each generated slide uses a different page as reference (not just first page)
+- Changes: PDF Support + AI Style Scout Integration
+  - **PDF Upload**: SmartDeckGenerator now accepts PDF files as style references (all pages extracted)
+  - **All Pages Imported**: When uploading a PDF, ALL pages are added to style library (not just first page)
+  - **AI Style Scout**: Intelligent reference selection - AI picks the best matching page from library for each slide
+  - **Smart Matching**: Title slides get title references, chart slides get chart references, etc.
+  - Replaces dumb rotation with intelligent AI-powered selection
 
 ## Previous Revisions
+- `deckr-app-00022-s5k` - Deployed Style Scout integration
+- `deckr-app-00021-nnb` - Content-Aware Designer Styles + Reference Slide Cycling Fix
 - `deckr-app-00020-gkp` - Enhanced Theme Preview with Content-Aware Designer Styles
 - `deckr-app-00019-lg7` - Added Visual Theme Preview Selection - Users now see 3 sample slides in different themes BEFORE full generation
 - `deckr-app-00018-gm6` - Added Smart AI Generation with Planning Agent pattern - GenerationModeSelector, SmartDeckGenerator, audience-aware and style-aware generation with incremental build
