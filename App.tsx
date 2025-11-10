@@ -19,6 +19,7 @@ import {
     removeFromStyleLibrary,
     batchAddToStyleLibrary
 } from './services/firestoreService';
+import { exportToGoogleSlides } from './services/googleSlidesService';
 
 
 declare const jspdf: any;
@@ -28,6 +29,7 @@ const App: React.FC = () => {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [activeSlideId, setActiveSlideId] = useState<string | null>(null);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [isExportingToSlides, setIsExportingToSlides] = useState(false);
   const [isPresenting, setIsPresenting] = useState(false);
   const [styleLibrary, setStyleLibrary] = useState<StyleLibraryItem[]>([]);
   const [sessionHistory, setSessionHistory] = useState<DebugSession[]>([]);
@@ -342,6 +344,49 @@ const App: React.FC = () => {
     }
 }, [slides]);
 
+  const handleExportToGoogleSlides = useCallback(async () => {
+    if (slides.length === 0) {
+      alert('No slides to export');
+      return;
+    }
+
+    if (!user) {
+      alert('Please sign in to export to Google Slides');
+      return;
+    }
+
+    setIsExportingToSlides(true);
+
+    try {
+      const slideImages = slides.map(slide => ({
+        src: slide.history[slide.history.length - 1],
+        name: slide.name
+      }));
+
+      const presentationUrl = await exportToGoogleSlides(
+        slideImages,
+        currentDeckName,
+        (message) => {
+          console.log('[Google Slides Export]', message);
+        }
+      );
+
+      // Open the presentation in a new tab
+      window.open(presentationUrl, '_blank');
+
+      alert(`✅ Successfully exported to Google Slides!\n\nPresentation URL copied to clipboard.`);
+
+      // Copy URL to clipboard
+      navigator.clipboard.writeText(presentationUrl);
+
+    } catch (error: any) {
+      console.error('Export to Google Slides failed:', error);
+      alert(`Failed to export to Google Slides: ${error.message}`);
+    } finally {
+      setIsExportingToSlides(false);
+    }
+  }, [slides, currentDeckName, user]);
+
 
   const handlePresent = useCallback(() => {
     if (slides.length > 0 && activeSlideId) {
@@ -421,6 +466,8 @@ const App: React.FC = () => {
         hasActiveProject={slides.length > 0}
         onDownloadPdf={handleDownloadPdf}
         isDownloading={isDownloadingPdf}
+        onExportToGoogleSlides={handleExportToGoogleSlides}
+        isExportingToSlides={isExportingToSlides}
         onPresent={handlePresent}
         isTestMode={isTestMode}
         onToggleTestMode={handleToggleTestMode}

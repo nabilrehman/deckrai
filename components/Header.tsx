@@ -31,6 +31,10 @@ interface HeaderProps {
 
   onOpenDeckLibrary: () => void;
 
+  onExportToGoogleSlides: () => void;
+
+  isExportingToSlides: boolean;
+
 }
 
 
@@ -49,7 +53,7 @@ const Spinner: React.FC = () => (
 
 
 
-const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPdf, isDownloading, onPresent, isTestMode, onToggleTestMode, onSaveDeck, onOpenDeckLibrary }) => {
+const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPdf, isDownloading, onPresent, isTestMode, onToggleTestMode, onSaveDeck, onOpenDeckLibrary, onExportToGoogleSlides, isExportingToSlides }) => {
 
   const { user, signOut: authSignOut } = useAuth();
   const { userProfile, usage } = useUserUsage();
@@ -500,6 +504,34 @@ const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPd
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-brand-text-secondary group-hover:text-brand-primary-500 transition-colors" viewBox="0 0 20 20" fill="currentColor">
 
                     <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+
+                  </svg>
+
+                )}
+
+              </button>
+
+              <button
+
+                onClick={onExportToGoogleSlides}
+
+                disabled={isExportingToSlides}
+
+                className="btn-icon group"
+
+                title="Export to Google Slides"
+
+              >
+
+                {isExportingToSlides ? (
+
+                  <Spinner />
+
+                ) : (
+
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-brand-text-secondary group-hover:text-brand-primary-500 transition-colors" viewBox="0 0 24 24" fill="currentColor">
+
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H6v-2h6v2zm6-4H6v-2h12v2zm0-4H6V7h12v2z" />
 
                   </svg>
 
