@@ -104,7 +104,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [variants, setVariants] = useState<{ images: string[], prompts: string[], context: any } | null>(null);
-  const [isDebugMode, setIsDebugMode] = useState(true); // Enabled by default to see actual prompts
+  const [isDebugMode, setIsDebugMode] = useState(false); // Debug logs available via console, modal disabled by default
   const [isDeepMode, setIsDeepMode] = useState(false);
   const [debugLogs, setDebugLogs] = useState<DebugLog[] | null>(null);
   const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([]);
@@ -138,6 +138,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
   const [rightPanelInitialMessage, setRightPanelInitialMessage] = useState<string>('');
   const [clickedTextRegion, setClickedTextRegion] = useState<TextRegion | null>(null);
   const [isDetectingText, setIsDetectingText] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState<string | null>(null);
 
   const currentSrc = !creationModeInfo ? slide.history[slide.history.length - 1] : null;
   const hasHistory = !creationModeInfo && slide.history.length > 1;
@@ -255,6 +256,8 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     } finally {
       setIsGenerating(false);
       setProgressSteps([]);
+      setProcessingStatus(null);
+      setClickedTextRegion(null); // Clear the overlay after completion
       onAddSessionToHistory(session as DebugSession);
     }
   };
@@ -761,12 +764,20 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
         rect.width,
         rect.height
       );
+      console.log('[Text Detection] Detected region:', detectedRegion);
       setClickedTextRegion(detectedRegion);
     } catch (error) {
       console.error('Failed to detect clicked text:', error);
     } finally {
       setIsDetectingText(false);
     }
+  };
+
+  // Helper to detect if message is a removal/deletion intent
+  const isRemovalIntent = (message: string): boolean => {
+    const lowerMessage = message.toLowerCase().trim();
+    const removalKeywords = ['remove this', 'delete this', 'remove', 'delete', 'clear', 'erase', 'get rid'];
+    return removalKeywords.some(keyword => lowerMessage.includes(keyword));
   };
 
   const handleChatSubmit = async (message: string) => {
@@ -785,9 +796,25 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     let shouldBypassAnalyst = false;
 
     if (clickedTextRegion?.text) {
-      // Simple direct instruction - bypass the Design Analyst
-      enhancedMessage = `Change the text "${clickedTextRegion.text}" to: ${message}. Keep everything else exactly the same - same fonts, colors, layout, logos, and all other text.`;
+      console.log('[Prompt Enhancement] Detected text from region:', clickedTextRegion.text);
+
+      // Detect if this is a removal intent
+      if (isRemovalIntent(message)) {
+        // Removal prompt
+        enhancedMessage = `Remove the text "${clickedTextRegion.text}" from the slide. Keep everything else exactly the same - same fonts, colors, layout, logos, and all other text. Just delete this specific text element.`;
+        console.log('[Prompt Enhancement] Using REMOVAL prompt:', enhancedMessage);
+        setProcessingStatus(`Deckr is removing this...`);
+      } else {
+        // Text change prompt
+        enhancedMessage = `Change the text "${clickedTextRegion.text}" to: ${message}. Keep everything else exactly the same - same fonts, colors, layout, logos, and all other text.`;
+        console.log('[Prompt Enhancement] Using CHANGE prompt:', enhancedMessage);
+        const truncatedMsg = message.length > 30 ? message.substring(0, 30) + '...' : message;
+        setProcessingStatus(`Deckr is updating to "${truncatedMsg}"`);
+      }
       shouldBypassAnalyst = true; // Use direct prompt without Design Analyst
+    } else {
+      console.log('[Prompt Enhancement] No text detected, using original message:', message);
+      setProcessingStatus('Deckr is working on it...');
     }
 
     let session: Partial<DebugSession> = {
@@ -817,7 +844,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
 
         // If only 1 variation, auto-apply instead of showing selector
         if (images.length === 1) {
-          onSlideUpdate(slide.id, images[0]);
+          onNewSlideVersion(slide.id, images[0]);
           onSuccessfulSingleSlideEdit(context);
         } else {
           setVariants({ images, prompts: variationPrompts, context });
@@ -836,17 +863,21 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     } finally {
       setIsGenerating(false);
       setProgressSteps([]);
+      setProcessingStatus(null);
+      setClickedTextRegion(null); // Clear the overlay after completion
       onAddSessionToHistory(session as DebugSession);
     }
   };
 
   const handleCloseChat = () => {
     setAnchoredChatPosition(null);
+    setClickedTextRegion(null); // Clear the text overlay
   };
 
   const handleCloseRightPanel = () => {
     setIsRightPanelOpen(false);
     setRightPanelInitialMessage('');
+    setClickedTextRegion(null); // Clear the text overlay
   };
 
   const handleRightPanelSubmit = async (message: string) => {
@@ -861,8 +892,25 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     let shouldBypassAnalyst = false;
 
     if (clickedTextRegion?.text) {
-      enhancedMessage = `Change the text "${clickedTextRegion.text}" to: ${message}. Keep everything else exactly the same - same fonts, colors, layout, logos, and all other text.`;
+      console.log('[Right Panel] Detected text from region:', clickedTextRegion.text);
+
+      // Detect if this is a removal intent
+      if (isRemovalIntent(message)) {
+        // Removal prompt
+        enhancedMessage = `Remove the text "${clickedTextRegion.text}" from the slide. Keep everything else exactly the same - same fonts, colors, layout, logos, and all other text. Just delete this specific text element.`;
+        console.log('[Right Panel] Using REMOVAL prompt:', enhancedMessage);
+        setProcessingStatus(`Deckr is removing this...`);
+      } else {
+        // Text change prompt
+        enhancedMessage = `Change the text "${clickedTextRegion.text}" to: ${message}. Keep everything else exactly the same - same fonts, colors, layout, logos, and all other text.`;
+        console.log('[Right Panel] Using CHANGE prompt:', enhancedMessage);
+        const truncatedMsg = message.length > 30 ? message.substring(0, 30) + '...' : message;
+        setProcessingStatus(`Deckr is updating to "${truncatedMsg}"`);
+      }
       shouldBypassAnalyst = true;
+    } else {
+      console.log('[Right Panel] No text detected, using original message:', message);
+      setProcessingStatus('Deckr is working on it...');
     }
 
     let session: Partial<DebugSession> = {
@@ -892,7 +940,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
 
         // If only 1 variation, auto-apply instead of showing selector
         if (images.length === 1) {
-          onSlideUpdate(slide.id, images[0]);
+          onNewSlideVersion(slide.id, images[0]);
           onSuccessfulSingleSlideEdit(context);
         } else {
           setVariants({ images, prompts: variationPrompts, context });
@@ -911,6 +959,8 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     } finally {
       setIsGenerating(false);
       setProgressSteps([]);
+      setProcessingStatus(null);
+      setClickedTextRegion(null); // Clear the overlay after completion
       onAddSessionToHistory(session as DebugSession);
     }
   };
@@ -1312,6 +1362,45 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
                     )
                 }
 
+                {/* Text region overlay - shows detected text box with magic status */}
+                {!isInpaintingMode && !creationModeInfo && clickedTextRegion?.boundingBox && imageRef.current && (
+                    <div
+                        className={`absolute border-2 ${processingStatus ? 'border-purple-600 bg-purple-600/20' : 'border-purple-500 bg-purple-500/10'} rounded pointer-events-none ${processingStatus ? 'animate-pulse' : ''}`}
+                        style={{
+                            left: `${clickedTextRegion.boundingBox.xPercent}%`,
+                            top: `${clickedTextRegion.boundingBox.yPercent}%`,
+                            width: `${clickedTextRegion.boundingBox.widthPercent}%`,
+                            height: `${clickedTextRegion.boundingBox.heightPercent}%`,
+                        }}
+                    >
+                        {/* Corner handles - Canva style */}
+                        <div className={`absolute -top-1.5 -left-1.5 w-3 h-3 ${processingStatus ? 'bg-purple-600' : 'bg-purple-500'} border-2 border-white rounded-full`} />
+                        <div className={`absolute -top-1.5 -right-1.5 w-3 h-3 ${processingStatus ? 'bg-purple-600' : 'bg-purple-500'} border-2 border-white rounded-full`} />
+                        <div className={`absolute -bottom-1.5 -left-1.5 w-3 h-3 ${processingStatus ? 'bg-purple-600' : 'bg-purple-500'} border-2 border-white rounded-full`} />
+                        <div className={`absolute -bottom-1.5 -right-1.5 w-3 h-3 ${processingStatus ? 'bg-purple-600' : 'bg-purple-500'} border-2 border-white rounded-full`} />
+
+                        {/* Label showing detected text or processing status */}
+                        <div className={`absolute -top-7 left-0 ${processingStatus ? 'bg-gradient-to-r from-pink-500 via-purple-500 via-blue-500 via-green-500 via-yellow-500 to-pink-500 bg-[length:300%_100%] animate-gradient shadow-2xl' : 'bg-purple-500'} text-white text-xs px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap flex items-center gap-2`}>
+                            {processingStatus ? (
+                                <>
+                                    <div className="relative flex items-center justify-center">
+                                        <span className="text-2xl animate-pulse">✨</span>
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-pink-400 via-purple-400 to-blue-400 opacity-50 blur-md animate-ping"></div>
+                                        </div>
+                                    </div>
+                                    <span className="font-semibold">{processingStatus}</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span>✨</span>
+                                    <span>{clickedTextRegion.text}</span>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {isInpaintingMode && (
                     <>
                         {/* Hidden canvas for mask generation */}
@@ -1407,8 +1496,26 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
                 onSubmit={handleRightPanelSubmit}
                 isLoading={isGenerating}
                 initialMessage={rightPanelInitialMessage}
+                loadingStatus={processingStatus || undefined}
             />
         )}
+
+        <style>{`
+            @keyframes gradient {
+                0% {
+                    background-position: 0% 50%;
+                }
+                50% {
+                    background-position: 100% 50%;
+                }
+                100% {
+                    background-position: 0% 50%;
+                }
+            }
+            .animate-gradient {
+                animation: gradient 3s ease infinite;
+            }
+        `}</style>
     </>
   );
 };

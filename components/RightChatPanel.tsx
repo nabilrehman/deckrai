@@ -10,6 +10,7 @@ interface RightChatPanelProps {
   onSubmit: (message: string) => void;
   isLoading: boolean;
   initialMessage?: string;
+  loadingStatus?: string;
 }
 
 const RightChatPanel: React.FC<RightChatPanelProps> = ({
@@ -17,6 +18,7 @@ const RightChatPanel: React.FC<RightChatPanelProps> = ({
   onSubmit,
   isLoading,
   initialMessage,
+  loadingStatus,
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -52,13 +54,18 @@ const RightChatPanel: React.FC<RightChatPanelProps> = ({
   };
 
   return (
-    <div className="fixed right-0 top-0 h-full w-96 bg-white border-l border-gray-200 shadow-2xl flex flex-col z-50 animate-slide-in-right">
-      {/* Header */}
-      <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">Refine Slide</h2>
+    <div className="fixed right-0 top-0 h-full w-96 bg-white border-l border-purple-100 shadow-2xl flex flex-col z-50 animate-slide-in-right">
+      {/* Header - Minimal Canva Style */}
+      <div className="px-6 py-5 bg-gradient-to-r from-purple-50 to-white border-b border-purple-100 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center">
+            <span className="text-white text-sm">✨</span>
+          </div>
+          <h2 className="text-base font-semibold text-gray-900">Deckr Assistant</h2>
+        </div>
         <button
           onClick={onClose}
-          className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors"
+          className="p-1.5 hover:bg-purple-100 rounded-full transition-colors"
           aria-label="Close panel"
         >
           <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -77,7 +84,7 @@ const RightChatPanel: React.FC<RightChatPanelProps> = ({
             <div
               className={`max-w-[80%] px-4 py-2.5 rounded-2xl ${
                 msg.role === 'user'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-md'
                   : 'bg-gray-100 text-gray-900'
               }`}
             >
@@ -89,10 +96,15 @@ const RightChatPanel: React.FC<RightChatPanelProps> = ({
         {isLoading && (
           <div className="flex justify-start">
             <div className="bg-gray-100 px-4 py-2.5 rounded-2xl">
-              <div className="flex gap-1">
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+                {loadingStatus && (
+                  <span className="text-sm text-gray-600">{loadingStatus}</span>
+                )}
               </div>
             </div>
           </div>
@@ -101,30 +113,32 @@ const RightChatPanel: React.FC<RightChatPanelProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-        <div className="flex gap-2">
+      {/* Input Area - Canva Style */}
+      <div className="px-6 py-4 bg-white border-t border-gray-100">
+        <div className="flex gap-2 items-end">
           <textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Describe what you'd like to change..."
+            placeholder="Ask me anything..."
             disabled={isLoading}
-            className="flex-1 px-4 py-2.5 bg-white border border-gray-300 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            className="flex-1 px-4 py-2.5 bg-gray-50 border-0 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-purple-400 focus:bg-white disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-all"
             rows={2}
             style={{ maxHeight: '120px' }}
           />
           <button
             onClick={handleSubmit}
             disabled={!input.trim() || isLoading}
-            className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm flex items-center gap-2"
+            className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl hover:from-purple-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center shadow-lg disabled:shadow-none flex-shrink-0"
           >
-            ✨ Apply
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
           </button>
         </div>
-        <p className="mt-2 text-xs text-gray-500">
-          Press Enter to send, Shift+Enter for new line
+        <p className="mt-2 text-xs text-gray-400">
+          Enter to send, Shift+Enter for new line
         </p>
       </div>
     </div>

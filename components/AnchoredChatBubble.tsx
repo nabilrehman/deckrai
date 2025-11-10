@@ -84,7 +84,7 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
         <>
             {/* Backdrop */}
             <div
-                className="fixed inset-0 bg-black/10 backdrop-blur-sm z-[999]"
+                className="fixed inset-0 bg-black/10 z-[999]"
                 onClick={onClose}
             />
 
@@ -94,73 +94,30 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
                 className="animate-slideIn"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="w-80 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden">
-                    {/* Header */}
-                    <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <span className="text-xl">💬</span>
-                            <h3 className="text-sm font-semibold text-gray-900">Refine Slide</h3>
-                        </div>
-                        <button
-                            onClick={onClose}
-                            className="text-gray-400 hover:text-gray-600 transition-colors p-1 hover:bg-gray-100 rounded"
-                        >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-
-                    {/* Quick Actions */}
-                    {localHistory.length === 0 && (
-                        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-                            <p className="text-xs text-gray-500 mb-2">Quick actions:</p>
-                            <div className="flex flex-wrap gap-2">
-                                <button
-                                    onClick={() => prefillPrompt('Change to: ')}
-                                    className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
-                                >
-                                    <span>✏️</span>
-                                    <span>Change text</span>
-                                </button>
-                                <button
-                                    onClick={() => prefillPrompt('Make this ')}
-                                    className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
-                                >
-                                    <span>🎨</span>
-                                    <span>Restyle</span>
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        if (onEnterInpaintMode) {
-                                            onEnterInpaintMode();
-                                            onClose();
-                                        } else {
-                                            prefillPrompt('Remove this');
-                                        }
-                                    }}
-                                    className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
-                                >
-                                    <span>🗑️</span>
-                                    <span>Remove</span>
-                                </button>
-                            </div>
-                        </div>
-                    )}
+                <div className="w-80 bg-white rounded-2xl shadow-2xl overflow-hidden border border-purple-200">
+                    {/* Close button - minimal */}
+                    <button
+                        onClick={onClose}
+                        className="absolute -top-2 -right-2 w-7 h-7 bg-gray-800 text-white rounded-full hover:bg-gray-900 transition-colors flex items-center justify-center shadow-lg z-10"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
 
                     {/* Conversation History */}
                     {localHistory.length > 0 && (
-                        <div className="px-4 py-3 max-h-64 overflow-y-auto bg-white">
+                        <div className="px-4 pt-4 pb-2 max-h-64 overflow-y-auto bg-white">
                             {localHistory.map((message) => (
                                 <div
                                     key={message.id}
                                     className={`mb-3 ${message.sender === 'user' ? 'text-right' : 'text-left'}`}
                                 >
                                     <div
-                                        className={`inline-block px-3 py-2 rounded-lg text-sm max-w-[85%] ${
+                                        className={`inline-block px-4 py-2 rounded-2xl text-sm max-w-[85%] ${
                                             message.sender === 'user'
-                                                ? 'bg-gray-100 text-gray-900 border border-gray-200'
-                                                : 'bg-blue-50 text-gray-900 border border-blue-100'
+                                                ? 'bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-md'
+                                                : 'bg-gray-100 text-gray-900'
                                         }`}
                                     >
                                         {message.text}
@@ -169,14 +126,13 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
                             ))}
                             {isLoading && (
                                 <div className="text-left mb-3">
-                                    <div className="inline-block px-3 py-2 rounded-lg text-sm bg-gray-100 text-gray-700 border border-gray-200">
+                                    <div className="inline-block px-4 py-2 rounded-2xl text-sm bg-gray-100 text-gray-700">
                                         <div className="flex items-center gap-2">
                                             <div className="flex gap-1">
-                                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                                             </div>
-                                            <span className="text-xs">Applying changes...</span>
                                         </div>
                                     </div>
                                 </div>
@@ -185,55 +141,91 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
                         </div>
                     )}
 
-                    {/* Input Area */}
-                    <form onSubmit={handleSubmit} className="px-4 py-3 bg-white border-t border-gray-200">
-                        <div className="flex gap-2">
+                    {/* Input Area - Chat Style */}
+                    <form onSubmit={handleSubmit} className="p-4 bg-white">
+                        {/* Context Indicator - Above input */}
+                        {regionText !== 'this area' && regionText !== 'Detecting...' && (
+                            <div className="mb-3 bg-purple-50 rounded-xl px-3 py-2 border border-purple-100">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                                        <span className="text-white text-sm">✨</span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs text-purple-600 font-medium">Editing</p>
+                                        <p className="text-sm text-purple-900 font-medium truncate">"{regionText}"</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Suggestions - Canva style */}
+                        {localHistory.length === 0 && (
+                            <div className="mb-3 flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => prefillPrompt('change to ')}
+                                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs rounded-full transition-colors"
+                                >
+                                    change text
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => prefillPrompt('make it ')}
+                                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs rounded-full transition-colors"
+                                >
+                                    restyle
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => prefillPrompt('remove')}
+                                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs rounded-full transition-colors"
+                                >
+                                    remove
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Input */}
+                        <div className="flex gap-2 items-end">
                             <input
                                 ref={inputRef}
                                 type="text"
                                 value={inputValue}
                                 onChange={(e) => setInputValue(e.target.value)}
-                                placeholder={`Describe what you'd like to change...`}
+                                placeholder="Describe your change..."
                                 disabled={isLoading}
-                                className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex-1 px-4 py-2.5 bg-gray-50 border-0 rounded-xl text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                             />
                             <button
                                 type="submit"
                                 disabled={!inputValue.trim() || isLoading}
-                                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 shadow-sm"
+                                className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-lg disabled:shadow-none flex-shrink-0"
                             >
-                                <span>✨</span>
-                                <span>Apply</span>
+                                {isLoading ? (
+                                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                ) : (
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                    </svg>
+                                )}
                             </button>
                         </div>
 
-                        {/* Context Indicator */}
-                        <div className="mt-2">
-                            {regionText !== 'this area' && regionText !== 'Detecting...' ? (
-                                <div className="text-xs bg-blue-50 border border-blue-200 rounded-lg px-2 py-1.5 flex items-start gap-1.5">
-                                    <span className="text-blue-600">✨</span>
-                                    <div>
-                                        <p className="text-blue-900 font-medium">Editing:</p>
-                                        <p className="text-blue-700">"{regionText}"</p>
-                                    </div>
-                                </div>
-                            ) : (
-                                <p className="text-xs text-gray-500 flex items-center gap-1">
-                                    <span>💡</span>
-                                    <span>{regionText === 'Detecting...' ? 'Detecting text...' : 'I\'ll refine the area you clicked'}</span>
-                                </p>
-                            )}
-                        </div>
+                        {/* Detecting indicator */}
+                        {regionText === 'Detecting...' && (
+                            <p className="text-xs text-gray-500 mt-2 flex items-center gap-1.5">
+                                <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span>Detecting text...</span>
+                            </p>
+                        )}
                     </form>
                 </div>
-
-                {/* Visual connector line to clicked region */}
-                <div className="absolute top-1/2 -translate-y-1/2 w-2 h-0.5 bg-gray-300"
-                    style={{
-                        left: position.x > window.innerWidth / 2 ? '100%' : '-8px',
-                        width: '8px'
-                    }}
-                />
             </div>
 
             <style>{`
