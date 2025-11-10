@@ -16,6 +16,7 @@ interface AnchoredChatBubbleProps {
     position: Position;
     onClose: () => void;
     onSubmit: (message: string) => Promise<void>;
+    onEnterInpaintMode?: () => void;
     conversationHistory?: ChatMessage[];
     isLoading?: boolean;
     regionText?: string;
@@ -25,6 +26,7 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
     position,
     onClose,
     onSubmit,
+    onEnterInpaintMode,
     conversationHistory = [],
     isLoading = false,
     regionText = 'this'
@@ -129,7 +131,14 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
                                     <span>Restyle</span>
                                 </button>
                                 <button
-                                    onClick={() => prefillPrompt('Remove this')}
+                                    onClick={() => {
+                                        if (onEnterInpaintMode) {
+                                            onEnterInpaintMode();
+                                            onClose();
+                                        } else {
+                                            prefillPrompt('Remove this');
+                                        }
+                                    }}
                                     className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
                                 >
                                     <span>🗑️</span>
@@ -199,10 +208,22 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
                         </div>
 
                         {/* Context Indicator */}
-                        <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
-                            <span>💡</span>
-                            <span>I'll refine the area you clicked</span>
-                        </p>
+                        <div className="mt-2">
+                            {regionText !== 'this area' && regionText !== 'Detecting...' ? (
+                                <div className="text-xs bg-blue-50 border border-blue-200 rounded-lg px-2 py-1.5 flex items-start gap-1.5">
+                                    <span className="text-blue-600">✨</span>
+                                    <div>
+                                        <p className="text-blue-900 font-medium">Editing:</p>
+                                        <p className="text-blue-700">"{regionText}"</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-xs text-gray-500 flex items-center gap-1">
+                                    <span>💡</span>
+                                    <span>{regionText === 'Detecting...' ? 'Detecting text...' : 'I\'ll refine the area you clicked'}</span>
+                                </p>
+                            )}
+                        </div>
                     </form>
                 </div>
 

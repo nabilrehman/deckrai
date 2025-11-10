@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Slide, StyleLibraryItem, DebugLog, DebugSession, LastSuccessfulEditContext, PersonalizationAction } from '../types';
-import { getGenerativeVariations, getPersonalizationPlan, getPersonalizedVariationsFromPlan, getInpaintingVariations, remakeSlideWithStyleReference, createSlideFromPrompt, findBestStyleReferenceFromPrompt } from '../services/geminiService';
+import { getGenerativeVariations, getPersonalizationPlan, getPersonalizedVariationsFromPlan, getInpaintingVariations, remakeSlideWithStyleReference, createSlideFromPrompt, findBestStyleReferenceFromPrompt, detectClickedText } from '../services/geminiService';
 import VariantSelector from './VariantSelector';
 import DebugLogViewer from './DebugLogViewer';
 import PersonalizationReviewModal from './PersonalizationReviewModal';
@@ -136,6 +136,8 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
   const [isChatRefining, setIsChatRefining] = useState(false);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
   const [rightPanelInitialMessage, setRightPanelInitialMessage] = useState<string>('');
+  const [clickedText, setClickedText] = useState<string | null>(null);
+  const [isDetectingText, setIsDetectingText] = useState(false);
 
   const currentSrc = !creationModeInfo ? slide.history[slide.history.length - 1] : null;
   const hasHistory = !creationModeInfo && slide.history.length > 1;
@@ -733,15 +735,38 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
   };
 
   // Anchored AI Chat handlers
-  const handleSlideClick = (e: React.MouseEvent<HTMLImageElement>) => {
+  const handleSlideClick = async (e: React.MouseEvent<HTMLImageElement>) => {
     // Don't open chat if in inpainting mode or if image generation is in progress
-    if (isInpaintingMode || isGenerating || creationModeInfo) return;
+    if (isInpaintingMode || isGenerating || creationModeInfo || !currentSrc || !imageRef.current) return;
 
-    // Get click position relative to the viewport
+    // Get click position relative to the image
+    const rect = imageRef.current.getBoundingClientRect();
+    const clickXImage = e.clientX - rect.left;
+    const clickYImage = e.clientY - rect.top;
+
+    // Get click position relative to viewport for chat bubble
     const clickX = e.clientX;
     const clickY = e.clientY;
 
     setAnchoredChatPosition({ x: clickX, y: clickY });
+    setClickedText(null);
+
+    // Detect which text was clicked (async, won't block UI)
+    setIsDetectingText(true);
+    try {
+      const detectedText = await detectClickedText(
+        currentSrc,
+        clickXImage,
+        clickYImage,
+        rect.width,
+        rect.height
+      );
+      setClickedText(detectedText);
+    } catch (error) {
+      console.error('Failed to detect clicked text:', error);
+    } finally {
+      setIsDetectingText(false);
+    }
   };
 
   const handleChatSubmit = async (message: string) => {
@@ -754,6 +779,12 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
 
     setIsGenerating(true);
     setError(null);
+
+    // Enhance the message with clicked text context for precision
+    let enhancedMessage = message;
+    if (clickedText) {
+      enhancedMessage = `IMPORTANT: Change ONLY the text "${clickedText}" as follows: ${message}. Do not modify any other text, logos, or elements on the slide. Preserve all other content exactly as it is.`;
+    }
 
     let session: Partial<DebugSession> = {
       timestamp: Date.now(),
@@ -819,7 +850,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
       timestamp: Date.now(),
       slideId: slide.id,
       slideNumber: slides.findIndex(s => s.id === slide.id) + 1,
-      prompt: message,
+      prompt: enhancedMessage,
       model: selectedModel,
       workflow: 'Edit',
       logs: [],
@@ -830,7 +861,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     try {
       const { images, prompts: variationPrompts, logs } = await getGenerativeVariations(
         selectedModel,
-        message,
+        enhancedMessage,
         currentSrc,
         isDeepMode,
         handleProgressUpdate
@@ -1232,7 +1263,6 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
             <div className="flex-grow flex items-center justify-center mb-4">
                 <div
                     className={`group relative aspect-video bg-white rounded-2xl shadow-card flex items-center justify-center w-full max-w-5xl border-2 border-brand-border/50 overflow-hidden transition-all duration-300 ${isImagenSelected || creationModeInfo ? 'cursor-default' : 'cursor-pointer hover:shadow-card-hover hover:border-brand-primary-300'}`}
-                    onClick={handleEnterInpaintingMode}
                     onDragStart={(e) => e.preventDefault()}
                 >
                 {
@@ -1339,7 +1369,9 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
                 position={anchoredChatPosition}
                 onClose={handleCloseChat}
                 onSubmit={handleChatSubmit}
+                onEnterInpaintMode={handleEnterInpaintingMode}
                 isLoading={isChatRefining}
+                regionText={clickedText || (isDetectingText ? 'Detecting...' : 'this area')}
             />
         )}
         {isRightPanelOpen && (

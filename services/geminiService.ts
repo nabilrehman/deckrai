@@ -924,3 +924,51 @@ export const generateThemeFromWebsite = async (companyWebsite: string): Promise<
         throw new Error("The AI brand analyst failed to generate a valid theme. The website might be inaccessible or too complex.");
     }
 };
+
+/**
+ * Detect which text was clicked on a slide image
+ * Returns the text content at the clicked location
+ */
+export const detectClickedText = async (
+    base64Image: string,
+    clickX: number,
+    clickY: number,
+    imageWidth: number,
+    imageHeight: number
+): Promise<string | null> => {
+    const imagePart = fileToGenerativePart(base64Image);
+
+    // Convert pixel coordinates to percentage (0-100)
+    const xPercent = (clickX / imageWidth) * 100;
+    const yPercent = (clickY / imageHeight) * 100;
+
+    const prompt = `Analyze this presentation slide image and identify which text element is located at approximately ${xPercent.toFixed(0)}% from the left and ${yPercent.toFixed(0)}% from the top.
+
+**Your task:**
+1. Examine all text elements in the image
+2. Determine which text is closest to the specified coordinates
+3. Return ONLY the exact text content at that location, nothing else
+
+**Important:**
+- Return just the text, no explanations
+- If no text is near those coordinates, return "NO_TEXT_FOUND"
+- Be precise - return the specific text element, not nearby text
+
+**Example outputs:**
+- "Craft the Perfect Message"
+- "3 Elements That Convert"
+- "NO_TEXT_FOUND"`;
+
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: { parts: [imagePart, { text: prompt }] },
+    });
+
+    const detectedText = response.text.trim();
+
+    if (detectedText === "NO_TEXT_FOUND" || !detectedText) {
+        return null;
+    }
+
+    return detectedText;
+};
