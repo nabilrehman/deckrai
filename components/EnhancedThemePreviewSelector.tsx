@@ -47,66 +47,76 @@ const EnhancedThemePreviewSelector: React.FC<EnhancedThemePreviewSelectorProps> 
     setDesignerPreviews(initialPreviews);
   }, [designerStyles, samplePrompts]);
 
-  // Generate all preview slides
+  // Generate all preview slides IN PARALLEL
   useEffect(() => {
     const generateAllPreviews = async () => {
+      // Create all generation tasks
+      const allTasks: Promise<void>[] = [];
+
       for (let designerIdx = 0; designerIdx < designerStyles.length; designerIdx++) {
         const designer = designerStyles[designerIdx];
         const styleModifier = generateStylePromptModifier(designer);
 
-        // Generate 3 slides for this designer
+        // Generate 3 slides for this designer IN PARALLEL
         for (let slideIdx = 0; slideIdx < samplePrompts.length; slideIdx++) {
           const prompt = samplePrompts[slideIdx];
 
-          try {
-            const finalPrompt = prompt + styleModifier;
+          // Create task but don't await yet
+          const task = (async () => {
+            try {
+              const finalPrompt = prompt + styleModifier;
 
-            const { images } = await createSlideFromPrompt(
-              styleReference,
-              finalPrompt,
-              false,
-              [],
-              undefined,
-              null,
-              null
-            );
+              const { images } = await createSlideFromPrompt(
+                styleReference,
+                finalPrompt,
+                false,
+                [],
+                undefined,
+                null,
+                null
+              );
 
-            // Update this specific slide
-            setDesignerPreviews(prev =>
-              prev.map((dp, dIdx) =>
-                dIdx === designerIdx
-                  ? {
-                      ...dp,
-                      slides: dp.slides.map((slide, sIdx) =>
-                        sIdx === slideIdx
-                          ? { src: images[0], isGenerating: false, error: false }
-                          : slide
-                      ),
-                    }
-                  : dp
-              )
-            );
-          } catch (error) {
-            console.error(`Failed to generate slide ${slideIdx} for ${designer.name}:`, error);
+              // Update this specific slide
+              setDesignerPreviews(prev =>
+                prev.map((dp, dIdx) =>
+                  dIdx === designerIdx
+                    ? {
+                        ...dp,
+                        slides: dp.slides.map((slide, sIdx) =>
+                          sIdx === slideIdx
+                            ? { src: images[0], isGenerating: false, error: false }
+                            : slide
+                        ),
+                      }
+                    : dp
+                )
+              );
+            } catch (error) {
+              console.error(`Failed to generate slide ${slideIdx} for ${designer.name}:`, error);
 
-            setDesignerPreviews(prev =>
-              prev.map((dp, dIdx) =>
-                dIdx === designerIdx
-                  ? {
-                      ...dp,
-                      slides: dp.slides.map((slide, sIdx) =>
-                        sIdx === slideIdx
-                          ? { src: null, isGenerating: false, error: true }
-                          : slide
-                      ),
-                    }
-                  : dp
-              )
-            );
-          }
+              setDesignerPreviews(prev =>
+                prev.map((dp, dIdx) =>
+                  dIdx === designerIdx
+                    ? {
+                        ...dp,
+                        slides: dp.slides.map((slide, sIdx) =>
+                          sIdx === slideIdx
+                            ? { src: null, isGenerating: false, error: true }
+                            : slide
+                        ),
+                      }
+                    : dp
+                )
+              );
+            }
+          })();
+
+          allTasks.push(task);
         }
       }
 
+      // Wait for ALL 9 slides to generate in parallel
+      await Promise.all(allTasks);
       setIsGenerating(false);
     };
 
