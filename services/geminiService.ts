@@ -220,14 +220,11 @@ export const getPersonalizedVariationsFromPlan = async (plan: PersonalizationAct
     if (imageActions.length > 0) artistPrompt += `\n**Image Replacements:**\n${imageActions.map(r => `- In the area described as '${r.areaToReplace}', replace it with '${r.replacementPrompt}'`).join('\n')}\n`;
     artistPrompt += `\n**CRITICAL RULES:**\n1. For text changes, the new text must perfectly match the font, color, size, position, and style of the text it is replacing.\n2. For image changes, the new image should fit seamlessly into the slide's design.\n3. **DO NOT** change any other part of the slide.`;
 
-    const basePrompts = [
-        artistPrompt,
-        `${artistPrompt}\n(For this version, try a slightly more creative or visually distinct style for the new content if possible, while still matching the slide's overall theme.)`,
-        `${artistPrompt}\n(For this version, offer another alternative that is clean and professional.)`,
-    ];
+    // Generate only 1 variation to save budget
+    const basePrompts = [artistPrompt];
 
-    onProgress('Generating 3 variations in parallel...');
-    const promises = basePrompts.map(p => 
+    onProgress('Generating personalized variation...');
+    const promises = basePrompts.map(p =>
         generateSingleImage('gemini-2.5-flash-image', [originalImagePart], p, deepMode, logs)
     );
     const settledResults = await Promise.allSettled(promises);
@@ -282,13 +279,10 @@ export const getGenerativeVariations = async (model: string, prompt: string, bas
         onProgress('Plan received. Briefing AI Artist...');
     }
 
-     const basePrompts = [
-        refinedPrompt,
-        `${refinedPrompt} (Try a slightly different, creative style.)`,
-        `${refinedPrompt} (Offer another alternative version.)`,
-    ];
+     // Generate only 1 variation to save budget
+    const basePrompts = [refinedPrompt];
 
-    onProgress('Generating 3 variations in parallel...');
+    onProgress('Generating variation...');
     const promises = basePrompts.map(p =>
         generateSingleImage(model, [originalImagePart], p, deepMode, logs)
     );
@@ -329,13 +323,10 @@ export const getInpaintingVariations = async (
     logs.push({ title: "Agent: Inpainting Artist (Input)", content: inpaintingPrompt });
     onProgress('Briefing AI Artist with your inpainting request...');
 
-    const basePrompts = [
-        inpaintingPrompt,
-        `${inpaintingPrompt} (Try a slightly more creative interpretation.)`,
-        `${inpaintingPrompt} (Offer another clean and professional alternative.)`,
-    ];
+    // Generate only 1 variation to save budget
+    const basePrompts = [inpaintingPrompt];
 
-    onProgress('Generating 3 inpainting variations in parallel...');
+    onProgress('Generating inpainting result...');
     const promises = basePrompts.map(p =>
         generateSingleImage(
             'gemini-2.5-flash-image',
