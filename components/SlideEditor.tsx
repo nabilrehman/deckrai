@@ -121,6 +121,9 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
   const maskCanvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawing = useRef(false);
 
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const imageUploadInputRef = useRef<HTMLInputElement>(null);
+
   const currentSrc = !creationModeInfo ? slide.history[slide.history.length - 1] : null;
   const hasHistory = !creationModeInfo && slide.history.length > 1;
   const isImagenSelected = selectedModel === 'imagen-4.0-generate-001';
@@ -131,6 +134,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     setCompanyWebsite('');
     setIsInpaintingMode(false);
     setInpaintingPrompt('');
+    setUploadedImage(null);
     if (variants) setVariants(null);
     if (personalizationPlanToReview) setPersonalizationPlanToReview(null);
   }, [slide?.id, slide?.history, creationModeInfo]);
@@ -375,6 +379,46 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
             onAddSessionToHistory(session as DebugSession);
         }
     };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please upload an image file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      setUploadedImage(result);
+      setError(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCreateFromUploadedImage = async () => {
+    if (!uploadedImage || !creationModeInfo) return;
+
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      const newSlide: Slide = {
+        id: `slide-${Date.now()}`,
+        name: 'Uploaded Slide',
+        originalSrc: uploadedImage,
+        history: [uploadedImage],
+      };
+      onAddNewSlide({ newSlide, insertAfterSlideId: creationModeInfo.insertAfterSlideId });
+      onCancelCreation();
+    } catch (err: any) {
+      setError(err.message || 'Failed to add uploaded image');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
 
   const handleVariantSelected = async (variantSrc: string, variantIndex: number) => {
@@ -740,24 +784,104 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
                 Adding New Slide
             </h3>
         </div>
-        <div className="bg-brand-surface p-4 rounded-xl border border-brand-border shadow-card">
-            <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Describe the new slide you want to create... e.g., 'An agenda slide with 5 points'"
-                className="w-full p-3 text-sm bg-brand-background border border-brand-border rounded-md focus:ring-2 focus:ring-brand-primary transition-all resize-none text-brand-text-primary placeholder-brand-text-tertiary h-24"
-                disabled={isGenerating}
-            />
-            <div className="flex items-center gap-4 mt-4">
-                 <button onClick={onCancelCreation} disabled={isGenerating} className="btn btn-secondary w-full">
-                    Cancel
-                </button>
+        <div className="bg-brand-surface p-4 rounded-xl border border-brand-border shadow-card space-y-6">
+            {/* Option 1: AI Generation */}
+            <div>
+                <div className="flex items-center gap-2 mb-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-brand-primary-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
+                    </svg>
+                    <label className="text-sm font-medium text-brand-text-primary">✨ Generate with AI</label>
+                </div>
+                <textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="Describe the new slide you want to create... e.g., 'An agenda slide with 5 points'"
+                    className="w-full p-3 text-sm bg-brand-background border border-brand-border rounded-md focus:ring-2 focus:ring-brand-primary transition-all resize-none text-brand-text-primary placeholder-brand-text-tertiary h-24"
+                    disabled={isGenerating || uploadedImage !== null}
+                />
                 <button
                     onClick={handleCreateNewSlide}
-                    disabled={isGenerating || !prompt}
-                    className="btn btn-primary w-full text-base"
+                    disabled={isGenerating || !prompt || uploadedImage !== null}
+                    className="btn btn-primary w-full text-base mt-3"
                 >
                     {isGenerating ? <><Spinner size="h-5 w-5" className="-ml-1 mr-3" /> Creating...</> : 'Create New Slide'}
+                </button>
+            </div>
+
+            {/* Divider */}
+            <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-brand-border"></div>
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-brand-surface px-2 text-brand-text-tertiary">or</span>
+                </div>
+            </div>
+
+            {/* Option 2: Upload Image */}
+            <div>
+                <div className="flex items-center gap-2 mb-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-brand-primary-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                    </svg>
+                    <label className="text-sm font-medium text-brand-text-primary">📤 Upload Image</label>
+                </div>
+                <input
+                    ref={imageUploadInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                />
+                <button
+                    onClick={() => imageUploadInputRef.current?.click()}
+                    disabled={isGenerating || prompt.trim() !== ''}
+                    className="w-full p-4 border-2 border-dashed border-brand-border rounded-lg hover:border-brand-primary-300 hover:bg-brand-primary-50/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {uploadedImage ? (
+                        <div className="flex items-center justify-center gap-2 text-brand-primary-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            <span className="text-sm font-medium">Image uploaded - click below to add</span>
+                        </div>
+                    ) : (
+                        <div className="flex items-center justify-center gap-2 text-brand-text-tertiary">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            <span className="text-sm">Click to select an image file</span>
+                        </div>
+                    )}
+                </button>
+                {uploadedImage && (
+                    <div className="mt-3 space-y-2">
+                        <img src={uploadedImage} alt="Preview" className="w-full rounded-lg border border-brand-border" />
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setUploadedImage(null)}
+                                disabled={isGenerating}
+                                className="btn btn-secondary flex-1"
+                            >
+                                Remove
+                            </button>
+                            <button
+                                onClick={handleCreateFromUploadedImage}
+                                disabled={isGenerating}
+                                className="btn btn-primary flex-1"
+                            >
+                                {isGenerating ? <><Spinner size="h-5 w-5" className="-ml-1 mr-3" /> Adding...</> : 'Add to Deck'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Cancel Button */}
+            <div className="pt-2 border-t border-brand-border">
+                <button onClick={onCancelCreation} disabled={isGenerating} className="btn btn-secondary w-full">
+                    Cancel
                 </button>
             </div>
         </div>

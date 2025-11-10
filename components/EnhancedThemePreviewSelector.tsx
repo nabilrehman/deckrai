@@ -65,6 +65,8 @@ const EnhancedThemePreviewSelector: React.FC<EnhancedThemePreviewSelectorProps> 
           const task = (async () => {
             try {
               const finalPrompt = prompt + styleModifier;
+              console.log(`[Preview Gen] Starting slide ${slideIdx + 1} for ${designer.name}`);
+              console.log(`[Preview Gen] Prompt: ${finalPrompt.substring(0, 150)}...`);
 
               const { images } = await createSlideFromPrompt(
                 styleReference,
@@ -75,6 +77,13 @@ const EnhancedThemePreviewSelector: React.FC<EnhancedThemePreviewSelectorProps> 
                 null,
                 null
               );
+
+              console.log(`[Preview Gen] Got ${images?.length || 0} images for ${designer.name} slide ${slideIdx + 1}`);
+
+              if (!images || images.length === 0) {
+                console.error(`[Preview Gen] No images returned for ${designer.name} slide ${slideIdx + 1}`);
+                throw new Error('No images returned from API');
+              }
 
               // Update this specific slide
               setDesignerPreviews(prev =>
@@ -91,8 +100,10 @@ const EnhancedThemePreviewSelector: React.FC<EnhancedThemePreviewSelectorProps> 
                     : dp
                 )
               );
+
+              console.log(`[Preview Gen] ✅ Successfully generated ${designer.name} slide ${slideIdx + 1}`);
             } catch (error) {
-              console.error(`Failed to generate slide ${slideIdx} for ${designer.name}:`, error);
+              console.error(`[Preview Gen] ❌ Failed to generate slide ${slideIdx + 1} for ${designer.name}:`, error);
 
               setDesignerPreviews(prev =>
                 prev.map((dp, dIdx) =>
