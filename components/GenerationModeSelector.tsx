@@ -7,6 +7,7 @@ interface GenerationModeSelectorProps {
   onDeckUpload: (slides: Slide[]) => void;
   styleLibrary: StyleLibraryItem[];
   isTestMode: boolean;
+  onLibraryUpload?: (items: StyleLibraryItem[]) => void;
 }
 
 type GenerationMode = 'smart' | 'classic';
@@ -15,6 +16,7 @@ const GenerationModeSelector: React.FC<GenerationModeSelectorProps> = ({
   onDeckUpload,
   styleLibrary,
   isTestMode,
+  onLibraryUpload,
 }) => {
   const [mode, setMode] = useState<GenerationMode>('smart');
 
@@ -93,6 +95,7 @@ const GenerationModeSelector: React.FC<GenerationModeSelectorProps> = ({
             onDeckUpload={onDeckUpload}
             styleLibrary={styleLibrary}
             isTestMode={isTestMode}
+            onLibraryUpload={onLibraryUpload}
           />
         ) : (
           <DeckUploader

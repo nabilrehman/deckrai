@@ -7,10 +7,13 @@ import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationConte
 import { createSlideFromPrompt, findBestStyleReferenceFromPrompt } from '../services/geminiService';
 import { detectVibeFromNotes, getDesignerStylesForVibe, getDesignerStyleById, generateStylePromptModifier, PresentationVibe } from '../services/vibeDetection';
 
+declare const pdfjsLib: any;
+
 interface SmartDeckGeneratorProps {
   onDeckUpload: (slides: Slide[]) => void;
   styleLibrary: StyleLibraryItem[];
   isTestMode: boolean;
+  onLibraryUpload?: (items: StyleLibraryItem[]) => void;
 }
 
 const launderImageSrc = (src: string): Promise<string> => {
@@ -56,6 +59,7 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
   onDeckUpload,
   styleLibrary,
   isTestMode,
+  onLibraryUpload,
 }) => {
   // Core state
   const [rawNotes, setRawNotes] = useState('');
@@ -443,21 +447,66 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
     setError(null);
 
     try {
-      let styleSrc: string | null = null;
+      if (file.type === 'application/pdf') {
+        // Process all pages and add to style library
+        const fileReader = new FileReader();
+        const pdfPages = await new Promise<StyleLibraryItem[]>((resolve, reject) => {
+          fileReader.onload = async (event) => {
+            try {
+              const typedarray = new Uint8Array(event.target?.result as ArrayBuffer);
+              const pdf = await pdfjsLib.getDocument(typedarray).promise;
+              const pagePromises: Promise<StyleLibraryItem | null>[] = [];
 
-      if (file.type.startsWith('image/')) {
-        styleSrc = await new Promise<string>((resolve) => {
+              for (let i = 1; i <= pdf.numPages; i++) {
+                pagePromises.push((async (pageNum): Promise<StyleLibraryItem | null> => {
+                  const page = await pdf.getPage(pageNum);
+                  const viewport = page.getViewport({ scale: 1.5 });
+                  const canvas = document.createElement('canvas');
+                  canvas.height = viewport.height;
+                  canvas.width = viewport.width;
+                  const context = canvas.getContext('2d');
+                  if (context) {
+                    await page.render({ canvasContext: context, viewport }).promise;
+                    const id = `${file.name}-p${pageNum}-${Date.now() + pageNum}`;
+                    const src = canvas.toDataURL('image/png');
+                    return { id, src, name: `${file.name.replace(/\.pdf$/i, '')} - Page ${pageNum}` };
+                  }
+                  return null;
+                })(i));
+              }
+              const resolvedItems = await Promise.all(pagePromises);
+              resolve(resolvedItems.filter((item): item is StyleLibraryItem => item !== null));
+            } catch (err) {
+              console.error("PDF processing error:", err);
+              reject(new Error("Failed to process PDF file. It may be corrupted."));
+            }
+          };
+          fileReader.readAsArrayBuffer(file);
+        });
+
+        if (pdfPages.length > 0 && onLibraryUpload) {
+          // Add all pages to style library
+          onLibraryUpload(pdfPages);
+          // Use first page as uploaded reference
+          setUploadedStyleReference({ src: pdfPages[0].src, name: file.name });
+          setSelectedStyleId(null);
+        } else if (pdfPages.length > 0) {
+          // No library callback, just use first page
+          setUploadedStyleReference({ src: pdfPages[0].src, name: file.name });
+          setSelectedStyleId(null);
+        } else {
+          throw new Error('PDF has no pages');
+        }
+      } else if (file.type.startsWith('image/')) {
+        const styleSrc = await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onload = (event) => resolve(event.target?.result as string);
           reader.readAsDataURL(file);
         });
-      }
-
-      if (styleSrc) {
         setUploadedStyleReference({ src: styleSrc, name: file.name });
         setSelectedStyleId(null);
       } else {
-        throw new Error('Unsupported file type. Please use an image file.');
+        throw new Error('Unsupported file type. Please use an image or PDF file.');
       }
     } catch (err: any) {
       setError(err.message);
@@ -543,7 +592,7 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
           Upload a Reference File
         </button>
       )}
-      <input ref={styleUploadInputRef} type="file" className="sr-only" accept="image/*" onChange={handleStyleFileChange} />
+      <input ref={styleUploadInputRef} type="file" className="sr-only" accept="application/pdf,image/*" onChange={handleStyleFileChange} />
     </div>
   );
 

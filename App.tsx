@@ -464,6 +464,7 @@ const App: React.FC = () => {
                 onDeckUpload={handleDeckUpload}
                 styleLibrary={styleLibrary}
                 isTestMode={isTestMode}
+                onLibraryUpload={handleLibraryUpload}
             />
           </div>
         )}
