@@ -127,6 +127,25 @@ https://deckr-app-948199894623.us-central1.run.app
   - `.gcloudignore` - Ensures env files are uploaded to Cloud Build
 - The `.env.local` file is for local development only (gitignored, not deployed)
 
+### ⚠️ .env File Priority (IMPORTANT!)
+Vite loads environment files in this order (later files override earlier ones):
+1. `.env` - Base config for all environments
+2. `.env.local` - **HIGHEST PRIORITY** - Local overrides (gitignored)
+3. `.env.[mode]` - Mode-specific (e.g., `.env.production`)
+4. `.env.[mode].local` - Mode-specific local overrides
+
+**Common Gotcha**: If you update the API key in `.env` but still get "API key expired" errors:
+- Check if `.env.local` exists - it will override `.env`!
+- Always update **BOTH** `.env` and `.env.local` with the new API key
+- Or delete `.env.local` if you don't need local overrides
+
+```bash
+# Quick fix for expired API key errors:
+# Update ALL env files with the new key
+grep -l "VITE_GEMINI_API_KEY" .env* 2>/dev/null
+# Then manually update each file found
+```
+
 ## Why Two API Keys?
 - **Firebase API Key** (`AIzaSyAZ_o...`): Used for Firebase Auth, Firestore, and Storage
 - **Gemini API Key** (`AIzaSyDP6j...`): Used for AI slide generation with Google Gemini
