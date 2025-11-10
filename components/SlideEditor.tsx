@@ -803,20 +803,26 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     };
 
     try {
-      // Use the existing inpainting/variation API
-      // This will maintain the visual style automatically
       const { images, prompts: variationPrompts, logs } = await getGenerativeVariations(
         selectedModel,
-        message,
+        enhancedMessage,
         currentSrc,
         isDeepMode,
-        handleProgressUpdate
+        handleProgressUpdate,
+        shouldBypassAnalyst
       );
 
       if (images.length > 0) {
         const context = { workflow: 'Edit', userIntentPrompt: message, model: selectedModel, deepMode: isDeepMode };
-        setVariants({ images, prompts: variationPrompts, context });
-        onSuccessfulSingleSlideEdit(context);
+
+        // If only 1 variation, auto-apply instead of showing selector
+        if (images.length === 1) {
+          onSlideUpdate(slide.id, images[0]);
+          onSuccessfulSingleSlideEdit(context);
+        } else {
+          setVariants({ images, prompts: variationPrompts, context });
+          onSuccessfulSingleSlideEdit(context);
+        }
 
         if (isDebugMode) {
           setDebugLogs(logs);
@@ -883,8 +889,15 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
 
       if (images.length > 0) {
         const context = { workflow: 'Edit', userIntentPrompt: message, model: selectedModel, deepMode: isDeepMode };
-        setVariants({ images, prompts: variationPrompts, context });
-        onSuccessfulSingleSlideEdit(context);
+
+        // If only 1 variation, auto-apply instead of showing selector
+        if (images.length === 1) {
+          onSlideUpdate(slide.id, images[0]);
+          onSuccessfulSingleSlideEdit(context);
+        } else {
+          setVariants({ images, prompts: variationPrompts, context });
+          onSuccessfulSingleSlideEdit(context);
+        }
 
         if (isDebugMode) {
           setDebugLogs(logs);
