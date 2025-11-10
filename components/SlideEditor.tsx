@@ -650,7 +650,10 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
   const handleChatSubmit = async (message: string) => {
     if (!message.trim() || !currentSrc) return;
 
-    setIsChatRefining(true);
+    // OPTION A: Close chat immediately for clean UX
+    setAnchoredChatPosition(null);
+
+    setIsGenerating(true);
     setError(null);
 
     let session: Partial<DebugSession> = {
@@ -687,14 +690,11 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
         session = { ...session, status: 'Success', finalImages: images, logs };
       }
 
-      // Close the chat after successful submission
-      setAnchoredChatPosition(null);
-
     } catch (err: any) {
       setError(err.message || 'An unknown error occurred while refining the slide.');
       session = { ...session, status: 'Failed', error: err.message, logs: [], finalImages: [] };
     } finally {
-      setIsChatRefining(false);
+      setIsGenerating(false);
       setProgressSteps([]);
       onAddSessionToHistory(session as DebugSession);
     }

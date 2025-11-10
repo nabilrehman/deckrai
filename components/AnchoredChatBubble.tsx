@@ -82,7 +82,7 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
         <>
             {/* Backdrop */}
             <div
-                className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[999]"
+                className="fixed inset-0 bg-black/10 backdrop-blur-sm z-[999]"
                 onClick={onClose}
             />
 
@@ -92,16 +92,16 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
                 className="animate-slideIn"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="w-80 bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-purple-500/30 rounded-xl shadow-2xl overflow-hidden">
+                <div className="w-80 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden">
                     {/* Header */}
-                    <div className="px-4 py-3 bg-slate-800/50 border-b border-slate-700 flex items-center justify-between">
+                    <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <span className="text-xl">💬</span>
-                            <h3 className="text-sm font-semibold text-white">Refine Slide</h3>
+                            <h3 className="text-sm font-semibold text-gray-900">Refine Slide</h3>
                         </div>
                         <button
                             onClick={onClose}
-                            className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-slate-700 rounded"
+                            className="text-gray-400 hover:text-gray-600 transition-colors p-1 hover:bg-gray-100 rounded"
                         >
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -111,26 +111,26 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
 
                     {/* Quick Actions */}
                     {localHistory.length === 0 && (
-                        <div className="px-4 py-3 border-b border-slate-700 bg-slate-800/30">
-                            <p className="text-xs text-gray-400 mb-2">Quick actions:</p>
+                        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                            <p className="text-xs text-gray-500 mb-2">Quick actions:</p>
                             <div className="flex flex-wrap gap-2">
                                 <button
                                     onClick={() => prefillPrompt('Change to: ')}
-                                    className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg transition-colors flex items-center gap-1.5"
+                                    className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
                                 >
                                     <span>✏️</span>
                                     <span>Change text</span>
                                 </button>
                                 <button
                                     onClick={() => prefillPrompt('Make this ')}
-                                    className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg transition-colors flex items-center gap-1.5"
+                                    className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
                                 >
                                     <span>🎨</span>
                                     <span>Restyle</span>
                                 </button>
                                 <button
                                     onClick={() => prefillPrompt('Remove this')}
-                                    className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded-lg transition-colors flex items-center gap-1.5"
+                                    className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
                                 >
                                     <span>🗑️</span>
                                     <span>Remove</span>
@@ -141,7 +141,7 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
 
                     {/* Conversation History */}
                     {localHistory.length > 0 && (
-                        <div className="px-4 py-3 max-h-64 overflow-y-auto bg-slate-800/20">
+                        <div className="px-4 py-3 max-h-64 overflow-y-auto bg-white">
                             {localHistory.map((message) => (
                                 <div
                                     key={message.id}
@@ -150,8 +150,8 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
                                     <div
                                         className={`inline-block px-3 py-2 rounded-lg text-sm max-w-[85%] ${
                                             message.sender === 'user'
-                                                ? 'bg-purple-600 text-white'
-                                                : 'bg-slate-700 text-gray-200'
+                                                ? 'bg-gray-100 text-gray-900 border border-gray-200'
+                                                : 'bg-blue-50 text-gray-900 border border-blue-100'
                                         }`}
                                     >
                                         {message.text}
@@ -160,12 +160,12 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
                             ))}
                             {isLoading && (
                                 <div className="text-left mb-3">
-                                    <div className="inline-block px-3 py-2 rounded-lg text-sm bg-slate-700 text-gray-200">
+                                    <div className="inline-block px-3 py-2 rounded-lg text-sm bg-gray-100 text-gray-700 border border-gray-200">
                                         <div className="flex items-center gap-2">
                                             <div className="flex gap-1">
-                                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                                             </div>
                                             <span className="text-xs">Applying changes...</span>
                                         </div>
@@ -177,7 +177,7 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
                     )}
 
                     {/* Input Area */}
-                    <form onSubmit={handleSubmit} className="px-4 py-3 bg-slate-800/50 border-t border-slate-700">
+                    <form onSubmit={handleSubmit} className="px-4 py-3 bg-white border-t border-gray-200">
                         <div className="flex gap-2">
                             <input
                                 ref={inputRef}
@@ -186,12 +186,12 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
                                 onChange={(e) => setInputValue(e.target.value)}
                                 placeholder={`Describe what you'd like to change...`}
                                 disabled={isLoading}
-                                className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                             <button
                                 type="submit"
                                 disabled={!inputValue.trim() || isLoading}
-                                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white text-sm font-medium rounded-lg hover:from-purple-500 hover:to-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 shadow-sm"
                             >
                                 <span>✨</span>
                                 <span>Apply</span>
@@ -199,7 +199,7 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
                         </div>
 
                         {/* Context Indicator */}
-                        <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                        <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
                             <span>💡</span>
                             <span>I'll refine the area you clicked</span>
                         </p>
@@ -207,7 +207,7 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
                 </div>
 
                 {/* Visual connector line to clicked region */}
-                <div className="absolute top-1/2 -translate-y-1/2 w-2 h-0.5 bg-purple-500/50"
+                <div className="absolute top-1/2 -translate-y-1/2 w-2 h-0.5 bg-gray-300"
                     style={{
                         left: position.x > window.innerWidth / 2 ? '100%' : '-8px',
                         width: '8px'
