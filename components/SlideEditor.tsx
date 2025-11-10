@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Slide, StyleLibraryItem, DebugLog, DebugSession, LastSuccessfulEditContext, PersonalizationAction } from '../types';
-import { getGenerativeVariations, getPersonalizationPlan, getPersonalizedVariationsFromPlan, getInpaintingVariations, remakeSlideWithStyleReference, createSlideFromPrompt, findBestStyleReferenceFromPrompt, detectClickedText } from '../services/geminiService';
+import { getGenerativeVariations, getPersonalizationPlan, getPersonalizedVariationsFromPlan, getInpaintingVariations, remakeSlideWithStyleReference, createSlideFromPrompt, findBestStyleReferenceFromPrompt, detectClickedText, TextRegion } from '../services/geminiService';
 import VariantSelector from './VariantSelector';
 import DebugLogViewer from './DebugLogViewer';
 import PersonalizationReviewModal from './PersonalizationReviewModal';
@@ -104,7 +104,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [variants, setVariants] = useState<{ images: string[], prompts: string[], context: any } | null>(null);
-  const [isDebugMode, setIsDebugMode] = useState(false);
+  const [isDebugMode, setIsDebugMode] = useState(true); // Enabled by default to see actual prompts
   const [isDeepMode, setIsDeepMode] = useState(false);
   const [debugLogs, setDebugLogs] = useState<DebugLog[] | null>(null);
   const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([]);
@@ -136,7 +136,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
   const [isChatRefining, setIsChatRefining] = useState(false);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
   const [rightPanelInitialMessage, setRightPanelInitialMessage] = useState<string>('');
-  const [clickedText, setClickedText] = useState<string | null>(null);
+  const [clickedTextRegion, setClickedTextRegion] = useState<TextRegion | null>(null);
   const [isDetectingText, setIsDetectingText] = useState(false);
 
   const currentSrc = !creationModeInfo ? slide.history[slide.history.length - 1] : null;
@@ -749,19 +749,19 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     const clickY = e.clientY;
 
     setAnchoredChatPosition({ x: clickX, y: clickY });
-    setClickedText(null);
+    setClickedTextRegion(null);
 
     // Detect which text was clicked (async, won't block UI)
     setIsDetectingText(true);
     try {
-      const detectedText = await detectClickedText(
+      const detectedRegion = await detectClickedText(
         currentSrc,
         clickXImage,
         clickYImage,
         rect.width,
         rect.height
       );
-      setClickedText(detectedText);
+      setClickedTextRegion(detectedRegion);
     } catch (error) {
       console.error('Failed to detect clicked text:', error);
     } finally {
@@ -782,8 +782,12 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
 
     // Enhance the message with clicked text context for precision
     let enhancedMessage = message;
-    if (clickedText) {
-      enhancedMessage = `IMPORTANT: Change ONLY the text "${clickedText}" as follows: ${message}. Do not modify any other text, logos, or elements on the slide. Preserve all other content exactly as it is.`;
+    let shouldBypassAnalyst = false;
+
+    if (clickedTextRegion?.text) {
+      // Simple direct instruction - bypass the Design Analyst
+      enhancedMessage = `Change the text "${clickedTextRegion.text}" to: ${message}. Keep everything else exactly the same - same fonts, colors, layout, logos, and all other text.`;
+      shouldBypassAnalyst = true; // Use direct prompt without Design Analyst
     }
 
     let session: Partial<DebugSession> = {
@@ -846,6 +850,15 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     setIsGenerating(true);
     setError(null);
 
+    // Apply same text detection enhancement
+    let enhancedMessage = message;
+    let shouldBypassAnalyst = false;
+
+    if (clickedTextRegion?.text) {
+      enhancedMessage = `Change the text "${clickedTextRegion.text}" to: ${message}. Keep everything else exactly the same - same fonts, colors, layout, logos, and all other text.`;
+      shouldBypassAnalyst = true;
+    }
+
     let session: Partial<DebugSession> = {
       timestamp: Date.now(),
       slideId: slide.id,
@@ -864,7 +877,8 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
         enhancedMessage,
         currentSrc,
         isDeepMode,
-        handleProgressUpdate
+        handleProgressUpdate,
+        shouldBypassAnalyst
       );
 
       if (images.length > 0) {
@@ -1371,7 +1385,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
                 onSubmit={handleChatSubmit}
                 onEnterInpaintMode={handleEnterInpaintingMode}
                 isLoading={isChatRefining}
-                regionText={clickedText || (isDetectingText ? 'Detecting...' : 'this area')}
+                regionText={clickedTextRegion?.text || (isDetectingText ? 'Detecting...' : 'this area')}
             />
         )}
         {isRightPanelOpen && (

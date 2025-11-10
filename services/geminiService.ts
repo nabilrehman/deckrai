@@ -249,13 +249,13 @@ export const getPersonalizedVariationsFromPlan = async (plan: PersonalizationAct
 };
 
 
-export const getGenerativeVariations = async (model: string, prompt: string, base64Image: string, deepMode: boolean, onProgress: (message: string) => void): Promise<{ images: string[], logs: DebugLog[], variationPrompts: string[] }> => {
+export const getGenerativeVariations = async (model: string, prompt: string, base64Image: string, deepMode: boolean, onProgress: (message: string) => void, bypassAnalyst: boolean = false): Promise<{ images: string[], logs: DebugLog[], variationPrompts: string[] }> => {
     const logs: DebugLog[] = [{ title: "Workflow Started", content: "Generate with AI" }];
     const originalImagePart = fileToGenerativePart(base64Image);
 
-    // If using Imagen, the prompt is used directly. No "Design Analyst" is needed.
+    // If using Imagen or bypassing analyst, the prompt is used directly
     let refinedPrompt = prompt;
-    if (model !== 'imagen-4.0-generate-001') {
+    if (model !== 'imagen-4.0-generate-001' && !bypassAnalyst) {
         onProgress('Briefing AI Design Analyst with your request...');
         const systemPrompt = `You are a world-class AI agent acting as a "Design Analyst". Your job is to analyze a slide image and a user's request to create a perfect, actionable prompt for a generative image model. Your prompt must describe the **FINAL DESIRED STATE** and include these critical rules:
 1.  **"It is absolutely critical to preserve all original branding (logos), text, fonts, colors, and specific numbering with 100% accuracy. The final image must be a perfect match in style to the original, with only the requested change applied."**
@@ -273,9 +273,10 @@ export const getGenerativeVariations = async (model: string, prompt: string, bas
         
         const analystOutput = response.text.trim();
         if (!analystOutput) throw new Error("The AI Analyst failed to generate a refined prompt.");
-        
+
         refinedPrompt = analystOutput;
         logs.push({ title: "Agent 1: Design Analyst (Raw Output)", content: refinedPrompt });
+        console.log('[DEBUG] Design Analyst Refined Prompt:', refinedPrompt);
         onProgress('Plan received. Briefing AI Artist...');
     }
 
@@ -925,9 +926,19 @@ export const generateThemeFromWebsite = async (companyWebsite: string): Promise<
     }
 };
 
+export interface TextRegion {
+    text: string;
+    boundingBox: {
+        xPercent: number;
+        yPercent: number;
+        widthPercent: number;
+        heightPercent: number;
+    };
+}
+
 /**
- * Detect which text was clicked on a slide image
- * Returns the text content at the clicked location
+ * Detect which text was clicked on a slide image with bounding box
+ * Returns the text content and its bounding box for precise inpainting
  */
 export const detectClickedText = async (
     base64Image: string,
@@ -935,7 +946,7 @@ export const detectClickedText = async (
     clickY: number,
     imageWidth: number,
     imageHeight: number
-): Promise<string | null> => {
+): Promise<TextRegion | null> => {
     const imagePart = fileToGenerativePart(base64Image);
 
     // Convert pixel coordinates to percentage (0-100)
@@ -947,28 +958,43 @@ export const detectClickedText = async (
 **Your task:**
 1. Examine all text elements in the image
 2. Determine which text is closest to the specified coordinates
-3. Return ONLY the exact text content at that location, nothing else
+3. Return the text content AND its bounding box in JSON format
+
+**Return format (JSON only, no markdown):**
+{
+  "text": "the exact text content",
+  "boundingBox": {
+    "xPercent": 10,
+    "yPercent": 15,
+    "widthPercent": 50,
+    "heightPercent": 10
+  }
+}
 
 **Important:**
-- Return just the text, no explanations
-- If no text is near those coordinates, return "NO_TEXT_FOUND"
-- Be precise - return the specific text element, not nearby text
-
-**Example outputs:**
-- "Craft the Perfect Message"
-- "3 Elements That Convert"
-- "NO_TEXT_FOUND"`;
+- xPercent: left edge position (0-100)
+- yPercent: top edge position (0-100)
+- widthPercent: width of the text region (0-100)
+- heightPercent: height of the text region (0-100)
+- If no text is near those coordinates, return: {"text": "NO_TEXT_FOUND"}`;
 
     const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: { parts: [imagePart, { text: prompt }] },
     });
 
-    const detectedText = response.text.trim();
+    const jsonText = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
 
-    if (detectedText === "NO_TEXT_FOUND" || !detectedText) {
+    try {
+        const parsed = JSON.parse(jsonText);
+
+        if (parsed.text === "NO_TEXT_FOUND" || !parsed.text) {
+            return null;
+        }
+
+        return parsed as TextRegion;
+    } catch (e) {
+        console.error("Failed to parse text detection response:", e, jsonText);
         return null;
     }
-
-    return detectedText;
 };
