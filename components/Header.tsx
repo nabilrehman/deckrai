@@ -453,7 +453,8 @@ const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPd
 
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-brand-text-secondary group-hover:text-brand-primary-500 transition-colors" viewBox="0 0 20 20" fill="currentColor">
 
-                  <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" />
+                  {/* Cloud upload icon */}
+                  <path d="M5.5 13a3.5 3.5 0 01-.369-6.98 4 4 0 117.753-1.977A4.5 4.5 0 1113.5 13H11V9.413l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13H5.5z" />
 
                 </svg>
 
@@ -529,10 +530,11 @@ const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPd
 
                 ) : (
 
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-brand-text-secondary group-hover:text-brand-primary-500 transition-colors" viewBox="0 0 24 24" fill="currentColor">
-
-                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H6v-2h6v2zm6-4H6v-2h12v2zm0-4H6V7h12v2z" />
-
+                  <svg className="h-5 w-5 group-hover:scale-110 transition-transform" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                    {/* Google Slides Icon */}
+                    <path fill="#FFA726" d="M39,16v25c0,1.105-0.895,2-2,2H11c-1.105,0-2-0.895-2-2V7c0-1.105,0.895-2,2-2h17L39,16z"/>
+                    <path fill="#FB8C00" d="M28,5v9c0,1.105,0.895,2,2,2h9L28,5z"/>
+                    <path fill="#FFF" d="M31 24H17v2h14V24zM31 28H17v2h14V28zM31 32H17v2h14V32z"/>
                   </svg>
 
                 )}

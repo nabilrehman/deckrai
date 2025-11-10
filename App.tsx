@@ -10,6 +10,7 @@ import SessionInspectorPanel from './components/SessionInspectorPanel';
 import StyleLibraryPanel from './components/StyleLibraryPanel';
 import DeckLibrary from './components/DeckLibrary';
 import SaveDeckModal from './components/SaveDeckModal';
+import ExportSuccessModal from './components/ExportSuccessModal';
 import { TEMPLATES } from './data/templates';
 import { useAuth } from './contexts/AuthContext';
 import {
@@ -19,7 +20,7 @@ import {
     removeFromStyleLibrary,
     batchAddToStyleLibrary
 } from './services/firestoreService';
-import { exportToGoogleSlides } from './services/googleSlidesService';
+import { exportToGoogleSlides, handleOAuthCallback } from './services/googleSlidesService';
 
 
 declare const jspdf: any;
@@ -30,6 +31,8 @@ const App: React.FC = () => {
   const [activeSlideId, setActiveSlideId] = useState<string | null>(null);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [isExportingToSlides, setIsExportingToSlides] = useState(false);
+  const [showExportSuccessModal, setShowExportSuccessModal] = useState(false);
+  const [exportedPresentationUrl, setExportedPresentationUrl] = useState('');
   const [isPresenting, setIsPresenting] = useState(false);
   const [styleLibrary, setStyleLibrary] = useState<StyleLibraryItem[]>([]);
   const [sessionHistory, setSessionHistory] = useState<DebugSession[]>([]);
@@ -59,6 +62,11 @@ const App: React.FC = () => {
         console.error("Failed to load session history from localStorage", e);
         localStorage.removeItem('aiDeckEditorSessionHistory');
     }
+  }, []);
+
+  // Handle Google OAuth callback (for Google Slides export)
+  useEffect(() => {
+    handleOAuthCallback();
   }, []);
 
   // Load user's style library from Firestore when they sign in
@@ -305,9 +313,55 @@ const App: React.FC = () => {
             const slide = slides[i];
             const imgSrc = slide.history[slide.history.length - 1];
 
+            console.log(`[PDF] Processing slide ${i + 1}/${slides.length}...`);
+
+            // If it's already a data URL, use it directly
+            let cleanImgSrc: string;
+            if (imgSrc.startsWith('data:image/')) {
+                console.log(`[PDF] Slide ${i + 1} is already a data URL, using directly`);
+                cleanImgSrc = imgSrc;
+            } else {
+                // For external URLs, launder through canvas
+                console.log(`[PDF] Slide ${i + 1} is external URL, laundering through canvas...`);
+                cleanImgSrc = await new Promise<string>((resolve, reject) => {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous'; // Handle CORS for external URLs
+                    img.onload = () => {
+                        try {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = img.naturalWidth || img.width;
+                            canvas.height = img.naturalHeight || img.height;
+                            const ctx = canvas.getContext('2d');
+                            if (!ctx) {
+                                reject(new Error('Failed to get canvas context'));
+                                return;
+                            }
+                            ctx.drawImage(img, 0, 0);
+                            const dataUrl = canvas.toDataURL('image/png');
+                            console.log(`[PDF] Slide ${i + 1} successfully laundered`);
+                            resolve(dataUrl);
+                        } catch (err: any) {
+                            console.error(`[PDF] Canvas error for slide ${i + 1}:`, err);
+                            reject(new Error(`Canvas processing failed: ${err.message}`));
+                        }
+                    };
+                    img.onerror = (err) => {
+                        console.error(`[PDF] Failed to load image for slide ${i + 1}:`, err);
+                        reject(new Error(`Failed to load image from URL. Check console for details.`));
+                    };
+                    img.src = imgSrc;
+                });
+            }
+
+            // Load the clean image to get dimensions
             const img = new Image();
-            img.src = imgSrc;
-            await new Promise(resolve => { img.onload = resolve; });
+            img.src = cleanImgSrc;
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = () => reject(new Error(`Failed to load processed image for slide ${i + 1}`));
+                // Timeout after 10 seconds
+                setTimeout(() => reject(new Error(`Timeout loading slide ${i + 1}`)), 10000);
+            });
 
             const imgWidth = img.naturalWidth;
             const imgHeight = img.naturalHeight;
@@ -330,10 +384,10 @@ const App: React.FC = () => {
             if (i > 0) {
                 pdf.addPage();
             }
-            
-            pdf.addImage(imgSrc, 'PNG', xOffset, yOffset, finalImgWidth, finalImgHeight);
+
+            pdf.addImage(cleanImgSrc, 'PNG', xOffset, yOffset, finalImgWidth, finalImgHeight);
         }
-        
+
         pdf.save('deckr-ai-presentation.pdf');
 
     } catch (error: any) {
@@ -371,13 +425,12 @@ const App: React.FC = () => {
         }
       );
 
-      // Open the presentation in a new tab
-      window.open(presentationUrl, '_blank');
-
-      alert(`✅ Successfully exported to Google Slides!\n\nPresentation URL copied to clipboard.`);
-
       // Copy URL to clipboard
       navigator.clipboard.writeText(presentationUrl);
+
+      // Show success modal with confetti celebration!
+      setExportedPresentationUrl(presentationUrl);
+      setShowExportSuccessModal(true);
 
     } catch (error: any) {
       console.error('Export to Google Slides failed:', error);
@@ -544,6 +597,12 @@ const App: React.FC = () => {
         defaultName={currentDeckName}
         isSaving={isSavingDeck}
         showSuccess={showSaveSuccess}
+      />
+
+      <ExportSuccessModal
+        isOpen={showExportSuccessModal}
+        onClose={() => setShowExportSuccessModal(false)}
+        presentationUrl={exportedPresentationUrl}
       />
     </div>
   );

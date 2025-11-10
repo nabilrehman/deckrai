@@ -50,55 +50,138 @@ export const getGoogleAccessToken = async (): Promise<string> => {
     const left = window.screenX + (window.outerWidth - width) / 2;
     const top = window.screenY + (window.outerHeight - height) / 2;
 
+    console.log('[OAuth] Opening popup for Google authorization...');
+    console.log('[OAuth] Auth URL:', authUrl);
+
     const popup = window.open(
         authUrl,
         'Google Slides Authorization',
         `width=${width},height=${height},left=${left},top=${top}`
     );
 
-    // Wait for OAuth callback
+    if (!popup) {
+        throw new Error('Popup was blocked by browser. Please allow popups for this site.');
+    }
+
+    // Listen for messages from the popup (better than polling)
     return new Promise((resolve, reject) => {
+        const messageHandler = (event: MessageEvent) => {
+            // Verify origin for security
+            if (event.origin !== window.location.origin) return;
+
+            console.log('[OAuth] Received message from popup:', event.data);
+
+            if (event.data.type === 'google_oauth_success') {
+                window.removeEventListener('message', messageHandler);
+                clearInterval(checkPopup);
+                clearTimeout(timeout);
+                popup?.close();
+
+                const token = event.data.accessToken;
+                const expiresIn = event.data.expiresIn;
+
+                if (token && expiresIn) {
+                    const expiry = Date.now() + parseInt(expiresIn) * 1000;
+                    sessionStorage.setItem('google_access_token', token);
+                    sessionStorage.setItem('google_token_expiry', expiry.toString());
+                    console.log('[OAuth] Token saved successfully');
+                    resolve(token);
+                } else {
+                    reject(new Error('Invalid token received from OAuth'));
+                }
+            } else if (event.data.type === 'google_oauth_error') {
+                window.removeEventListener('message', messageHandler);
+                clearInterval(checkPopup);
+                clearTimeout(timeout);
+                popup?.close();
+                reject(new Error(event.data.error || 'OAuth authorization failed'));
+            }
+        };
+
+        window.addEventListener('message', messageHandler);
+
+        // Fallback: Also check if popup closed (in case message doesn't work)
         const checkPopup = setInterval(() => {
             if (popup?.closed) {
+                console.log('[OAuth] Popup was closed');
+                window.removeEventListener('message', messageHandler);
                 clearInterval(checkPopup);
+                clearTimeout(timeout);
 
                 const token = sessionStorage.getItem('google_access_token');
                 if (token) {
+                    console.log('[OAuth] Found token in sessionStorage');
                     resolve(token);
                 } else {
-                    reject(new Error('OAuth authorization was cancelled'));
+                    reject(new Error('Authorization window was closed. Please try again and click "Allow" to grant permissions.'));
                 }
             }
         }, 500);
 
         // Timeout after 2 minutes
-        setTimeout(() => {
+        const timeout = setTimeout(() => {
+            console.log('[OAuth] Timeout reached');
+            window.removeEventListener('message', messageHandler);
             clearInterval(checkPopup);
             popup?.close();
-            reject(new Error('OAuth authorization timed out'));
+            reject(new Error('Authorization timed out after 2 minutes'));
         }, 120000);
     });
 };
 
 /**
  * Handle OAuth callback (parse hash fragment)
+ * This should be called when the page loads to check for OAuth redirect
  */
 export const handleOAuthCallback = () => {
     const hash = window.location.hash;
+    console.log('[OAuth Callback] Checking URL hash:', hash);
+
     if (hash && hash.includes('access_token')) {
         const params = new URLSearchParams(hash.substring(1));
         const accessToken = params.get('access_token');
         const expiresIn = params.get('expires_in');
 
+        console.log('[OAuth Callback] Found access token:', accessToken ? 'YES' : 'NO');
+        console.log('[OAuth Callback] Expires in:', expiresIn);
+
         if (accessToken && expiresIn) {
+            // Save to sessionStorage
             const expiry = Date.now() + parseInt(expiresIn) * 1000;
             sessionStorage.setItem('google_access_token', accessToken);
             sessionStorage.setItem('google_token_expiry', expiry.toString());
 
-            // Close popup if this is a popup window
+            console.log('[OAuth Callback] Token saved to sessionStorage');
+
+            // Send message to parent window if this is a popup
             if (window.opener) {
-                window.close();
+                console.log('[OAuth Callback] Sending token to parent window...');
+                window.opener.postMessage({
+                    type: 'google_oauth_success',
+                    accessToken: accessToken,
+                    expiresIn: expiresIn
+                }, window.location.origin);
+
+                // Close popup after a short delay
+                setTimeout(() => {
+                    console.log('[OAuth Callback] Closing popup...');
+                    window.close();
+                }, 500);
             }
+        }
+    } else if (hash && hash.includes('error')) {
+        // Handle OAuth error
+        const params = new URLSearchParams(hash.substring(1));
+        const error = params.get('error');
+        console.error('[OAuth Callback] OAuth error:', error);
+
+        if (window.opener) {
+            window.opener.postMessage({
+                type: 'google_oauth_error',
+                error: error || 'Unknown OAuth error'
+            }, window.location.origin);
+
+            setTimeout(() => window.close(), 500);
         }
     }
 };
@@ -142,33 +225,62 @@ export const exportToGoogleSlides = async (
         const presentation = await createResponse.json();
         const presentationId = presentation.presentationId;
 
+        // Delete the default blank slide first
+        onProgress?.(`Preparing presentation...`);
+
+        await fetch(
+            `${GOOGLE_SLIDES_API}/presentations/${presentationId}:batchUpdate`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    requests: [{
+                        deleteObject: {
+                            objectId: presentation.slides[0].objectId,
+                        },
+                    }],
+                }),
+            }
+        );
+
         onProgress?.(`Adding ${slides.length} slides...`);
 
-        // Delete the default blank slide
-        const requests: any[] = [{
-            deleteObject: {
-                objectId: presentation.slides[0].objectId,
-            },
-        }];
-
-        // Add slides with images
+        // Add slides with images - process ONE at a time (not in batch)
+        // Google Slides API doesn't work well with large batches
         for (let i = 0; i < slides.length; i++) {
             const slide = slides[i];
             const slideId = `slide_${i}`;
 
-            onProgress?.(`Uploading slide ${i + 1}/${slides.length}...`);
+            onProgress?.(`Processing slide ${i + 1}/${slides.length}...`);
 
-            // Create a new slide
-            requests.push({
-                createSlide: {
-                    objectId: slideId,
-                    slideLayoutReference: {
-                        predefinedLayout: 'BLANK',
+            // Step 1: Create the slide
+            await fetch(
+                `${GOOGLE_SLIDES_API}/presentations/${presentationId}:batchUpdate`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
                     },
-                },
-            });
+                    body: JSON.stringify({
+                        requests: [{
+                            createSlide: {
+                                objectId: slideId,
+                                slideLayoutReference: {
+                                    predefinedLayout: 'BLANK',
+                                },
+                            },
+                        }],
+                    }),
+                }
+            );
 
-            // Upload image to Drive first (if it's a data URL)
+            onProgress?.(`Uploading image for slide ${i + 1}/${slides.length}...`);
+
+            // Step 2: Upload image to Drive and make it publicly readable
             let imageUrl = slide.src;
 
             if (slide.src.startsWith('data:')) {
@@ -176,7 +288,7 @@ export const exportToGoogleSlides = async (
                 const response = await fetch(slide.src);
                 const blob = await response.blob();
 
-                // Upload to Google Drive
+                // Upload to Google Drive with public sharing
                 const formData = new FormData();
                 formData.append('metadata', new Blob([JSON.stringify({
                     name: `${deckName}_slide_${i + 1}.png`,
@@ -197,50 +309,66 @@ export const exportToGoogleSlides = async (
 
                 if (uploadResponse.ok) {
                     const uploadedFile = await uploadResponse.json();
-                    imageUrl = `https://drive.google.com/uc?id=${uploadedFile.id}`;
+                    const fileId = uploadedFile.id;
+
+                    // No need to make public - both the image and presentation are in the same Google account
+                    // Google Slides can access the image because it's owned by the same user
+                    imageUrl = `https://drive.google.com/uc?id=${fileId}`;
+                    console.log(`[Google Slides] Uploaded image to Drive: ${imageUrl}`);
+                } else {
+                    const error = await uploadResponse.json();
+                    console.error('[Google Slides] Drive upload failed:', error);
+                    throw new Error(`Failed to upload image ${i + 1} to Google Drive`);
                 }
             }
 
-            // Add image to slide
-            requests.push({
-                createImage: {
-                    url: imageUrl,
-                    elementProperties: {
-                        pageObjectId: slideId,
-                        size: {
-                            width: { magnitude: 720, unit: 'EMU' },
-                            height: { magnitude: 405, unit: 'EMU' },
-                        },
-                        transform: {
-                            scaleX: 1,
-                            scaleY: 1,
-                            translateX: 0,
-                            translateY: 0,
-                            unit: 'EMU',
-                        },
+            // Step 3: Add image to slide with proper sizing (10" x 5.625" in EMUs)
+            // 1 inch = 914400 EMUs
+            // Standard slide: 10" width x 5.625" height
+            const slideWidth = 9144000; // 10 inches in EMUs
+            const slideHeight = 5143500; // 5.625 inches in EMUs
+
+            onProgress?.(`Adding image to slide ${i + 1}/${slides.length}...`);
+
+            const addImageResponse = await fetch(
+                `${GOOGLE_SLIDES_API}/presentations/${presentationId}:batchUpdate`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
                     },
-                },
-            });
-        }
+                    body: JSON.stringify({
+                        requests: [{
+                            createImage: {
+                                url: imageUrl,
+                                elementProperties: {
+                                    pageObjectId: slideId,
+                                    size: {
+                                        width: { magnitude: slideWidth, unit: 'EMU' },
+                                        height: { magnitude: slideHeight, unit: 'EMU' },
+                                    },
+                                    transform: {
+                                        scaleX: 1,
+                                        scaleY: 1,
+                                        translateX: 0,
+                                        translateY: 0,
+                                        unit: 'EMU',
+                                    },
+                                },
+                            },
+                        }],
+                    }),
+                }
+            );
 
-        // Execute all requests in batch
-        onProgress?.('Finalizing presentation...');
-
-        const batchResponse = await fetch(
-            `${GOOGLE_SLIDES_API}/presentations/${presentationId}:batchUpdate`,
-            {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ requests }),
+            if (!addImageResponse.ok) {
+                const error = await addImageResponse.json();
+                console.error(`[Google Slides] Failed to add image to slide ${i + 1}:`, error);
+                throw new Error(error.error?.message || `Failed to add image to slide ${i + 1}`);
             }
-        );
 
-        if (!batchResponse.ok) {
-            const error = await batchResponse.json();
-            throw new Error(error.error?.message || 'Failed to update presentation');
+            console.log(`[Google Slides] Successfully added slide ${i + 1}/${slides.length}`);
         }
 
         onProgress?.('✅ Export complete!');

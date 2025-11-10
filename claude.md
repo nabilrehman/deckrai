@@ -70,16 +70,15 @@ npm run build
 https://deckr-app-948199894623.us-central1.run.app
 
 ## Latest Revision
-- Revision: `deckr-app-00029-wft`
+- Revision: `deckr-app-00038-xp2`
 - Deployed: Successfully
-- Changes: Export to Google Slides
-  - **Export to Google Slides Button**: New button in header (next to Download PDF)
-  - **OAuth Integration**: Secure Google authentication for Slides + Drive API access
-  - **Image-by-Image Upload**: Each slide uploaded separately (Google Slides doesn't support PDF import)
-  - **Automatic Presentation Creation**: Creates new Google Slides presentation with all slides
-  - **Smart User Experience**: Progress messages, opens in new tab, copies URL to clipboard
-  - **Session Token Caching**: Remembers authorization to avoid repeated popups
-  - **Error Handling**: Clear messages if export fails or user cancels authorization
+- Changes: UI Polish - Modal Design + Icon Improvements
+  - **Dark Modal Theme**: Fixed background clash with dark slate gradient modal background
+  - **High Contrast Text**: White title, light gray subtitle, excellent readability on any background
+  - **Better Icon Contrast**: All text and icons now clearly visible
+  - **Save Deck Icon**: Changed from download arrow to cloud upload icon (more distinctive from Download PDF)
+  - **Professional Look**: Dark elegant modal with purple accents matches brand
+  - **Confetti Celebration**: Full-screen confetti animation when export succeeds
 
 **Configuration Required**:
 - OAuth 2.0 Client ID needs to be created in GCP Console
@@ -87,6 +86,13 @@ https://deckr-app-948199894623.us-central1.run.app
 - Add redirect URIs for OAuth callback
 
 ## Previous Revisions
+- `deckr-app-00035-5j6` - Fixed image privacy (no public sharing) + proper image sizing (was invisible)
+- `deckr-app-00034-77v` - Fixed Google Slides export with proper EMU sizing + individual slide processing
+- `deckr-app-00033-p5h` - Improved OAuth callback with postMessage communication
+- `deckr-app-00032-qpv` - PDF download canvas laundering fix
+- `deckr-app-00031-xxx` - PDF download fixes
+- `deckr-app-00030-jpr` - Initial Google Slides export implementation
+- `deckr-app-00029-wft` - Export to Google Slides OAuth setup
 - `deckr-app-00028-5cv` - Redesign Without Style Library + Iterative Editing + Multiple Image Upload
 - `deckr-app-00027-jrr` - Inpainting fix with canvas validation
 - `deckr-app-00026-r4m` - Redesign without style library requirement
