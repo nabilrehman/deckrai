@@ -5,6 +5,7 @@ import VariantSelector from './VariantSelector';
 import DebugLogViewer from './DebugLogViewer';
 import PersonalizationReviewModal from './PersonalizationReviewModal';
 import AnchoredChatBubble from './AnchoredChatBubble';
+import RightChatPanel from './RightChatPanel';
 
 interface ActiveSlideViewProps {
   slide: Slide;
@@ -128,6 +129,8 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
   // Anchored AI Chat state
   const [anchoredChatPosition, setAnchoredChatPosition] = useState<{ x: number; y: number } | null>(null);
   const [isChatRefining, setIsChatRefining] = useState(false);
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
+  const [rightPanelInitialMessage, setRightPanelInitialMessage] = useState<string>('');
 
   const currentSrc = !creationModeInfo ? slide.history[slide.history.length - 1] : null;
   const hasHistory = !creationModeInfo && slide.history.length > 1;
@@ -650,8 +653,10 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
   const handleChatSubmit = async (message: string) => {
     if (!message.trim() || !currentSrc) return;
 
-    // OPTION A: Close chat immediately for clean UX
-    setAnchoredChatPosition(null);
+    // Transition from floating bubble to right panel (Canva-style)
+    setRightPanelInitialMessage(message);
+    setAnchoredChatPosition(null); // Close floating bubble
+    setIsRightPanelOpen(true); // Open right panel
 
     setIsGenerating(true);
     setError(null);
@@ -702,6 +707,60 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
 
   const handleCloseChat = () => {
     setAnchoredChatPosition(null);
+  };
+
+  const handleCloseRightPanel = () => {
+    setIsRightPanelOpen(false);
+    setRightPanelInitialMessage('');
+  };
+
+  const handleRightPanelSubmit = async (message: string) => {
+    // Similar to handleChatSubmit but keeps panel open for conversation
+    if (!message.trim() || !currentSrc) return;
+
+    setIsGenerating(true);
+    setError(null);
+
+    let session: Partial<DebugSession> = {
+      timestamp: Date.now(),
+      slideId: slide.id,
+      slideNumber: slides.findIndex(s => s.id === slide.id) + 1,
+      prompt: message,
+      model: selectedModel,
+      workflow: 'Edit',
+      logs: [],
+      status: 'In Progress',
+      finalImages: [],
+    };
+
+    try {
+      const { images, prompts: variationPrompts, logs } = await getGenerativeVariations(
+        selectedModel,
+        message,
+        currentSrc,
+        isDeepMode,
+        handleProgressUpdate
+      );
+
+      if (images.length > 0) {
+        const context = { workflow: 'Edit', userIntentPrompt: message, model: selectedModel, deepMode: isDeepMode };
+        setVariants({ images, prompts: variationPrompts, context });
+        onSuccessfulSingleSlideEdit(context);
+
+        if (isDebugMode) {
+          setDebugLogs(logs);
+        }
+        session = { ...session, status: 'Success', finalImages: images, logs };
+      }
+
+    } catch (err: any) {
+      setError(err.message || 'An unknown error occurred while refining the slide.');
+      session = { ...session, status: 'Failed', error: err.message, logs: [], finalImages: [] };
+    } finally {
+      setIsGenerating(false);
+      setProgressSteps([]);
+      onAddSessionToHistory(session as DebugSession);
+    }
   };
 
 
@@ -1157,6 +1216,14 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
                 onClose={handleCloseChat}
                 onSubmit={handleChatSubmit}
                 isLoading={isChatRefining}
+            />
+        )}
+        {isRightPanelOpen && (
+            <RightChatPanel
+                onClose={handleCloseRightPanel}
+                onSubmit={handleRightPanelSubmit}
+                isLoading={isGenerating}
+                initialMessage={rightPanelInitialMessage}
             />
         )}
     </>
