@@ -121,7 +121,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
   const maskCanvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawing = useRef(false);
 
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const imageUploadInputRef = useRef<HTMLInputElement>(null);
 
   const currentSrc = !creationModeInfo ? slide.history[slide.history.length - 1] : null;
@@ -134,7 +134,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     setCompanyWebsite('');
     setIsInpaintingMode(false);
     setInpaintingPrompt('');
-    setUploadedImage(null);
+    setUploadedImages([]);
     if (variants) setVariants(null);
     if (personalizationPlanToReview) setPersonalizationPlanToReview(null);
   }, [slide?.id, slide?.history, creationModeInfo]);
@@ -170,30 +170,28 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     }
     setIsGenerating(true);
     setError(null);
-    
+
     const isRedesignIntent = REDESIGN_KEYWORDS.some(keyword => prompt.toLowerCase().includes(keyword));
 
-    if (isRedesignIntent && styleLibrary.length === 0) {
-        setError("To use the redesign feature, please add one or more high-quality slides to your Style Library first.");
-        setIsGenerating(false);
-        return;
-    }
+    // Redesign now works with OR without style library (no requirement!)
+    const useStyleLibrary = isRedesignIntent && styleLibrary.length > 0;
 
-    const initialSteps = isRedesignIntent
-        ? [
-            { text: 'Analyzing original slide content...', status: 'pending' as ProgressStatus },
-            { text: 'Selecting design references...', status: 'pending' as ProgressStatus },
-            { text: 'Generating new designs...', status: 'pending' as ProgressStatus },
-          ]
-        : (isImagenSelected ? 
-            [ { text: 'Generating image with Imagen 4...', status: 'pending' as ProgressStatus } ] :
+    const initialSteps = isImagenSelected ?
+        [ { text: 'Generating image with Imagen 4...', status: 'pending' as ProgressStatus } ] :
+        (useStyleLibrary ?
             [
-                { text: 'Briefing AI Design Analyst...', status: 'pending' as ProgressStatus },
+                { text: 'Analyzing original slide content...', status: 'pending' as ProgressStatus },
+                { text: 'Selecting design references...', status: 'pending' as ProgressStatus },
+                { text: 'Generating new designs...', status: 'pending' as ProgressStatus },
+            ] :
+            [
+                { text: 'Analyzing current slide...', status: 'pending' as ProgressStatus },
                 { text: 'Generating variations...', status: 'pending' as ProgressStatus },
-            ]);
+            ]
+        );
 
     if (isDeepMode && !isImagenSelected) {
-        initialSteps.splice(isRedesignIntent ? 2 : 1, 0, { text: 'Verifying & correcting variations...', status: 'pending' as ProgressStatus });
+        initialSteps.splice(useStyleLibrary ? 2 : 1, 0, { text: 'Verifying & correcting variations...', status: 'pending' as ProgressStatus });
     }
     initialSteps.push({ text: 'Finalizing images...', status: 'pending' });
     setProgressSteps(initialSteps);
@@ -201,7 +199,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     let session: Partial<DebugSession> = {
         id: `session-${Date.now()}`,
         timestamp: new Date().toISOString(),
-        workflow: isRedesignIntent ? 'Remake' : 'Generate',
+        workflow: useStyleLibrary ? 'Remake' : 'Generate',
         initialPrompt: prompt,
         initialImage: currentSrc,
         model: selectedModel,
@@ -210,7 +208,9 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
 
     try {
         let resultLogs: DebugLog[] = [];
-        if (isRedesignIntent) {
+
+        if (useStyleLibrary) {
+            // Redesign WITH style library
             const { images, logs, variationPrompts, bestReferenceSrc } = await remakeSlideWithStyleReference(prompt, currentSrc, styleLibrary, isDeepMode, handleProgressUpdate);
             const context = {
                 workflow: 'Remake',
@@ -222,6 +222,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
             resultLogs = logs;
             session = { ...session, status: 'Success', finalImages: images, logs, styleReferenceImage: bestReferenceSrc };
         } else {
+            // Iterative editing OR redesign WITHOUT style library - use current slide as input
             const { images, logs, variationPrompts } = await getGenerativeVariations(selectedModel, prompt, currentSrc, isDeepMode, handleProgressUpdate);
             const context = { workflow: 'Generate', userIntentPrompt: prompt };
             setVariants({ images, prompts: variationPrompts, context });
@@ -229,7 +230,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
             resultLogs = logs;
             session = { ...session, status: 'Success', finalImages: images, logs };
         }
-        
+
         setProgressSteps(prev => prev.map(step => ({ ...step, status: 'complete' })));
         await new Promise(resolve => setTimeout(resolve, 300));
 
@@ -381,40 +382,74 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    if (!file.type.startsWith('image/')) {
-      setError('Please upload an image file');
+    const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+
+    if (imageFiles.length === 0) {
+      setError('Please upload image files only');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      setUploadedImage(result);
+    if (imageFiles.length !== files.length) {
+      setError(`Uploaded ${imageFiles.length} images (${files.length - imageFiles.length} non-image files skipped)`);
+    } else {
       setError(null);
-    };
-    reader.readAsDataURL(file);
+    }
+
+    const readPromises = imageFiles.map(file => {
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          resolve(event.target?.result as string);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(readPromises).then(results => {
+      setUploadedImages(results);
+    }).catch(err => {
+      setError('Failed to read some image files');
+      console.error('Image upload error:', err);
+    });
   };
 
   const handleCreateFromUploadedImage = async () => {
-    if (!uploadedImage || !creationModeInfo) return;
+    if (uploadedImages.length === 0 || !creationModeInfo) return;
 
     setIsGenerating(true);
     setError(null);
 
     try {
-      const newSlide: Slide = {
-        id: `slide-${Date.now()}`,
-        name: 'Uploaded Slide',
-        originalSrc: uploadedImage,
-        history: [uploadedImage],
-      };
-      onAddNewSlide({ newSlide, insertAfterSlideId: creationModeInfo.insertAfterSlideId });
+      // Add all images as separate slides
+      let insertAfter = creationModeInfo.insertAfterSlideId;
+
+      for (let i = 0; i < uploadedImages.length; i++) {
+        const imageSrc = uploadedImages[i];
+        const newSlide: Slide = {
+          id: `slide-${Date.now()}-${i}`,
+          name: `Uploaded Slide ${uploadedImages.length > 1 ? i + 1 : ''}`.trim(),
+          originalSrc: imageSrc,
+          history: [imageSrc],
+        };
+
+        onAddNewSlide({ newSlide, insertAfterSlideId: insertAfter });
+
+        // Update insertAfter to the newly created slide so next one goes after it
+        insertAfter = newSlide.id;
+
+        // Small delay to ensure unique timestamps
+        if (i < uploadedImages.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      }
+
       onCancelCreation();
     } catch (err: any) {
-      setError(err.message || 'Failed to add uploaded image');
+      setError(err.message || 'Failed to add uploaded images');
     } finally {
       setIsGenerating(false);
     }
@@ -530,6 +565,13 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
       setError('Please paint an area and enter a prompt.');
       return;
     }
+
+    // Ensure canvas has valid dimensions
+    if (maskCanvasRef.current.width === 0 || maskCanvasRef.current.height === 0) {
+      setError('Canvas not properly initialized. Please try again.');
+      return;
+    }
+
     setError(null);
     setIsGenerating(true);
 
@@ -543,7 +585,10 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
             return;
         }
     }
+
     const maskDataUrl = maskCanvasRef.current.toDataURL('image/png');
+    console.log('[Inpaint] Mask data URL length:', maskDataUrl.length);
+    console.log('[Inpaint] Mask data URL prefix:', maskDataUrl.substring(0, 50));
     
     const initialSteps: ProgressStep[] = [{ text: 'Generating inpainting variations...', status: 'pending' }];
     if (isDeepMode) {
@@ -646,8 +691,8 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
                         <div className="w-2 h-2 rounded-full bg-brand-primary-500 animate-pulse"></div>
                         <span className="text-xs font-semibold text-brand-primary-700">
                             {detectedIntent === 'personalize' && '🎨 Personalization detected'}
-                            {detectedIntent === 'redesign' && '✨ Redesign detected'}
-                            {detectedIntent === 'edit' && '✏️ Edit mode'}
+                            {detectedIntent === 'redesign' && `✨ Redesign${styleLibrary.length > 0 ? ' with style library' : ' without reference'}`}
+                            {detectedIntent === 'edit' && '✏️ Iterative editing'}
                         </span>
                     </div>
                 )}
@@ -733,6 +778,11 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
                                     <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
                                 </svg>
                             )}
+                            {detectedIntent === 'redesign' && (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                                </svg>
+                            )}
                             {(!detectedIntent || detectedIntent === 'edit') && (
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                     <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
@@ -798,11 +848,11 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
                     onChange={(e) => setPrompt(e.target.value)}
                     placeholder="Describe the new slide you want to create... e.g., 'An agenda slide with 5 points'"
                     className="w-full p-3 text-sm bg-brand-background border border-brand-border rounded-md focus:ring-2 focus:ring-brand-primary transition-all resize-none text-brand-text-primary placeholder-brand-text-tertiary h-24"
-                    disabled={isGenerating || uploadedImage !== null}
+                    disabled={isGenerating || uploadedImages.length > 0}
                 />
                 <button
                     onClick={handleCreateNewSlide}
-                    disabled={isGenerating || !prompt || uploadedImage !== null}
+                    disabled={isGenerating || !prompt || uploadedImages.length > 0}
                     className="btn btn-primary w-full text-base mt-3"
                 >
                     {isGenerating ? <><Spinner size="h-5 w-5" className="-ml-1 mr-3" /> Creating...</> : 'Create New Slide'}
@@ -819,18 +869,19 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
                 </div>
             </div>
 
-            {/* Option 2: Upload Image */}
+            {/* Option 2: Upload Images */}
             <div>
                 <div className="flex items-center gap-2 mb-2">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-brand-primary-500" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
                     </svg>
-                    <label className="text-sm font-medium text-brand-text-primary">📤 Upload Image</label>
+                    <label className="text-sm font-medium text-brand-text-primary">📤 Upload Images</label>
                 </div>
                 <input
                     ref={imageUploadInputRef}
                     type="file"
                     accept="image/*"
+                    multiple
                     onChange={handleImageUpload}
                     className="hidden"
                 />
@@ -839,39 +890,43 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
                     disabled={isGenerating || prompt.trim() !== ''}
                     className="w-full p-4 border-2 border-dashed border-brand-border rounded-lg hover:border-brand-primary-300 hover:bg-brand-primary-50/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    {uploadedImage ? (
+                    {uploadedImages.length > 0 ? (
                         <div className="flex items-center justify-center gap-2 text-brand-primary-600">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                             </svg>
-                            <span className="text-sm font-medium">Image uploaded - click below to add</span>
+                            <span className="text-sm font-medium">{uploadedImages.length} image{uploadedImages.length > 1 ? 's' : ''} uploaded - click below to add</span>
                         </div>
                     ) : (
                         <div className="flex items-center justify-center gap-2 text-brand-text-tertiary">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                             </svg>
-                            <span className="text-sm">Click to select an image file</span>
+                            <span className="text-sm">Click to select image files (multiple allowed)</span>
                         </div>
                     )}
                 </button>
-                {uploadedImage && (
+                {uploadedImages.length > 0 && (
                     <div className="mt-3 space-y-2">
-                        <img src={uploadedImage} alt="Preview" className="w-full rounded-lg border border-brand-border" />
+                        <div className="grid grid-cols-2 gap-2">
+                            {uploadedImages.map((imageSrc, idx) => (
+                                <img key={idx} src={imageSrc} alt={`Preview ${idx + 1}`} className="w-full rounded-lg border border-brand-border aspect-video object-cover" />
+                            ))}
+                        </div>
                         <div className="flex gap-2">
                             <button
-                                onClick={() => setUploadedImage(null)}
+                                onClick={() => setUploadedImages([])}
                                 disabled={isGenerating}
                                 className="btn btn-secondary flex-1"
                             >
-                                Remove
+                                Remove All
                             </button>
                             <button
                                 onClick={handleCreateFromUploadedImage}
                                 disabled={isGenerating}
                                 className="btn btn-primary flex-1"
                             >
-                                {isGenerating ? <><Spinner size="h-5 w-5" className="-ml-1 mr-3" /> Adding...</> : 'Add to Deck'}
+                                {isGenerating ? <><Spinner size="h-5 w-5" className="-ml-1 mr-3" /> Adding...</> : `Add ${uploadedImages.length} Slide${uploadedImages.length > 1 ? 's' : ''}`}
                             </button>
                         </div>
                     </div>
