@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createSlideFromPrompt } from '../services/geminiService';
 import { DesignerStyle, generateStylePromptModifier } from '../services/vibeDetection';
 
@@ -33,9 +33,17 @@ const EnhancedThemePreviewSelector: React.FC<EnhancedThemePreviewSelectorProps> 
   const [designerPreviews, setDesignerPreviews] = useState<DesignerPreview[]>([]);
   const [selectedDesignerId, setSelectedDesignerId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(true);
+  const hasGeneratedRef = useRef(false); // Prevent infinite loop
 
-  // Initialize designer previews
+  // Initialize designer previews AND start generation
   useEffect(() => {
+    // 🛑 INFINITE LOOP GUARD: Only run generation once
+    if (hasGeneratedRef.current) {
+      console.log('🛑 Generation already ran, skipping to prevent infinite loop');
+      return;
+    }
+    hasGeneratedRef.current = true;
+
     const initialPreviews: DesignerPreview[] = designerStyles.map(style => ({
       style,
       slides: samplePrompts.map(() => ({
@@ -45,17 +53,43 @@ const EnhancedThemePreviewSelector: React.FC<EnhancedThemePreviewSelectorProps> 
       })),
     }));
     setDesignerPreviews(initialPreviews);
-  }, [designerStyles, samplePrompts]);
 
-  // Generate all preview slides IN PARALLEL
-  useEffect(() => {
+    // Start generation immediately after initialization
     const generateAllPreviews = async () => {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🎨 THEME PREVIEW GENERATION STARTED');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log(`📊 Total Designers: ${designerStyles.length}`);
+      console.log(`📊 Slides per Designer: ${samplePrompts.length}`);
+      console.log(`📊 Total Slides to Generate: ${designerStyles.length * samplePrompts.length}`);
+      console.log(`📊 Note: Each slide generates 3 variations internally (${designerStyles.length * samplePrompts.length * 3} total API calls)`);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
+      // Log sample prompts
+      console.log('📝 Sample Prompts Being Used:');
+      samplePrompts.forEach((prompt, idx) => {
+        console.log(`  ${idx + 1}. "${prompt}"`);
+        console.log(`     Length: ${prompt.length} characters`);
+        if (prompt.length < 50) {
+          console.warn(`     ⚠️  WARNING: Prompt is very short! This may cause generation failures.`);
+        }
+      });
+      console.log('');
+
+      console.log(`🎨 Style Reference: ${styleReference ? 'YES (provided)' : 'NO (will use default style)'}\n`);
+
       // Create all generation tasks
       const allTasks: Promise<void>[] = [];
+      const startTime = Date.now();
+      let successCount = 0;
+      let failureCount = 0;
 
       for (let designerIdx = 0; designerIdx < designerStyles.length; designerIdx++) {
         const designer = designerStyles[designerIdx];
         const styleModifier = generateStylePromptModifier(designer);
+
+        console.log(`\n👨‍🎨 Designer ${designerIdx + 1}/${designerStyles.length}: ${designer.name}`);
+        console.log(`   Icon: ${designer.icon} | Aesthetic: ${designer.aesthetic}`);
 
         // Generate 3 slides for this designer IN PARALLEL
         for (let slideIdx = 0; slideIdx < samplePrompts.length; slideIdx++) {
@@ -63,10 +97,14 @@ const EnhancedThemePreviewSelector: React.FC<EnhancedThemePreviewSelectorProps> 
 
           // Create task but don't await yet
           const task = (async () => {
+            const taskStartTime = Date.now();
             try {
               const finalPrompt = prompt + styleModifier;
-              console.log(`[Preview Gen] Starting slide ${slideIdx + 1} for ${designer.name}`);
-              console.log(`[Preview Gen] Prompt: ${finalPrompt.substring(0, 150)}...`);
+              console.log(`\n[Preview Gen] 🚀 Starting: ${designer.name} - Slide ${slideIdx + 1}/${samplePrompts.length}`);
+              console.log(`[Preview Gen] Base Prompt: "${prompt}"`);
+              console.log(`[Preview Gen] Style Modifier Length: ${styleModifier.length} chars`);
+              console.log(`[Preview Gen] Final Prompt Length: ${finalPrompt.length} chars`);
+              console.log(`[Preview Gen] Full Prompt Preview:\n${finalPrompt.substring(0, 300)}...\n`);
 
               const { images } = await createSlideFromPrompt(
                 styleReference,
@@ -78,10 +116,17 @@ const EnhancedThemePreviewSelector: React.FC<EnhancedThemePreviewSelectorProps> 
                 null
               );
 
-              console.log(`[Preview Gen] Got ${images?.length || 0} images for ${designer.name} slide ${slideIdx + 1}`);
+              const taskDuration = ((Date.now() - taskStartTime) / 1000).toFixed(2);
+              console.log(`[Preview Gen] ⏱️  Task completed in ${taskDuration}s`);
+              console.log(`[Preview Gen] 📦 Received ${images?.length || 0} image(s) for ${designer.name} slide ${slideIdx + 1}`);
 
               if (!images || images.length === 0) {
-                console.error(`[Preview Gen] No images returned for ${designer.name} slide ${slideIdx + 1}`);
+                console.error(`[Preview Gen] ❌ ERROR: No images returned for ${designer.name} slide ${slideIdx + 1}`);
+                console.error(`[Preview Gen] This likely means:`);
+                console.error(`  - API safety filter rejection`);
+                console.error(`  - Empty prompt content`);
+                console.error(`  - Rate limit exceeded`);
+                console.error(`  - API quota exhausted`);
                 throw new Error('No images returned from API');
               }
 
@@ -101,9 +146,30 @@ const EnhancedThemePreviewSelector: React.FC<EnhancedThemePreviewSelectorProps> 
                 )
               );
 
-              console.log(`[Preview Gen] ✅ Successfully generated ${designer.name} slide ${slideIdx + 1}`);
-            } catch (error) {
-              console.error(`[Preview Gen] ❌ Failed to generate slide ${slideIdx + 1} for ${designer.name}:`, error);
+              successCount++;
+              console.log(`[Preview Gen] ✅ SUCCESS: ${designer.name} slide ${slideIdx + 1} generated`);
+              console.log(`[Preview Gen] Image preview: ${images[0].substring(0, 50)}...`);
+            } catch (error: any) {
+              failureCount++;
+              const taskDuration = ((Date.now() - taskStartTime) / 1000).toFixed(2);
+              console.error(`\n[Preview Gen] ❌❌❌ FAILED: ${designer.name} - Slide ${slideIdx + 1} ❌❌❌`);
+              console.error(`[Preview Gen] ⏱️  Failed after ${taskDuration}s`);
+              console.error(`[Preview Gen] Error Type: ${error?.name || 'Unknown'}`);
+              console.error(`[Preview Gen] Error Message: ${error?.message || 'No message'}`);
+              console.error(`[Preview Gen] Full Error:`, error);
+
+              // Try to extract more details
+              if (error?.message?.includes('SAFETY')) {
+                console.error(`[Preview Gen] 🚨 SAFETY FILTER TRIGGERED - Prompt was rejected as unsafe`);
+              } else if (error?.message?.includes('RATE_LIMIT') || error?.message?.includes('429')) {
+                console.error(`[Preview Gen] 🚨 RATE LIMIT EXCEEDED - Too many requests`);
+              } else if (error?.message?.includes('QUOTA')) {
+                console.error(`[Preview Gen] 🚨 QUOTA EXHAUSTED - API usage limit reached`);
+              } else if (error?.message?.includes('NO_IMAGE')) {
+                console.error(`[Preview Gen] 🚨 NO IMAGE RETURNED - Check if prompt is valid`);
+              }
+
+              console.error(`[Preview Gen] Prompt that failed: "${prompt.substring(0, 100)}..."`);
 
               setDesignerPreviews(prev =>
                 prev.map((dp, dIdx) =>
@@ -126,15 +192,34 @@ const EnhancedThemePreviewSelector: React.FC<EnhancedThemePreviewSelectorProps> 
         }
       }
 
+      console.log(`\n⏳ Waiting for all ${allTasks.length} tasks to complete...\n`);
+
       // Wait for ALL 9 slides to generate in parallel
       await Promise.all(allTasks);
+
+      const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
+
+      console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🏁 THEME PREVIEW GENERATION COMPLETED');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log(`⏱️  Total Duration: ${totalDuration}s`);
+
+      // Display final counts
+      const totalExpected = designerStyles.length * samplePrompts.length;
+
+      console.log(`✅ Successful: ${successCount}/${totalExpected}`);
+      console.log(`❌ Failed: ${failureCount}/${totalExpected}`);
+      console.log(`📊 Success Rate: ${totalExpected > 0 ? ((successCount / totalExpected) * 100).toFixed(1) : 0}%`);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
       setIsGenerating(false);
     };
 
-    if (designerPreviews.length > 0) {
-      generateAllPreviews();
-    }
-  }, [designerStyles, samplePrompts, styleReference]);
+    console.log('🎬 Starting theme preview generation...');
+    generateAllPreviews();
+
+    // Cleanup: this effect should only run ONCE on mount
+  }, [designerStyles, samplePrompts, styleReference]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelectDesigner = () => {
     if (!selectedDesignerId) return;

@@ -94,21 +94,33 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
    * Step 1: Analyze notes and create generation plan
    */
   const handleSmartGenerate = useCallback(async () => {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🚀 SMART GENERATE CLICKED');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
     if (!rawNotes.trim()) {
+      console.error('❌ No notes provided');
       setError('Please paste your notes or content first.');
       return;
     }
+
+    console.log(`📝 Notes length: ${rawNotes.length} characters`);
+    console.log(`📝 Notes preview: ${rawNotes.substring(0, 100)}...\n`);
 
     setIsAnalyzing(true);
     setError(null);
 
     try {
       // Detect presentation vibe from notes
+      console.log('🔍 Step 1: Detecting vibe from notes...');
       const vibe = detectVibeFromNotes(rawNotes);
+      console.log(`✅ Detected vibe: ${vibe}`);
       setDetectedVibe(vibe);
 
       // AI analyzes notes and provides recommendations
+      console.log('🤖 Step 2: AI analyzing notes and asking questions...');
       const analysis = await analyzeNotesAndAskQuestions(rawNotes);
+      console.log('✅ AI analysis complete:', analysis);
 
       // Extract audience from questions (if answered by AI)
       let inferredAudience = 'General professional audience';
@@ -136,7 +148,9 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
         estimatedTime,
       };
 
+      console.log('📋 Generation Plan Created:', plan);
       setGenerationPlan(plan);
+      console.log('✅ Showing plan proposal modal...');
       setShowPlanProposal(true);
     } catch (err: any) {
       console.error('Analysis failed:', err);
@@ -150,11 +164,26 @@ const SmartDeckGenerator: React.FC<SmartDeckGeneratorProps> = ({
    * Step 2: User approves plan - show theme preview
    */
   const handleApprovePlan = useCallback(async () => {
-    if (!generationPlan || !detectedVibe) return;
+    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('✅ USER APPROVED PLAN');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+    if (!generationPlan || !detectedVibe) {
+      console.error('❌ Missing required data:');
+      console.error(`   Generation Plan: ${generationPlan ? 'YES' : 'NO'}`);
+      console.error(`   Detected Vibe: ${detectedVibe || 'NO'}`);
+      return;
+    }
+
+    console.log(`📋 Plan: ${generationPlan.slideCount} slides, ${generationPlan.style} style, ${generationPlan.audience}`);
+    console.log(`🎨 Vibe: ${detectedVibe}`);
 
     // Close plan proposal and show theme preview
+    console.log('🔄 Closing plan proposal modal...');
     setShowPlanProposal(false);
+    console.log('🎨 Opening theme preview modal...');
     setShowThemePreview(true);
+    console.log('✅ Theme preview should now be visible\n');
   }, [generationPlan, detectedVibe]);
 
   /**

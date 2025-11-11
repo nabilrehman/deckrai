@@ -67,7 +67,12 @@ export const analyzeNotesAndAskQuestions = async (notes: string): Promise<{
 }`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash-exp",
+    model: "gemini-2.5-pro",
+    config: {
+      thinkingConfig: {
+        thinkingBudgetTokens: 10000 // Enable planning mode for better analysis
+      }
+    },
     contents: [
       { text: systemPrompt },
       { text: `\n\n--- USER'S NOTES ---\n${notes}\n\nAnalyze these notes and ask smart questions to help generate the perfect presentation.` }
@@ -110,13 +115,13 @@ export const analyzeNotesAndAskQuestions = async (notes: string): Promise<{
 export const generateSlidesWithContext = async (
   context: GenerationContext
 ): Promise<string[]> => {
-  const systemPrompt = `You are an expert presentation creator. Generate slide-by-slide descriptions based on the user's notes and preferences.
+  const systemPrompt = `You are an expert "Presentation Content Strategist" for a leading tech company. Your specialty is transforming raw information into clear, concise, and compelling slide deck outlines.
 
 **Context:**
 - Notes: ${context.notes}
 - Audience: ${context.audience || 'General professional audience'}
-- Number of Slides: ${context.slideCount || '7-10'}
-- Style: ${context.style || 'Auto (you decide)'}
+- Target Slides: ${context.slideCount || '7-10'}
+- Presentation Style: ${context.style || 'Auto (you decide)'}
 
 **Audience-Specific Guidelines:**
 
@@ -127,23 +132,35 @@ ${getAudienceGuidelines(context.audience || '')}
 ${getStyleGuidelines(context.style || 'auto')}
 
 **Your Task:**
-Generate exactly ${context.slideCount || 7} slide descriptions. For each slide, provide:
-1. Slide title (clear, concise)
-2. Key content/bullet points
-3. Visual description (what should be shown)
-4. Layout notes (text-heavy? image-focused? chart?)
+1.  **Read and Deeply Understand** the entire context of the provided notes.
+2.  **Identify the Key Themes** and narrative pillars: What is the main message? What problem are we solving? What are the key points? What is the call to action?
+3.  **Structure a Logical Narrative Flow** suitable for a ${context.audience || 'professional'} audience. Build a compelling story arc.
+4.  **Break Down the Narrative into Individual Slides.** Be selective and strategic. Not every detail needs its own slide. Group related concepts.
+5.  For each slide, write a **clear and descriptive prompt** that includes:
+    - A compelling slide title
+    - Key content/bullet points (2-5 items)
+    - Visual description (what images, charts, or graphics should be shown)
+    - Layout guidance (text-heavy? image-focused? data visualization?)
+    - The prompt should be detailed enough for a designer AI to create a professional slide
 
-**Important:**
+**Critical Constraints:**
+- Generate exactly ${context.slideCount || 7} slides
+- Each slide should have a clear purpose in the narrative
 - Be natural and authentic, not overly salesy
-- Focus on clarity and value
-- Adapt to the audience's needs and knowledge level
-- Each slide should have a clear purpose
-- Build a logical narrative flow
+- Focus on clarity and value for the ${context.audience || 'audience'}
+- Build logical flow from slide to slide
+- Adapt depth and complexity to audience knowledge level
 
-Output as JSON array of strings, where each string is a complete slide description.`;
+**Output Format:**
+Your final output MUST be a JSON array of strings, where each string is the complete, detailed prompt for one slide. Do not add any other explanation or text outside of the JSON array.`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash-exp",
+    model: "gemini-2.5-pro",
+    config: {
+      thinkingConfig: {
+        thinkingBudgetTokens: 15000 // Enable extended planning mode for strategic deck creation
+      }
+    },
     contents: [{ text: systemPrompt }],
   });
 
