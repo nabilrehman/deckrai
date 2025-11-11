@@ -137,8 +137,8 @@ ${getStyleGuidelines(context.style || 'auto')}
 3.  **Structure a Logical Narrative Flow** suitable for a ${context.audience || 'professional'} audience. Build a compelling story arc.
 4.  **Break Down the Narrative into Individual Slides.** Be selective and strategic. Not every detail needs its own slide. Group related concepts.
 5.  For each slide, write a **clear and descriptive prompt** that includes:
-    - A compelling slide title
-    - Key content/bullet points (2-5 items)
+    - A compelling slide title (SHORT - 3-7 words maximum)
+    - Key content/bullet points (2-4 items, each 5-10 words maximum)
     - Visual description (what images, charts, or graphics should be shown)
     - Layout guidance (text-heavy? image-focused? data visualization?)
     - The prompt should be detailed enough for a designer AI to create a professional slide
@@ -146,10 +146,16 @@ ${getStyleGuidelines(context.style || 'auto')}
 **Critical Constraints:**
 - Generate exactly ${context.slideCount || 7} slides
 - Each slide should have a clear purpose in the narrative
+- **MINIMAL TEXT RULE**: Keep text concise. Slides are visual aids, not documents.
+  - Titles: 3-7 words max
+  - Bullet points: 5-10 words each
+  - Total text per slide: 30-50 words maximum
+  - Prefer powerful visuals over lengthy text
 - Be natural and authentic, not overly salesy
 - Focus on clarity and value for the ${context.audience || 'audience'}
 - Build logical flow from slide to slide
 - Adapt depth and complexity to audience knowledge level
+- Emphasize visual storytelling - let images and graphics do the heavy lifting
 
 **Output Format:**
 Your final output MUST be a JSON array of strings, where each string is the complete, detailed prompt for one slide. Do not add any other explanation or text outside of the JSON array.`;
@@ -217,11 +223,11 @@ function getAudienceGuidelines(audience: string): string {
 
     'conference_audience': `
 **Conference Audience:**
-- Big ideas with powerful visuals
-- Tell compelling stories
-- One key message per slide
-- Inspire and educate
-- Make it memorable`
+- Big ideas with powerful visuals (minimal text!)
+- Tell compelling stories through imagery
+- One key message per slide (3-7 words max)
+- Inspire and educate visually
+- Make it memorable with striking visuals, not dense text`
   };
 
   return guidelines[audience] || `**General Professional Audience:**
@@ -237,39 +243,41 @@ function getStyleGuidelines(style: string): string {
   const guidelines: Record<string, string> = {
     'visual': `
 **Visual Storytelling Style:**
-- Large, impactful images
-- Minimal text (3-5 words per slide)
-- Bold, emotional language
-- Tell a story
-- Create visual metaphors`,
+- Large, impactful images dominate the slide
+- MINIMAL text (3-5 words per slide MAXIMUM)
+- Bold, emotional single-phrase headlines
+- Tell a story through visuals, not words
+- Create visual metaphors instead of bullet points`,
 
     'executive': `
 **Executive Brief Style:**
-- Clean, minimal layouts
-- Concise bullet points (3-5 per slide)
-- Professional aesthetic
-- Data to support key points
-- Clear hierarchy`,
+- Clean, minimal layouts with lots of whitespace
+- Ultra-concise bullet points (3-4 max, 5-8 words each)
+- Professional aesthetic, no clutter
+- Key data points only, not paragraphs
+- Clear hierarchy, scannable at a glance`,
 
     'data': `
 **Data-Driven Style:**
-- Chart and graph focused
-- Show trends and comparisons
-- Include data labels
-- Multiple data points per slide OK
-- Lead with insights`,
+- Chart and graph focused (visuals tell the story)
+- Show trends and comparisons graphically
+- Minimal text labels, let data speak
+- One key insight per slide
+- Lead with headline, support with visualization`,
 
     'technical': `
 **Technical Style:**
-- Diagrams and flowcharts
-- Technical depth and detail
-- Architecture visualizations
-- Step-by-step explanations
-- Include technical specifications`
+- Diagrams and flowcharts (visual > text)
+- Keep explanations brief and bullet-pointed
+- Architecture visualizations instead of descriptions
+- Step-by-step with minimal words per step
+- Technical specs in tables/diagrams, not paragraphs`
   };
 
   return guidelines[style] || `**Balanced Approach:**
-- Mix of text and visuals
-- Clear structure
-- Professional design`;
+- Mix of text and visuals, but prioritize visuals
+- Keep text minimal (30-50 words per slide max)
+- Short bullet points (5-10 words each)
+- Clear structure with whitespace
+- Professional design, avoid clutter`;
 }
