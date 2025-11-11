@@ -51,6 +51,8 @@ export const analyzeNotesAndAskQuestions = async (notes: string): Promise<{
 - Don't ask unnecessary questions if context is obvious
 
 **Output Format (JSON):**
+IMPORTANT: Return ONLY the JSON object. Do not include any conversational text, explanations, or commentary before or after the JSON.
+
 {
   "questions": [
     {
@@ -79,7 +81,19 @@ export const analyzeNotesAndAskQuestions = async (notes: string): Promise<{
     ],
   });
 
-  const jsonText = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
+  let jsonText = response.text.trim();
+
+  // Extract JSON from response - handle conversational text before JSON
+  const jsonMatch = jsonText.match(/```json\s*([\s\S]*?)\s*```/);
+  if (jsonMatch) {
+    jsonText = jsonMatch[1];
+  } else {
+    // Try to find JSON object in the response
+    const objMatch = jsonText.match(/\{[\s\S]*\}/);
+    if (objMatch) {
+      jsonText = objMatch[0];
+    }
+  }
 
   try {
     const parsed = JSON.parse(jsonText);
