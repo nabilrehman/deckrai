@@ -68,8 +68,11 @@ export const analyzeNotesAndAskQuestions = async (notes: string): Promise<{
 
   const response = await ai.models.generateContent({
     model: "gemini-2.5-pro",
-    // Note: gemini-2.5-pro has built-in extended reasoning capabilities
-    // No need for explicit thinking config - it plans automatically
+    config: {
+      thinkingConfig: {
+        thinkingBudget: 32768 // Max thinking budget for best strategic analysis quality
+      }
+    },
     contents: [
       { text: systemPrompt },
       { text: `\n\n--- USER'S NOTES ---\n${notes}\n\nAnalyze these notes and ask smart questions to help generate the perfect presentation.` }
@@ -159,7 +162,11 @@ Your final output MUST be a JSON array of strings, where each string is the comp
 
   const response = await ai.models.generateContent({
     model: "gemini-2.5-pro",
-    // Note: gemini-2.5-pro has built-in extended reasoning for strategic thinking
+    config: {
+      thinkingConfig: {
+        thinkingBudget: 32768 // Max thinking budget for highest quality deck planning
+      }
+    },
     contents: [{ text: systemPrompt }],
   });
 
