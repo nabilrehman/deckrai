@@ -445,38 +445,57 @@ export const removeFromStyleLibrary = async (
 /**
  * Batch add multiple items to style library
  *
- * Handles large uploads by chunking into smaller batches to avoid:
- * - Firebase limit: 500 operations per batch
- * - Firebase limit: 11MB payload size per batch
+ * Uploads images to Firebase Storage and stores metadata in Firestore.
+ * - Storage: Actual image files (no size limit)
+ * - Firestore: Metadata with Storage URLs (small, efficient queries)
  */
 export const batchAddToStyleLibrary = async (
     userId: string,
     items: StyleLibraryItem[]
 ): Promise<void> => {
     const now = Date.now();
+    console.log(`📤 Uploading ${items.length} reference slides to Firebase Storage...`);
 
-    // Chunk size: 5 items per batch to stay well under 11MB limit
-    // (each slide image can be ~2MB, so 5 slides = ~10MB < 11MB limit)
-    const CHUNK_SIZE = 5;
+    // Step 1: Upload all images to Storage in parallel
+    const uploadPromises = items.map(async (item, index) => {
+        try {
+            // Convert base64 to blob
+            const base64Data = item.src.split(',')[1];
+            const mimeType = item.src.match(/data:(.*?);/)?.[1] || 'image/png';
+            const blob = base64ToBlob(`data:${mimeType};base64,${base64Data}`);
 
-    // Process in chunks
-    for (let i = 0; i < items.length; i += CHUNK_SIZE) {
-        const chunk = items.slice(i, i + CHUNK_SIZE);
-        const batch = writeBatch(db);
+            // Upload to Firebase Storage
+            const storagePath = `users/${userId}/styleLibrary/${item.id}.png`;
+            const storageRef = ref(storage, storagePath);
+            await uploadBytes(storageRef, blob);
+            const downloadURL = await getDownloadURL(storageRef);
 
-        chunk.forEach(item => {
-            const itemRef = doc(db, 'users', userId, 'styleLibrary', item.id);
-            batch.set(itemRef, {
-                ...item,
-                createdAt: now
-            });
-        });
+            console.log(`✅ Uploaded ${index + 1}/${items.length}: ${item.name}`);
 
-        await batch.commit();
-        console.log(`✅ Uploaded chunk ${Math.floor(i / CHUNK_SIZE) + 1}/${Math.ceil(items.length / CHUNK_SIZE)} (${chunk.length} items)`);
-    }
+            // Return metadata with Storage URL
+            return {
+                id: item.id,
+                name: item.name,
+                src: downloadURL, // Storage URL, not base64
+                createdAt: now,
+            };
+        } catch (error) {
+            console.error(`❌ Failed to upload ${item.name}:`, error);
+            throw error;
+        }
+    });
 
-    console.log(`✅ Successfully uploaded all ${items.length} items to style library`);
+    const uploadedItems = await Promise.all(uploadPromises);
+
+    // Step 2: Save metadata to Firestore (tiny URLs, no size limit issues)
+    const batch = writeBatch(db);
+    uploadedItems.forEach(item => {
+        const itemRef = doc(db, 'users', userId, 'styleLibrary', item.id);
+        batch.set(itemRef, item);
+    });
+
+    await batch.commit();
+    console.log(`✅ Successfully saved ${items.length} items to Firestore`);
 };
 
 // ============================================================================

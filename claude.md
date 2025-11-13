@@ -109,69 +109,86 @@ Deckr.ai uses a hybrid storage approach optimized for different data types:
 
 ### Style Library Storage Pattern
 
-**Current Implementation (Hybrid - CORRECT):**
+**Current Implementation (Storage + Firestore):**
 ```typescript
 // 1. User uploads PDF → Extracted to base64 images in-memory
-// 2. Base64 data stored in Firestore (chunked to avoid 11MB limit)
+// 2. Upload images to Firebase Storage (no size limit)
+// 3. Store metadata in Firestore with Storage URLs
+
 interface StyleLibraryItem {
   id: string;
   name: string;
-  src: string;  // base64: data:image/png;base64,iVBORw0KG...
+  src: string;  // Storage URL: https://firebasestorage.googleapis.com/...
   createdAt: number;
 }
 
-// 3. Batch write to Firestore in chunks of 5 items
-// Each chunk: ~10MB (5 slides × ~2MB) < 11MB limit
-await batchAddToStyleLibrary(userId, items); // Handles chunking internally
-```
-
-**Why base64 in Firestore (not Storage)?**
-1. ✅ **Immediate availability**: No async upload, instant access
-2. ✅ **Simpler code**: No need to manage Storage URLs and cleanup
-3. ✅ **Transactional**: Firestore handles batch writes atomically
-4. ✅ **Works with chunking**: 5 items per batch stays under 11MB limit
-5. ✅ **Cost-effective**: Small number of reference slides (typically 5-50)
-
-**When to use Firebase Storage instead:**
-- ❌ User uploads 100+ reference slides (rare)
-- ❌ Reference slides are very high-res (>5MB each)
-- ❌ Need to share references across multiple users
-
-**Chunking Strategy:**
-```typescript
-// services/firestoreService.ts:452
+// Implementation (services/firestoreService.ts:452)
 export const batchAddToStyleLibrary = async (userId: string, items: StyleLibraryItem[]) => {
-  const CHUNK_SIZE = 5; // 5 slides × ~2MB = ~10MB < 11MB limit
+  // Step 1: Upload all images to Storage in parallel
+  const uploadPromises = items.map(async (item) => {
+    const blob = base64ToBlob(item.src);
+    const storagePath = `users/${userId}/styleLibrary/${item.id}.png`;
+    const storageRef = ref(storage, storagePath);
 
-  for (let i = 0; i < items.length; i += CHUNK_SIZE) {
-    const chunk = items.slice(i, i + CHUNK_SIZE);
-    const batch = writeBatch(db);
+    await uploadBytes(storageRef, blob);
+    const downloadURL = await getDownloadURL(storageRef);
 
-    chunk.forEach(item => {
-      const itemRef = doc(db, 'users', userId, 'styleLibrary', item.id);
-      batch.set(itemRef, { ...item, createdAt: now });
-    });
+    return { id: item.id, name: item.name, src: downloadURL, createdAt: now };
+  });
 
-    await batch.commit();
-  }
+  const uploadedItems = await Promise.all(uploadPromises);
+
+  // Step 2: Save metadata to Firestore (tiny URLs, no size issues)
+  const batch = writeBatch(db);
+  uploadedItems.forEach(item => {
+    const itemRef = doc(db, 'users', userId, 'styleLibrary', item.id);
+    batch.set(itemRef, item);
+  });
+
+  await batch.commit();
 };
 ```
 
-**Future Optimization (if needed):**
-If style library grows very large, migrate to Storage:
-```typescript
-// Upload to Storage, store URL in Firestore
-const storageRef = ref(storage, `users/${userId}/references/${item.id}.png`);
-await uploadBytes(storageRef, blob);
-const downloadURL = await getDownloadURL(storageRef);
+**Why Storage + Firestore (not just Firestore)?**
+1. ✅ **No size limits**: Storage handles any image size (no 11MB limit)
+2. ✅ **Efficient queries**: Firestore metadata enables fast listing/searching
+3. ✅ **Scalable**: Works for 5 slides or 500 slides
+4. ✅ **Best practice**: Separate concerns (binary in Storage, metadata in Firestore)
+5. ✅ **Cost-effective**: Storage is cheaper than Firestore for large files
 
-// Store only URL in Firestore (tiny metadata)
-await setDoc(doc(db, 'users', userId, 'styleLibrary', item.id), {
-  id: item.id,
-  name: item.name,
-  storageUrl: downloadURL, // Small URL, not base64
-  createdAt: now
-});
+**Storage Structure:**
+```
+gs://deckr-477706.appspot.com/
+  users/
+    {userId}/
+      styleLibrary/
+        {itemId1}.png  ← Actual image file
+        {itemId2}.png
+        ...
+```
+
+**Firestore Structure:**
+```
+/users/{userId}/styleLibrary/{itemId}
+  {
+    id: "abc123",
+    name: "google-cloud-page-1.png",
+    src: "https://firebasestorage.googleapis.com/...",
+    createdAt: 1699999999999
+  }
+```
+
+**Retrieval:**
+```typescript
+// Fast query via Firestore (no need to list Storage)
+const getUserStyleLibrary = async (userId: string) => {
+  const libraryRef = collection(db, 'users', userId, 'styleLibrary');
+  const q = query(libraryRef, orderBy('createdAt', 'desc'));
+  const querySnapshot = await getDocs(q);
+
+  return querySnapshot.docs.map(doc => doc.data() as StyleLibraryItem);
+  // Returns items with Storage URLs in 'src' field
+};
 ```
 
 ---
