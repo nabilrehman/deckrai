@@ -92,12 +92,15 @@ const DesignerModeGenerator: React.FC<DesignerModeGeneratorProps> = ({
   /**
    * Extract context from notes using LLM (not regex!)
    * Handles complex scenarios: "I work at Google, presenting to Microsoft"
+   * Dynamically detects presentation goal/intention from user input
    * See CLAUDE.md - don't use regex for natural language extraction
    */
   const extractPresentationContext = async (notes: string): Promise<{
     myCompany: string;
     audienceCompany?: string;
     audience: string;
+    goal: string;
+    presentationType: string;
   }> => {
     try {
       // Use lightweight Gemini Flash for quick extraction
@@ -105,40 +108,117 @@ const DesignerModeGenerator: React.FC<DesignerModeGeneratorProps> = ({
         apiKey: import.meta.env.VITE_GEMINI_API_KEY
       });
 
-      const prompt = `You are analyzing presentation notes to understand the CONTEXT and PURPOSE.
+      const prompt = `You are a presentation intelligence agent analyzing raw notes/brain dumps to extract metadata and intent.
 
-**CRITICAL:** Differentiate between presentation CONTENT vs. presentation METADATA:
-- CONTENT = what will be shown ON the slides (e.g., "Targeted accounts", "Upcoming renewals", lists, data)
-- METADATA = who's creating it, who's the audience, what's the purpose
+**CRITICAL INSTRUCTIONS:**
+1. These notes may be UNSTRUCTURED, messy, or incomplete - that's expected!
+2. Differentiate between CONTENT (what goes on slides) vs. METADATA (who/why/what for)
+3. Infer missing information intelligently based on context clues
+4. Handle brain dumps, bullet points, full paragraphs, or mixed formats
 
-**Your Task:**
-1. First, determine: What TYPE of presentation is this? (sales pitch, internal training, case study, conference talk, etc.)
-2. Then infer: WHO is the likely AUDIENCE based on the presentation type and content?
-3. Extract: WHICH COMPANY is creating the deck (whose brand to use)?
-4. Extract: Is there a specific company being presented TO (for personalization)?
+**Your Task - Extract 5 Key Elements:**
+
+1. **Company (Brand):** Which company/organization is creating this deck? Whose brand guidelines should we use?
+   - Look for: "my company is...", "I work at...", company name in context
+   - If unclear: Use "Your Company"
+
+2. **Audience Company:** Is there a specific company being presented TO? (for personalization)
+   - Look for: "presenting to [Company]", "for [Company]", audience company name
+   - If none: null
+
+3. **Audience Type:** WHO will see this presentation?
+   - Infer from presentation type and content
+   - Be specific: "Internal sales team", "C-suite executives", "Technical developers", etc.
+
+4. **Presentation Goal:** WHAT is the creator trying to ACHIEVE?
+   - Choose from: "Inform", "Persuade", "Educate", "Inspire", "Sell", "Train", "Entertain", "Report", "Propose", or combination
+   - Examples:
+     * Case study → "Persuade and inform" (show success, convince prospects)
+     * Training → "Educate and train" (teach skills/processes)
+     * Pitch deck → "Persuade and inspire" (get funding/buy-in)
+     * Conference talk → "Inspire and inform" (share ideas, engage audience)
+     * Product demo → "Inform and sell" (showcase features, drive adoption)
+     * Status update → "Report and inform" (share progress)
+     * Strategy proposal → "Propose and persuade" (get approval for plan)
+
+5. **Presentation Type:** What KIND of presentation is this?
+   - Examples: "Sales pitch", "Internal training", "Case study", "Conference talk", "Product demo",
+     "Investor pitch", "Status report", "Team update", "Marketing campaign", "Educational lecture",
+     "Technical deep-dive", "Strategy proposal", "Onboarding", "Thought leadership"
 
 **Examples:**
 
 Input: "my company is solarwinds.com. Outline: Sales workflow training. 1. Messaging - Call to action. 2. List - Targeted accounts, Upcoming Renewals. 3. Call strategy..."
-Analysis: This is INTERNAL SALES TRAINING about workflows and best practices.
-Output: {"myCompany": "solarwinds.com", "audienceCompany": null, "audience": "Internal sales team"}
+Analysis: Internal training deck teaching sales processes
+Output: {
+  "myCompany": "solarwinds.com",
+  "audienceCompany": null,
+  "audience": "Internal sales team",
+  "goal": "Educate and train",
+  "presentationType": "Internal training"
+}
 
 Input: "Atlassian case study showing how Acme Corp improved productivity by 40%"
-Analysis: This is a CASE STUDY presentation to potential customers.
-Output: {"myCompany": "Atlassian", "audienceCompany": null, "audience": "Potential enterprise customers"}
+Analysis: Customer success story to persuade prospects
+Output: {
+  "myCompany": "Atlassian",
+  "audienceCompany": null,
+  "audience": "Potential enterprise customers",
+  "goal": "Persuade and inform",
+  "presentationType": "Case study"
+}
 
 Input: "I work at Google, presenting cloud migration benefits to Microsoft IT team"
-Analysis: This is a B2B SALES PITCH.
-Output: {"myCompany": "Google", "audienceCompany": "Microsoft", "audience": "Microsoft IT executives"}
+Analysis: B2B sales pitch with personalization
+Output: {
+  "myCompany": "Google",
+  "audienceCompany": "Microsoft",
+  "audience": "Microsoft IT executives",
+  "goal": "Persuade and sell",
+  "presentationType": "Sales pitch"
+}
 
 Input: "Startup pitch deck for Sand Hill Road investors"
-Analysis: This is an INVESTOR PITCH.
-Output: {"myCompany": "Your Startup", "audienceCompany": null, "audience": "Venture capital investors"}
+Analysis: Fundraising pitch to get investment
+Output: {
+  "myCompany": "Your Startup",
+  "audienceCompany": null,
+  "audience": "Venture capital investors",
+  "goal": "Persuade and inspire",
+  "presentationType": "Investor pitch"
+}
 
-**Now analyze these notes:**
-${notes.substring(0, 1500)}
+Input: "need slides about climate change for my class tomorrow, cover causes effects solutions"
+Analysis: Educational presentation for students
+Output: {
+  "myCompany": "Your Organization",
+  "audienceCompany": null,
+  "audience": "Students",
+  "goal": "Educate and inform",
+  "presentationType": "Educational lecture"
+}
 
-Return ONLY valid JSON: {"myCompany": "...", "audienceCompany": null or "...", "audience": "..."}`;
+Input: "Q4 results, revenue up 23%, new markets, challenges in APAC region, team headcount growing"
+Analysis: Business status update/report
+Output: {
+  "myCompany": "Your Company",
+  "audienceCompany": null,
+  "audience": "Company leadership and stakeholders",
+  "goal": "Report and inform",
+  "presentationType": "Status report"
+}
+
+**Now analyze these notes (may be unstructured/brain dump):**
+${notes.substring(0, 2000)}
+
+Return ONLY valid JSON with all 5 fields:
+{
+  "myCompany": "...",
+  "audienceCompany": null or "...",
+  "audience": "...",
+  "goal": "...",
+  "presentationType": "..."
+}`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -156,17 +236,23 @@ Return ONLY valid JSON: {"myCompany": "...", "audienceCompany": null or "...", "
       const context = JSON.parse(cleanJson);
 
       console.log(`🏢 LLM extracted context:`, context);
+      console.log(`   📊 Presentation Type: ${context.presentationType}`);
+      console.log(`   🎯 Goal: ${context.goal}`);
 
       return {
         myCompany: context.myCompany || 'Your Company',
         audienceCompany: context.audienceCompany || undefined,
-        audience: context.audience || 'Business leaders and decision makers'
+        audience: context.audience || 'Business leaders and decision makers',
+        goal: context.goal || 'Inform and persuade',
+        presentationType: context.presentationType || 'Business presentation'
       };
     } catch (error) {
       console.error('❌ Context extraction failed:', error);
       return {
         myCompany: 'Your Company',
-        audience: 'Business leaders and decision makers'
+        audience: 'Business leaders and decision makers',
+        goal: 'Inform and persuade',
+        presentationType: 'Business presentation'
       };
     }
   };
@@ -196,19 +282,29 @@ Return ONLY valid JSON: {"myCompany": "...", "audienceCompany": null or "...", "
 
     try {
       // Step 1: Extract presentation context with LLM (not regex!)
-      setProgressMessage('🤖 Understanding your presentation context...');
+      setProgressMessage('🤖 Understanding your presentation context and intent...');
       const context = await extractPresentationContext(rawNotes);
-      console.log(`🏢 Presentation context:`, context);
-      console.log(`   - My company (brand): ${context.myCompany}`);
-      console.log(`   - Audience company: ${context.audienceCompany || 'None specified'}`);
-      console.log(`   - Audience type: ${context.audience}`);
+      console.log(`🏢 Presentation context extracted:`, context);
+      console.log(`   📊 Type: ${context.presentationType}`);
+      console.log(`   🎯 Goal: ${context.goal}`);
+      console.log(`   🏢 Company (brand): ${context.myCompany}`);
+      console.log(`   👥 Audience: ${context.audience}`);
+      console.log(`   🎯 Audience company: ${context.audienceCompany || 'None specified'}`);
 
-      // Build enhanced content with audience personalization
+      // Build enhanced content with context
       let enhancedContent = rawNotes;
-      if (context.audienceCompany) {
-        enhancedContent = `[CONTEXT: Presenting to ${context.audienceCompany}. Personalize content for their needs and reference their products/challenges where relevant.]\n\n${rawNotes}`;
-        console.log(`📝 Added audience personalization context for ${context.audienceCompany}`);
-      }
+
+      // Add presentation type and goal context
+      const contextPrefix = `[PRESENTATION CONTEXT]
+Type: ${context.presentationType}
+Goal: ${context.goal}
+${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Personalize content for their needs and reference their products/challenges where relevant.` : ''}
+
+[USER CONTENT]
+`;
+
+      enhancedContent = contextPrefix + rawNotes;
+      console.log(`📝 Enhanced content with presentation type and goal context`);
 
       // Step 2: Generate designer outline with parallel agents
       const result = await generateDesignerOutline(
@@ -216,7 +312,7 @@ Return ONLY valid JSON: {"myCompany": "...", "audienceCompany": null or "...", "
           company: context.myCompany,
           content: enhancedContent,
           audience: context.audience,
-          goal: 'Inform and persuade',
+          goal: context.goal, // Dynamic goal from LLM extraction!
           slideCount: slideCount,
         },
         (progress: DesignerGenerationProgress) => {
