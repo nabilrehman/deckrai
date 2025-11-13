@@ -181,9 +181,12 @@ const App: React.FC = () => {
       // Save to Firestore if user is signed in
       if (user) {
         try {
+          console.log(`📤 Uploading ${trulyNewItems.length} reference slides to Firestore...`);
           await batchAddToStyleLibrary(user.uid, trulyNewItems);
+          console.log(`✅ Successfully uploaded ${trulyNewItems.length} reference slides`);
         } catch (error) {
-          console.error('Error batch uploading to style library:', error);
+          console.error('❌ Error batch uploading to style library:', error);
+          alert(`Failed to upload reference slides: ${error instanceof Error ? error.message : 'Unknown error'}. Please try uploading fewer slides at once.`);
         }
       }
     }

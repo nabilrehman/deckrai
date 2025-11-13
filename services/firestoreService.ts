@@ -444,23 +444,39 @@ export const removeFromStyleLibrary = async (
 
 /**
  * Batch add multiple items to style library
+ *
+ * Handles large uploads by chunking into smaller batches to avoid:
+ * - Firebase limit: 500 operations per batch
+ * - Firebase limit: 11MB payload size per batch
  */
 export const batchAddToStyleLibrary = async (
     userId: string,
     items: StyleLibraryItem[]
 ): Promise<void> => {
-    const batch = writeBatch(db);
     const now = Date.now();
 
-    items.forEach(item => {
-        const itemRef = doc(db, 'users', userId, 'styleLibrary', item.id);
-        batch.set(itemRef, {
-            ...item,
-            createdAt: now
-        });
-    });
+    // Chunk size: 5 items per batch to stay well under 11MB limit
+    // (each slide image can be ~2MB, so 5 slides = ~10MB < 11MB limit)
+    const CHUNK_SIZE = 5;
 
-    await batch.commit();
+    // Process in chunks
+    for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+        const chunk = items.slice(i, i + CHUNK_SIZE);
+        const batch = writeBatch(db);
+
+        chunk.forEach(item => {
+            const itemRef = doc(db, 'users', userId, 'styleLibrary', item.id);
+            batch.set(itemRef, {
+                ...item,
+                createdAt: now
+            });
+        });
+
+        await batch.commit();
+        console.log(`✅ Uploaded chunk ${Math.floor(i / CHUNK_SIZE) + 1}/${Math.ceil(items.length / CHUNK_SIZE)} (${chunk.length} items)`);
+    }
+
+    console.log(`✅ Successfully uploaded all ${items.length} items to style library`);
 };
 
 // ============================================================================
