@@ -88,6 +88,94 @@ Result:
 
 ---
 
+## 🗄️ Data Storage Architecture
+
+### Firebase Storage vs Firestore
+Deckr.ai uses a hybrid storage approach optimized for different data types:
+
+#### **Firebase Storage** (for large binary data)
+- **Slide images**: All generated slides stored as images
+- **Reference templates**: User-uploaded reference slides/PDFs
+- **Location**: `gs://deckr-477706.appspot.com/users/{userId}/`
+- **No size limits**: Can store large images and PDFs
+- **Cost**: $0.026 per GB/month
+
+#### **Firestore** (for metadata only)
+- **User profiles**: Plan, usage, preferences
+- **Deck metadata**: Title, slide count, created date
+- **Style library metadata**: References to Storage URLs only
+- **Limits**: 11MB per batch write, 1MB per document
+- **Cost**: $0.18 per 100K operations
+
+### Style Library Storage Pattern
+
+**Current Implementation (Hybrid - CORRECT):**
+```typescript
+// 1. User uploads PDF → Extracted to base64 images in-memory
+// 2. Base64 data stored in Firestore (chunked to avoid 11MB limit)
+interface StyleLibraryItem {
+  id: string;
+  name: string;
+  src: string;  // base64: data:image/png;base64,iVBORw0KG...
+  createdAt: number;
+}
+
+// 3. Batch write to Firestore in chunks of 5 items
+// Each chunk: ~10MB (5 slides × ~2MB) < 11MB limit
+await batchAddToStyleLibrary(userId, items); // Handles chunking internally
+```
+
+**Why base64 in Firestore (not Storage)?**
+1. ✅ **Immediate availability**: No async upload, instant access
+2. ✅ **Simpler code**: No need to manage Storage URLs and cleanup
+3. ✅ **Transactional**: Firestore handles batch writes atomically
+4. ✅ **Works with chunking**: 5 items per batch stays under 11MB limit
+5. ✅ **Cost-effective**: Small number of reference slides (typically 5-50)
+
+**When to use Firebase Storage instead:**
+- ❌ User uploads 100+ reference slides (rare)
+- ❌ Reference slides are very high-res (>5MB each)
+- ❌ Need to share references across multiple users
+
+**Chunking Strategy:**
+```typescript
+// services/firestoreService.ts:452
+export const batchAddToStyleLibrary = async (userId: string, items: StyleLibraryItem[]) => {
+  const CHUNK_SIZE = 5; // 5 slides × ~2MB = ~10MB < 11MB limit
+
+  for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+    const chunk = items.slice(i, i + CHUNK_SIZE);
+    const batch = writeBatch(db);
+
+    chunk.forEach(item => {
+      const itemRef = doc(db, 'users', userId, 'styleLibrary', item.id);
+      batch.set(itemRef, { ...item, createdAt: now });
+    });
+
+    await batch.commit();
+  }
+};
+```
+
+**Future Optimization (if needed):**
+If style library grows very large, migrate to Storage:
+```typescript
+// Upload to Storage, store URL in Firestore
+const storageRef = ref(storage, `users/${userId}/references/${item.id}.png`);
+await uploadBytes(storageRef, blob);
+const downloadURL = await getDownloadURL(storageRef);
+
+// Store only URL in Firestore (tiny metadata)
+await setDoc(doc(db, 'users', userId, 'styleLibrary', item.id), {
+  id: item.id,
+  name: item.name,
+  storageUrl: downloadURL, // Small URL, not base64
+  createdAt: now
+});
+```
+
+---
+
 ## Development Guidelines
 
 ### 🔐 Preserving Existing Functionality
