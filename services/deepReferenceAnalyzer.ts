@@ -5,7 +5,7 @@
  * Analyzes background, layout, typography, spacing, visual elements, and brand elements.
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import type {
   DeepDesignBlueprint,
   BackgroundDesign,
@@ -19,8 +19,7 @@ import type {
 } from '../types/referenceMatching';
 
 // Initialize Gemini API
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
 /**
  * Deep analysis prompt for extracting design blueprint from reference slide
@@ -169,10 +168,6 @@ export async function analyzeReferenceSlide(
   slideContext?: string
 ): Promise<DeepDesignBlueprint> {
   try {
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-thinking-exp',
-    });
-
     // Fetch the image if it's a URL
     let imageData: string;
     if (referenceImageUrl.startsWith('data:')) {
@@ -184,8 +179,12 @@ export async function analyzeReferenceSlide(
     }
 
     // Extract mime type and base64 data
-    const [mimeTypePart, base64Data] = imageData.split(',');
-    const mimeType = mimeTypePart.match(/:(.*?);/)?.[1] || 'image/png';
+    const match = imageData.match(/^data:(image\/\w+);base64,(.*)$/);
+    if (!match) {
+      throw new Error('Invalid base64 image data string.');
+    }
+    const mimeType = match[1];
+    const base64Data = match[2];
 
     // Build the prompt with optional context
     let prompt = DEEP_ANALYSIS_PROMPT;
@@ -193,17 +192,20 @@ export async function analyzeReferenceSlide(
       prompt += `\n\nCONTEXT FOR THIS SLIDE:\n${slideContext}\n\nUse this context to inform your analysis and strategy decision.`;
     }
 
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          mimeType,
-          data: base64Data,
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.5-pro',
+      contents: [
+        {
+          inlineData: {
+            mimeType,
+            data: base64Data,
+          },
         },
-      },
-      { text: prompt },
-    ]);
+        { text: prompt },
+      ],
+    });
 
-    const responseText = result.response.text();
+    const responseText = result.text;
 
     // Remove markdown code blocks if present
     const jsonText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();

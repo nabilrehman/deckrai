@@ -5,7 +5,7 @@
  * Biased towards INPUT-MODIFY since Gemini excels at modifications.
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import type {
   StrategyDecision,
   GenerationStrategy,
@@ -17,8 +17,7 @@ import type {
 import type { SlideSpecification } from './referenceMatchingEngine';
 
 // Initialize Gemini API
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
 /**
  * Strategy decision prompt for Gemini 2.5 Pro
@@ -151,10 +150,6 @@ export async function decideGenerationStrategy(
   referenceImageUrl: string
 ): Promise<StrategyDecision> {
   try {
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-thinking-exp',
-    });
-
     // Prepare blueprint summary (without the lengthy specificInstructions)
     const blueprintSummary = {
       background: blueprint.background,
@@ -196,20 +191,27 @@ ${slideSpec.dataVisualization ? `Data: ${slideSpec.dataVisualization}` : ''}
       imageData = await blobToBase64(blob);
     }
 
-    const [mimeTypePart, base64Data] = imageData.split(',');
-    const mimeType = mimeTypePart.match(/:(.*?);/)?.[1] || 'image/png';
+    const match = imageData.match(/^data:(image\/\w+);base64,(.*)$/);
+    if (!match) {
+      throw new Error('Invalid base64 image data string.');
+    }
+    const mimeType = match[1];
+    const base64Data = match[2];
 
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          mimeType,
-          data: base64Data,
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.5-pro',
+      contents: [
+        {
+          inlineData: {
+            mimeType,
+            data: base64Data,
+          },
         },
-      },
-      { text: prompt },
-    ]);
+        { text: prompt },
+      ],
+    });
 
-    const responseText = result.response.text();
+    const responseText = result.text;
 
     // Remove markdown code blocks if present
     const jsonText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();

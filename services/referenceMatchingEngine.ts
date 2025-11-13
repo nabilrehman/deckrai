@@ -5,7 +5,7 @@
  * Uses a single API call to analyze all slides and references together for optimal matching.
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import type {
   ReferenceMatch,
   MatchWithBlueprint,
@@ -14,8 +14,7 @@ import type {
 import { analyzeReferenceSlide } from './deepReferenceAnalyzer';
 
 // Initialize Gemini API
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
 /**
  * Slide specification from Master Agent
@@ -157,16 +156,15 @@ ${spec.brandContext ? `- Brand Context: ${spec.brandContext}` : ''}
       .join('\n');
 
     // Step 3: Run matching with Gemini 2.5 Pro
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-thinking-exp',
-    });
-
     const prompt = MATCHING_PROMPT
       .replace('{{REFERENCES}}', referencesText)
       .replace('{{SLIDE_SPECS}}', slideSpecsText);
 
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.5-pro',
+      contents: prompt,
+    });
+    const responseText = result.text;
 
     // Remove markdown code blocks if present
     const jsonText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -235,10 +233,6 @@ ${spec.brandContext ? `- Brand Context: ${spec.brandContext}` : ''}
  */
 async function quickCategorizeReference(referenceUrl: string): Promise<string> {
   try {
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-thinking-exp',
-    });
-
     // Fetch the image
     let imageData: string;
     if (referenceUrl.startsWith('data:')) {
@@ -249,8 +243,12 @@ async function quickCategorizeReference(referenceUrl: string): Promise<string> {
       imageData = await blobToBase64(blob);
     }
 
-    const [mimeTypePart, base64Data] = imageData.split(',');
-    const mimeType = mimeTypePart.match(/:(.*?);/)?.[1] || 'image/png';
+    const match = imageData.match(/^data:(image\/\w+);base64,(.*)$/);
+    if (!match) {
+      throw new Error('Invalid base64 image data string.');
+    }
+    const mimeType = match[1];
+    const base64Data = match[2];
 
     const prompt = `Categorize this slide into ONE of these categories:
 - "title" - Title/cover slide with large headline
@@ -261,17 +259,20 @@ async function quickCategorizeReference(referenceUrl: string): Promise<string> {
 
 Respond with ONLY the category name, nothing else.`;
 
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          mimeType,
-          data: base64Data,
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.5-pro',
+      contents: [
+        {
+          inlineData: {
+            mimeType,
+            data: base64Data,
+          },
         },
-      },
-      { text: prompt },
-    ]);
+        { text: prompt },
+      ],
+    });
 
-    const category = result.response.text().trim().toLowerCase();
+    const category = result.text.trim().toLowerCase();
 
     // Validate category
     const validCategories = ['title', 'content', 'data-viz', 'image-content', 'closing'];
