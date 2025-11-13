@@ -7,6 +7,9 @@ import { buildPromptFromSpec } from '../services/outlineParser';
 import { createSlideFromPrompt } from '../services/geminiService';
 import { autoSaveSession } from '../services/sessionLogger';
 import type { DesignerGenerationProgress } from '../types/designerMode';
+import { matchReferencesToSlides } from '../services/referenceMatchingEngine';
+import { decideGenerationStrategy } from '../services/referenceStrategyDecider';
+import type { MatchWithBlueprint, StrategyDecision } from '../types/referenceMatching';
 
 declare const pdfjsLib: any;
 
@@ -67,6 +70,11 @@ const DesignerModeGenerator: React.FC<DesignerModeGeneratorProps> = ({
   const [slideCount, setSlideCount] = useState(10);
   const [uploadedStyleReference, setUploadedStyleReference] = useState<{ src: string; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Reference matching state
+  const [showModeSelector, setShowModeSelector] = useState(false);
+  const [selectedMode, setSelectedMode] = useState<'template' | 'crazy' | null>(null);
+  const [isMatchingReferences, setIsMatchingReferences] = useState(false);
 
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -266,6 +274,15 @@ Return ONLY valid JSON with all 5 fields:
       return;
     }
 
+    // Check if user has uploaded references (enterprise feature)
+    const hasReferences = styleLibrary && styleLibrary.length > 0;
+
+    // If user has references, ask for mode selection
+    if (hasReferences && selectedMode === null) {
+      setShowModeSelector(true);
+      return; // Wait for mode selection
+    }
+
     setIsGenerating(true);
     setError(null);
     setCurrentPhase('planning');
@@ -354,6 +371,58 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
 
       console.log('🎨 Theme created from brand research:', theme);
 
+      // Step 3.5: Match references to slides (Template Mode only)
+      let matchMap: Map<number, MatchWithBlueprint> | null = null;
+      let strategyMap: Map<number, StrategyDecision> | null = null;
+
+      if (selectedMode === 'template' && styleLibrary && styleLibrary.length > 0) {
+        try {
+          setIsMatchingReferences(true);
+          setProgressMessage(`🎯 Matching ${styleLibrary.length} references to ${result.outline.slideSpecifications.length} slides...`);
+
+          // Convert slide specifications to matching engine format
+          const slideSpecsForMatching = result.outline.slideSpecifications.map((spec, index) => ({
+            slideNumber: index + 1,
+            slideType: spec.slideType || 'content',
+            headline: spec.title || '',
+            content: spec.bulletPoints?.join('\n') || spec.visualElements?.description || '',
+            visualDescription: spec.visualElements?.description,
+            dataVisualization: spec.visualElements?.dataVisualization,
+            brandContext: context.myCompany,
+          }));
+
+          // Run intelligent matching
+          console.log('🤖 Starting intelligent reference matching...');
+          matchMap = await matchReferencesToSlides(slideSpecsForMatching, styleLibrary);
+          console.log(`✅ Matched ${matchMap.size} slides to references`);
+
+          // Decide generation strategy for each matched slide
+          setProgressMessage('🧠 Analyzing generation strategies (modify vs recreate)...');
+          strategyMap = new Map<number, StrategyDecision>();
+
+          for (const [slideNumber, matchData] of matchMap.entries()) {
+            const slideSpec = slideSpecsForMatching.find(s => s.slideNumber === slideNumber);
+            if (slideSpec) {
+              const strategy = await decideGenerationStrategy(
+                slideSpec,
+                matchData.blueprint,
+                matchData.match.referenceSrc
+              );
+              strategyMap.set(slideNumber, strategy);
+              console.log(`📊 Slide ${slideNumber} strategy: ${strategy.strategy} (confidence: ${strategy.confidence}%)`);
+            }
+          }
+
+          setIsMatchingReferences(false);
+        } catch (error) {
+          console.error('❌ Reference matching failed:', error);
+          console.warn('⚠️ Falling back to crazy mode (no references)');
+          matchMap = null;
+          strategyMap = null;
+          setIsMatchingReferences(false);
+        }
+      }
+
       // Step 4: Generate slides from specifications
       setCurrentPhase('creating');
       setProgressMessage('Creating slides from designer specifications...');
@@ -369,24 +438,37 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
 
       for (let i = 0; i < specsToGenerate.length; i++) {
         const spec = specsToGenerate[i];
-        setProgressMessage(`Creating slide ${i + 1} of ${specsToGenerate.length}: ${spec.title}`);
-        setCurrentSlideProgress(i + 1);
+        const slideNumber = i + 1;
+        setProgressMessage(`Creating slide ${slideNumber} of ${specsToGenerate.length}: ${spec.title}`);
+        setCurrentSlideProgress(slideNumber);
 
         // Build prompt from specification
         const prompt = buildPromptFromSpec(spec, result.outline.brandResearch);
-        console.log(`📝 Slide ${i + 1} prompt:`, prompt.substring(0, 200) + '...');
+        console.log(`📝 Slide ${slideNumber} prompt:`, prompt.substring(0, 200) + '...');
 
-        // Designer Mode does NOT use styleLibrary by default (prevents using old references from other sessions)
-        // Only use uploadedStyleReference if explicitly provided
-        const styleRef = uploadedStyleReference?.src || null;
+        // Determine style reference:
+        // 1. Template mode: use matched reference
+        // 2. Crazy mode or no match: use brand guidelines only
+        let styleRef: string | null = null;
+        let matchInfo: MatchWithBlueprint | undefined = undefined;
+        let strategyInfo: StrategyDecision | undefined = undefined;
 
-        if (styleRef) {
-          console.log(`🎨 Using uploaded style reference for slide ${i + 1}`);
+        if (matchMap && matchMap.has(slideNumber)) {
+          matchInfo = matchMap.get(slideNumber)!;
+          strategyInfo = strategyMap?.get(slideNumber);
+          styleRef = matchInfo.match.referenceSrc;
+
+          console.log(`🎨 Template Mode - Slide ${slideNumber}:`);
+          console.log(`   📎 Reference: ${matchInfo.match.referenceName}`);
+          console.log(`   📊 Match score: ${matchInfo.match.matchScore}%`);
+          console.log(`   💡 Reason: ${matchInfo.match.matchReason}`);
+          console.log(`   🎯 Strategy: ${strategyInfo?.strategy || 'unknown'} (confidence: ${strategyInfo?.confidence || 0}%)`);
         } else {
-          console.log(`🎨 No style reference for slide ${i + 1} - generating from brand guidelines only`);
+          console.log(`🎨 Crazy Mode - Slide ${slideNumber}: generating from brand guidelines only`);
         }
 
         // Generate slide with brand theme
+        // TODO: Pass blueprint and strategy to createSlideFromPrompt for enhanced generation
         const { images } = await createSlideFromPrompt(
           styleRef,
           prompt,
@@ -652,6 +734,98 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
           onDismiss={() => setShowActionBubble(false)}
           currentSlideCount={generatedSlides.length}
         />
+      )}
+
+      {/* Mode Selector Modal - Enterprise Feature */}
+      {showModeSelector && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-8 animate-scale-in">
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                </svg>
+              </div>
+              <h2 className="font-display text-3xl font-bold text-brand-text-primary mb-2">
+                Choose Generation Mode
+              </h2>
+              <p className="text-brand-text-secondary text-lg">
+                You have {styleLibrary.length} reference slide{styleLibrary.length !== 1 ? 's' : ''} uploaded
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              {/* Template Mode */}
+              <button
+                onClick={() => {
+                  setSelectedMode('template');
+                  setShowModeSelector(false);
+                  handleDesignerGenerate();
+                }}
+                className="group relative overflow-hidden bg-gradient-to-br from-purple-50 to-blue-50 border-2 border-purple-200 hover:border-purple-400 rounded-2xl p-6 text-left transition-all hover:shadow-lg"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className="relative">
+                  <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-500 rounded-xl mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                    </svg>
+                  </div>
+                  <h3 className="font-display font-bold text-xl text-brand-text-primary mb-2">
+                    Use Company Templates
+                  </h3>
+                  <p className="text-brand-text-secondary text-sm leading-relaxed mb-4">
+                    AI matches your content to your uploaded references and builds on top of them. Maintains your exact brand style.
+                  </p>
+                  <div className="flex items-center gap-2 text-xs text-purple-600 font-medium">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Perfect brand consistency
+                  </div>
+                </div>
+              </button>
+
+              {/* Crazy Mode */}
+              <button
+                onClick={() => {
+                  setSelectedMode('crazy');
+                  setShowModeSelector(false);
+                  handleDesignerGenerate();
+                }}
+                className="group relative overflow-hidden bg-gradient-to-br from-orange-50 to-pink-50 border-2 border-orange-200 hover:border-orange-400 rounded-2xl p-6 text-left transition-all hover:shadow-lg"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className="relative">
+                  <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-orange-500 to-pink-500 rounded-xl mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                  <h3 className="font-display font-bold text-xl text-brand-text-primary mb-2">
+                    Let Deckr Go Crazy
+                  </h3>
+                  <p className="text-brand-text-secondary text-sm leading-relaxed mb-4">
+                    AI researches your brand and creates entirely fresh designs from scratch. Maximum creative freedom.
+                  </p>
+                  <div className="flex items-center gap-2 text-xs text-orange-600 font-medium">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                    </svg>
+                    Fresh creative designs
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            <button
+              onClick={() => setShowModeSelector(false)}
+              className="w-full py-3 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
       <div className="text-center w-full max-w-5xl mx-auto">
