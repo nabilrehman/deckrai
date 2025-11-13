@@ -1,0 +1,32 @@
+{
+  "config": {
+    "company": "microsoft.com",
+    "slideCount": 8,
+    "notes": "Company: Microsoft\nCustomer: Contoso Manufacturing\nMeeting Date: Nov 2024\nAttendees: Sarah Chen (CTO), Mike Rodriguez (Head of IT), Jennifer Park (Business Process Manager)\n\nTopic: Azure Logic Apps for Enterprise Integration\n\nDISCOVERY NOTES:\n- Currently using 15+ different systems: SAP ERP, Salesforce CRM, ServiceNow, legacy AS/400, custom inventory system\n- Manual data entry between systems costing 200+ hours/month\n- Order processing takes 3-5 days due to system silos\n- Failed integration attempts with MuleSoft (too complex, project stalled after 6 months)\n- IT team is only 8 people - need low-code solution\n- Budget approved: $250K annually for integration platform\n\nPAIN POINTS:\n1. Order-to-Cash Process:\n   - Sales rep enters order in Salesforce\n   - Finance manually re-enters into SAP for invoicing\n   - Warehouse gets email notification, manually updates inventory system\n   - Average 47 manual touchpoints per order\n   - 12% error rate causing customer complaints\n\n2. IT Ticket Workflow:\n   - ServiceNow tickets not syncing with internal systems\n   - Engineers waste 30 mins/day checking multiple dashboards\n   - SLA breaches due to delayed notifications\n\n3. Supply Chain Visibility:\n   - Real-time inventory data not available\n   - Weekly batch updates from suppliers\n   - Overstocking costs $2M/year, stockouts losing $500K in sales\n\nSOLUTION DEMO:\nLogic Apps Use Cases to Present:\n1. Automated Order Processing Flow\n   - Salesforce opportunity closed → Logic App triggers\n   - Validate customer credit in SAP\n   - Create sales order in SAP automatically\n   - Send confirmation email via SendGrid\n   - Update inventory reservations\n   - Notify warehouse via Teams webhook\n   - Reduced processing time: 3 days → 2 hours\n\n2. IT Operations Automation\n   - ServiceNow ticket created → Logic App monitors\n   - Severity 1 tickets auto-escalate in Teams\n   - Pull related data from monitoring tools (Datadog, Azure Monitor)\n   - Create unified incident dashboard in Power BI\n   - Engineers save 2 hours/day\n\n3. Supply Chain Integration\n   - Real-time supplier EDI feeds → Logic Apps ingestion\n   - Parse XML/JSON from 12 different suppliers\n   - Normalize data formats\n   - Update central inventory database\n   - Trigger reorder workflows when stock < threshold\n   - Send daily summary reports\n\nCOMPETITIVE DIFFERENTIATION:\nvs MuleSoft:\n- Logic Apps: $0.000025/action vs MuleSoft $75K base license\n- Visual designer - no coding required (Jennifer's team can build)\n- Built-in Azure connectors (they're already using Azure VM, Storage, SQL)\n\nvs Workato:\n- Native Microsoft ecosystem integration (Teams, Dynamics 365, Power Platform)\n- Enterprise-grade security with Azure AD, compliance certifications\n- Managed service - no infrastructure to maintain\n\nKEY METRICS TO EMPHASIZE:\n- 200+ pre-built connectors including SAP, Salesforce, ServiceNow\n- 99.9% SLA uptime guarantee\n- 47 manual steps → 0 manual steps (100% automation)\n- ROI: $250K investment saves $850K/year (labor + error reduction + inventory optimization)\n- Implementation timeline: 6-8 weeks vs 6+ months for MuleSoft\n\nOBJECTION HANDLING:\n\"We tried integration before and it failed\"\n→ MuleSoft requires Java developers, Logic Apps uses visual designer. Jennifer's business analysts can build workflows with 2-day training.\n\n\"What about vendor lock-in?\"\n→ Open standards (REST, SOAP, EDI), can export workflow definitions, hybrid cloud support\n\n\"Security concerns with cloud?\"\n→ SOC 2, ISO 27001, HIPAA compliant. Data stays in Azure (already using), private endpoints, managed identities\n\nNEXT STEPS:\n1. 2-week POC: Build Salesforce-to-SAP order flow\n2. Success criteria: Process 100 test orders with <1% error rate\n3. Training sessions for Jennifer's team (3x 4-hour workshops)\n4. Pilot go-live: Dec 15, 2024\n5. Full rollout: Q1 2025\n\nCHAMPIONS:\n- Jennifer (Business Process Manager): Excited about low-code, wants to reduce dependency on IT\n- Mike (Head of IT): Loves managed service model, team is stretched thin\n- Sarah (CTO): Focused on ROI, needs quick wins to justify budget\n\nDECISION TIMELINE:\n- Verbal commitment by Dec 1\n- Contract signed by Dec 15\n- POC starts Jan 2, 2025"
+  },
+  "results": [
+    {
+      "testName": "Content Field Exists",
+      "passed": false,
+      "details": "Error: Error: Failed to generate slides",
+      "timestamp": "2025-11-13T15:23:58.547Z"
+    },
+    {
+      "testName": "Content Quality Assessment",
+      "passed": false,
+      "details": "Error: Error: Failed to generate slides",
+      "timestamp": "2025-11-13T15:23:58.548Z"
+    },
+    {
+      "testName": "Relevance to Input Notes",
+      "passed": false,
+      "details": "Error: Error: Failed to generate slides",
+      "timestamp": "2025-11-13T15:23:58.548Z"
+    }
+  ],
+  "summary": {
+    "passed": 0,
+    "total": 3,
+    "timestamp": "2025-11-13T15:23:58.548Z"
+  }
+}

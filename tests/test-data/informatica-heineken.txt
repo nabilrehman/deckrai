@@ -1,0 +1,147 @@
+Company: Informatica
+Customer: Heineken (Global Brewing Company)
+Meeting Date: November 13, 2024
+Attendees: Lars Van Der Berg (VP Data & Analytics EMEA), Maria Santos (Head of Supply Chain Data), James Mitchell (Enterprise Architect)
+
+Topic: Real-Time Data Integration for Global Supply Chain Optimization
+
+CUSTOMER PROFILE:
+- Heineken operates 160+ breweries across 70 countries
+- 300+ beer brands, 85,000 employees
+- Current data architecture: 50+ disparate systems (SAP, Oracle, custom brewery systems, IoT sensors)
+- Data latency: 24-48 hours (batch ETL) causing operational blindspots
+- Annual revenue: $30B, supply chain costs: $12B (40% of revenue)
+
+BUSINESS CONTEXT:
+Maria's Supply Chain Challenge:
+"We brew 25 billion liters of beer annually. When a brewery in Spain has a quality issue, we don't know until the next day. By then, 500,000 bottles are already bottled and shipped. Real-time visibility could save us $50M annually in waste and recalls alone."
+
+Lars' Data Strategy:
+"We have 2,400 data sources. Our data engineers spend 60% of time on plumbing - moving data between systems - instead of building analytics. We need to democratize data access for 800+ data consumers (analysts, scientists, business users) without overwhelming our 45-person data team."
+
+IT LANDSCAPE PAIN POINTS:
+1. Brewery Production Data:
+   - 160 breweries each with different IoT sensors (Siemens, Rockwell, Schneider Electric)
+   - Data formats: OPC-UA, MQTT, Modbus, CSV exports
+   - Current ETL: nightly batch jobs via custom Python scripts (15K lines of code to maintain)
+   - Downtime costs: $50K per hour per brewery
+   - Need: Real-time quality metrics (pH, temperature, fermentation rate) to predict issues
+
+2. Supply Chain Visibility:
+   - 3PL partners send shipment data via EDI (X12, EDIFACT), API, email (yes, email!)
+   - Inventory data scattered: SAP ERP (12 instances), Oracle WMS, custom systems
+   - Current state: Finance team manually reconciles in Excel (6 people, 40 hours/week)
+   - Business impact: $200M in excess inventory due to lack of real-time visibility
+
+3. Regulatory Compliance:
+   - GDPR, CCPA, local food safety regulations across 70 countries
+   - Data lineage requirements - must prove data origin for audits
+   - Current approach: manual documentation (300-page spreadsheets)
+   - Audit prep time: 3 months, risk of €20M fines for non-compliance
+
+INFORMATICA SOLUTION ARCHITECTURE:
+
+Real-Time Data Integration Platform:
+1. Intelligent Data Integration (IICS + CDI)
+   - Connect all 2,400 sources via 200+ pre-built connectors
+   - Change Data Capture (CDC) from SAP, Oracle for real-time sync
+   - REST API endpoints for IoT sensor streams
+   - Parse & normalize EDI formats from 3PL partners
+
+2. Data Quality & Master Data Management
+   - CLAIRE AI engine detects anomalies in brewery sensor data
+   - Automated data quality rules: flag pH outside 4.0-4.5 range, temp >28°C
+   - Master data for products, locations, suppliers across all systems
+   - Self-service data preparation for analysts (no IT required)
+
+3. Cloud Data Lakehouse (Snowflake Integration)
+   - Real-time streaming from sources → Snowflake
+   - Unified data model: raw, curated, consumption layers
+   - Data catalog with CLAIRE AI auto-classification (PII, financial, operational)
+   - Governance: policy-based access control, automated data masking for GDPR
+
+USE CASES TO DEMONSTRATE:
+
+Use Case 1: Predictive Brewing Quality (THE HERO USE CASE)
+Problem: Brewery in Spain had bacterial contamination, 500K bottles recalled, $2M loss
+Solution:
+- IoT sensors stream pH, temp, yeast activity to Informatica Cloud → Snowflake every 30 seconds
+- CLAIRE AI detects anomaly: pH trending down 6 hours before critical threshold
+- Automated alert to brewmaster via MS Teams
+- Brewmaster adjusts process, avoids contamination
+- Impact: $50M annual savings (25 prevented recalls/year)
+
+Use Case 2: Real-Time Inventory Optimization
+Problem: $200M excess inventory, $30M stockouts due to 48-hour data lag
+Solution:
+- CDC from 12 SAP instances + Oracle WMS → unified inventory view in Snowflake
+- Real-time dashboard: inventory levels, in-transit shipments, demand forecasts
+- Automated replenishment triggers when stock <7 days
+- Impact: Reduce inventory by 15% ($30M working capital freed), eliminate 80% stockouts
+
+Use Case 3: Automated Compliance Reporting
+Problem: 3 months to prepare for audit, risk of fines
+Solution:
+- Data lineage tracked automatically for all data flows
+- Pre-built compliance templates: GDPR data subject access requests in <24 hours
+- Automated PII discovery & classification across all datasets
+- Impact: Audit prep time 3 months → 2 weeks, zero compliance violations
+
+COMPETITIVE LANDSCAPE:
+vs Talend (current vendor):
+- Talend: on-premise, manual coding, limited connectors
+- Informatica: cloud-native, CLAIRE AI auto-mapping, 200+ connectors
+- Performance: Informatica processes 10M rows/min vs Talend 2M rows/min (5x faster)
+
+vs Fivetran/Matillion:
+- They only do ELT (load then transform), we do real-time CDC and data quality
+- No AI-powered data discovery or governance
+- Limited enterprise support (we have 24/7 dedicated CSM)
+
+vs Building Custom (their current approach):
+- 15K lines of Python code to maintain = 4 FTEs
+- Every new source takes 3-4 weeks to onboard
+- Informatica: drag-and-drop designer, new sources in hours, no code maintenance
+
+BUSINESS VALUE PROPOSITION:
+Investment: $800K annually (platform license + professional services)
+ROI Year 1:
+- Brewery quality savings: $50M (prevented recalls)
+- Inventory optimization: $30M (working capital + stockout reduction)
+- Data engineer productivity: $2M (60% time freed = 27 FTEs → focus on analytics)
+- Compliance risk mitigation: $20M (avoid potential fines)
+Total value: $102M
+Net ROI: $101.2M / $800K = 12,650% ROI
+
+Time to Value: 90 days to first production use case
+
+OBJECTION HANDLING:
+"Too expensive compared to Fivetran"
+→ Fivetran = $500K/year but only does 20% of what we need. You'd still need data quality tool ($200K), MDM ($300K), governance ($150K) = $1.15M total. We're all-in-one at $800K.
+
+"We have Talend, why switch?"
+→ Your team spends 60% time on maintenance. That's $2M in wasted labor annually. Our CLAIRE AI auto-maintains mappings. Plus, Talend can't do real-time CDC at scale.
+
+"Cloud security concerns for brewing IP"
+→ Data encrypted at rest & in transit (AES-256). Private cloud deployment option. You control data residency (keep EU data in EU). SOC 2 Type II, ISO 27001 certified.
+
+PROOF OF CONCEPT PLAN:
+Phase 1 (Week 1-2): Connect Spain brewery IoT sensors
+Phase 2 (Week 3-4): Build predictive quality dashboard
+Phase 3 (Week 5-6): Integrate SAP ERP for one region
+Success Criteria:
+- <30 second latency for sensor data
+- Detect 3 quality anomalies in testing
+- Zero data loss (100% reliability)
+
+EXECUTIVE SPONSORSHIP:
+- Lars (VP Data): Budget owner, reports to global CDO, needs quick win for board presentation in March
+- Maria (Supply Chain): Line of business champion, controls $12B budget, directly measures ROI
+- James (Architect): Technical validator, concerned about security but trusts Informatica brand
+
+NEXT STEPS:
+1. Technical deep dive with James' team: Nov 20
+2. POC kickoff: Dec 1
+3. Board presentation prep with Lars: Feb 15
+4. Contract signature target: March 1, 2025
+5. Production rollout: Q2 2025 (start with Spain + Netherlands breweries)

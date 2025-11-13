@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Slide, StyleLibraryItem, DebugLog, DebugSession, LastSuccessfulEditContext, PersonalizationAction } from '../types';
-import { getGenerativeVariations, getPersonalizationPlan, getPersonalizedVariationsFromPlan, getInpaintingVariations, remakeSlideWithStyleReference, createSlideFromPrompt, findBestStyleReferenceFromPrompt, detectClickedText, TextRegion } from '../services/geminiService';
+import { getGenerativeVariations, getPersonalizationPlan, getPersonalizedVariationsFromPlan, getInpaintingVariations, remakeSlideWithStyleReference, createSlideFromPrompt, findBestStyleReferenceFromPrompt, detectClickedText, detectAllTextRegions, TextRegion } from '../services/geminiService';
 import VariantSelector from './VariantSelector';
 import DebugLogViewer from './DebugLogViewer';
 import PersonalizationReviewModal from './PersonalizationReviewModal';
@@ -140,6 +140,30 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
   const [isDetectingText, setIsDetectingText] = useState(false);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
 
+  // Batch detection cache
+  const [cachedTextRegions, setCachedTextRegions] = useState<TextRegion[]>([]);
+  const [isBatchDetecting, setIsBatchDetecting] = useState(false);
+
+  // Magnetic cursor state - text follows mouse when active
+  const [magneticCursor, setMagneticCursor] = useState<{ active: boolean; textRegion: TextRegion | null }>({
+    active: false,
+    textRegion: null
+  });
+  const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
+
+  // Batch Edit Mode state
+  const [isBatchEditMode, setIsBatchEditMode] = useState<boolean>(false);
+  const [editQueue, setEditQueue] = useState<Array<{
+    id: string;
+    region: TextRegion;
+    action: 'change' | 'remove';
+    newText?: string;
+  }>>([]);
+  const [selectedTextForEdit, setSelectedTextForEdit] = useState<TextRegion | null>(null);
+  const [batchChatHistory, setBatchChatHistory] = useState<Array<{ id: string; sender: 'user' | 'ai'; text: string; timestamp: number }>>([]);
+  const previousSlideIdRef = useRef<string>(slide.id);
+  const preservedChatPositionRef = useRef<{ x: number; y: number } | null>(null);
+
   const currentSrc = !creationModeInfo ? slide.history[slide.history.length - 1] : null;
   const hasHistory = !creationModeInfo && slide.history.length > 1;
   const isImagenSelected = selectedModel === 'imagen-4.0-generate-001';
@@ -153,7 +177,144 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     setUploadedImages([]);
     if (variants) setVariants(null);
     if (personalizationPlanToReview) setPersonalizationPlanToReview(null);
+
+    // Clear batch detection cache and clicked region when slide changes
+    console.log('[Slide Change] Clearing cache and clicked region from previous slide');
+    setCachedTextRegions([]);
+    setClickedTextRegion(null);
+    setAnchoredChatPosition(null);
+    setMagneticCursor({ active: false, textRegion: null });
+    setCursorPosition(null);
+
+    // Close right panel to avoid showing previous slide's context
+    setIsRightPanelOpen(false);
+    setRightPanelInitialMessage('');
   }, [slide?.id, slide?.history, creationModeInfo]);
+
+  // Window-level mouse tracking for magnetic cursor (best practice for drag operations)
+  useEffect(() => {
+    if (!magneticCursor.active || !imageRef.current) {
+      return;
+    }
+
+    console.log('[Magnetic Cursor] 🎯 Setting up window-level mouse tracking');
+
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      if (!imageRef.current) return;
+
+      const rect = imageRef.current.getBoundingClientRect();
+      // Calculate position relative to image
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      // Keep tracking even if cursor goes outside image bounds
+      setCursorPosition({ x, y });
+
+      // Throttled logging (20% of events for visibility)
+      if (Math.random() < 0.2) {
+        console.log('[Magnetic Cursor] 🖱️ Mouse move:', { x, y, clientX: e.clientX, clientY: e.clientY });
+      }
+    };
+
+    // Attach to window for robust tracking
+    window.addEventListener('mousemove', handleWindowMouseMove);
+
+    return () => {
+      console.log('[Magnetic Cursor] 🧹 Cleaning up window mouse listener');
+      window.removeEventListener('mousemove', handleWindowMouseMove);
+    };
+  }, [magneticCursor.active]);
+
+  // Helper to convert any image URL to base64 data URL
+  const convertToBase64 = async (imageSrc: string): Promise<string> => {
+    // If already base64, return as-is
+    if (imageSrc.startsWith('data:image/')) {
+      return imageSrc;
+    }
+
+    // Convert Firebase/blob/http URL to base64 (CORS is now configured!)
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous'; // Now works with Firebase CORS
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Failed to get canvas context'));
+          return;
+        }
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = () => reject(new Error('Failed to load image for conversion'));
+      img.src = imageSrc;
+    });
+  };
+
+  // Preserve chat position in batch mode
+  useEffect(() => {
+    if (isBatchEditMode && anchoredChatPosition) {
+      preservedChatPositionRef.current = anchoredChatPosition;
+      console.log('[Batch Chat] Preserved position:', anchoredChatPosition);
+    }
+  }, [anchoredChatPosition, isBatchEditMode]);
+
+  // Restore chat position immediately if it gets cleared in batch mode
+  useEffect(() => {
+    if (isBatchEditMode && !anchoredChatPosition && preservedChatPositionRef.current) {
+      console.log('[Batch Chat] Restoring preserved position:', preservedChatPositionRef.current);
+      // Restore immediately to prevent any flicker or remount
+      setAnchoredChatPosition(preservedChatPositionRef.current);
+    }
+  }, [anchoredChatPosition, isBatchEditMode]);
+
+  // Pre-load text detection when slide loads (batch detection optimization)
+  useEffect(() => {
+    const isSlideSwitch = previousSlideIdRef.current !== slide.id;
+
+    if (isSlideSwitch) {
+      // Only clear batch edit state when switching to a DIFFERENT slide
+      console.log('[Batch Detection] SYNC: Switching slides, clearing batch edit state');
+      setIsBatchEditMode(false);
+      setEditQueue([]);
+      setSelectedTextForEdit(null);
+      setAnchoredChatPosition(null);
+      setBatchChatHistory([]);
+      preservedChatPositionRef.current = null;
+      previousSlideIdRef.current = slide.id;
+    } else {
+      // Same slide, just a new version - keep batch edit mode active if it was
+      console.log('[Batch Detection] Same slide updated, preserving batch edit state');
+    }
+
+    // Always clear these on any change (slide switch OR version update)
+    setCachedTextRegions([]);
+    setClickedTextRegion(null);
+
+    const preloadTextDetection = async () => {
+      if (!currentSrc || creationModeInfo) return;
+
+      console.log('[Batch Detection] Pre-loading text regions for current slide:', currentSrc.substring(0, 50));
+      setIsBatchDetecting(true);
+
+      try {
+        // Convert image to base64 if needed (works with Firebase Storage now that CORS is fixed!)
+        const base64Src = await convertToBase64(currentSrc);
+        const regions = await detectAllTextRegions(base64Src);
+        console.log(`[Batch Detection] Found ${regions.length} text regions for current slide:`, regions);
+        setCachedTextRegions(regions);
+      } catch (error) {
+        console.error('[Batch Detection] Failed to pre-load text regions:', error);
+        setCachedTextRegions([]); // Clear cache on error, will fallback to per-click detection
+      } finally {
+        setIsBatchDetecting(false);
+      }
+    };
+
+    preloadTextDetection();
+  }, [currentSrc, creationModeInfo, slide.id]);
 
 
   const handleProgressUpdate = (message: string) => {
@@ -227,7 +388,9 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
 
         if (useStyleLibrary) {
             // Redesign WITH style library
-            const { images, logs, variationPrompts, bestReferenceSrc } = await remakeSlideWithStyleReference(prompt, currentSrc, styleLibrary, isDeepMode, handleProgressUpdate);
+            // Convert currentSrc to base64 if needed (fixes Firebase Storage URL issue)
+            const base64Src = await convertToBase64(currentSrc);
+            const { images, logs, variationPrompts, bestReferenceSrc } = await remakeSlideWithStyleReference(prompt, base64Src, styleLibrary, isDeepMode, handleProgressUpdate);
             const context = {
                 workflow: 'Remake',
                 userIntentPrompt: prompt,
@@ -239,7 +402,9 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
             session = { ...session, status: 'Success', finalImages: images, logs, styleReferenceImage: bestReferenceSrc };
         } else {
             // Iterative editing OR redesign WITHOUT style library - use current slide as input
-            const { images, logs, variationPrompts } = await getGenerativeVariations(selectedModel, prompt, currentSrc, isDeepMode, handleProgressUpdate);
+            // Convert currentSrc to base64 if needed (fixes Firebase Storage URL issue)
+            const base64Src = await convertToBase64(currentSrc);
+            const { images, logs, variationPrompts } = await getGenerativeVariations(selectedModel, prompt, base64Src, isDeepMode, handleProgressUpdate);
             const context = { workflow: 'Generate', userIntentPrompt: prompt };
             setVariants({ images, prompts: variationPrompts, context });
             if (isDebugMode) setDebugLogs(logs);
@@ -284,7 +449,11 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     setProgressSteps([{ text: `Researching ${extractedCompany} & analyzing slide for personalization opportunities...`, status: 'in-progress' }]);
 
     try {
-        const plan = await getPersonalizationPlan(extractedCompany, currentSrc);
+        // Convert currentSrc to base64 if needed (fixes Firebase Storage URL issue)
+        console.log('[Personalize] Converting image to base64, currentSrc:', currentSrc.substring(0, 100));
+        const base64Src = await convertToBase64(currentSrc);
+        console.log('[Personalize] Conversion complete, base64 length:', base64Src.length, 'starts with:', base64Src.substring(0, 50));
+        const plan = await getPersonalizationPlan(extractedCompany, base64Src);
         if (plan && plan.length > 0) {
             setPersonalizationPlanToReview({ plan, originalImage: currentSrc });
         } else {
@@ -324,7 +493,11 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     };
 
     try {
-        const { images, logs, variationPrompts } = await getPersonalizedVariationsFromPlan(plan, currentSrc, isDeepMode, handleProgressUpdate);
+        // Convert currentSrc to base64 if needed (fixes Firebase Storage URL issue)
+        console.log('[Personalize Generate] Converting image to base64, currentSrc:', currentSrc.substring(0, 100));
+        const base64Src = await convertToBase64(currentSrc);
+        console.log('[Personalize Generate] Conversion complete, base64 length:', base64Src.length, 'starts with:', base64Src.substring(0, 50));
+        const { images, logs, variationPrompts } = await getPersonalizedVariationsFromPlan(plan, base64Src, isDeepMode, handleProgressUpdate);
         setProgressSteps(prev => prev.map(step => ({ ...step, status: 'complete' })));
         await new Promise(resolve => setTimeout(resolve, 300));
         
@@ -500,6 +673,10 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
             onCancelCreation();
         } else {
             onNewSlideVersion(slide.id, cleanSrc);
+
+            // Invalidate cache - new image will trigger automatic re-detection via useEffect
+            console.log('[Cache Invalidation] Clearing stale cache after variant selection');
+            setCachedTextRegions([]);
         }
     } catch (err: any) {
         console.error("Error processing selected image:", err);
@@ -714,7 +891,9 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     };
     
     try {
-        const { images, logs, variationPrompts } = await getInpaintingVariations(inpaintingPrompt, currentSrc, maskDataUrl, isDeepMode, handleProgressUpdate);
+        // Convert currentSrc to base64 if needed (fixes Firebase Storage URL issue)
+        const base64Src = await convertToBase64(currentSrc);
+        const { images, logs, variationPrompts } = await getInpaintingVariations(inpaintingPrompt, base64Src, maskDataUrl, isDeepMode, handleProgressUpdate);
         
         setProgressSteps(prev => prev.map(step => ({ ...step, status: 'complete' })));
         await new Promise(resolve => setTimeout(resolve, 300));
@@ -737,6 +916,224 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     }
   };
 
+  // Helper to find text region at a specific point from cached regions
+  // Added 2% padding on all sides for better hit detection on small text
+  // Smart selection: picks longest text when multiple regions overlap
+  const findTextAtPoint = (regions: TextRegion[], xPercent: number, yPercent: number): TextRegion | null => {
+    const PADDING = 2; // 2% padding makes text regions more forgiving
+
+    // Find all regions that contain the click point
+    const overlappingRegions = regions.filter(r => {
+      const inX = xPercent >= (r.boundingBox.xPercent - PADDING) &&
+                  xPercent <= (r.boundingBox.xPercent + r.boundingBox.widthPercent + PADDING);
+      const inY = yPercent >= (r.boundingBox.yPercent - PADDING) &&
+                  yPercent <= (r.boundingBox.yPercent + r.boundingBox.heightPercent + PADDING);
+      return inX && inY;
+    });
+
+    // If no regions found, return null
+    if (overlappingRegions.length === 0) return null;
+
+    // If only one region, return it
+    if (overlappingRegions.length === 1) return overlappingRegions[0];
+
+    // If multiple regions overlap, return the one with the longest text (most complete)
+    const selected = overlappingRegions.reduce((longest, current) =>
+      current.text.length > longest.text.length ? current : longest
+    );
+
+    console.log(`[Smart Selection] Found ${overlappingRegions.length} overlapping regions, selected longest: "${selected.text}"`);
+    return selected;
+  };
+
+  // Magnetic cursor handlers - text follows mouse
+  const handleActivateMagneticCursor = (textRegion: TextRegion) => {
+    console.log('[Magnetic Cursor] 🚀 ACTIVATING for text:', textRegion.text);
+    console.log('[Magnetic Cursor] 📦 Text region data:', textRegion);
+
+    // Close chat bubble and hide purple overlay
+    setAnchoredChatPosition(null);
+    setClickedTextRegion(null); // Hide purple overlay, will show blue magnetic cursor overlay
+
+    // Activate magnetic cursor - Set state FIRST before any calculations
+    setMagneticCursor({ active: true, textRegion });
+
+    // Initialize cursor position at the center of the text region
+    if (imageRef.current) {
+      const rect = imageRef.current.getBoundingClientRect();
+      // Position relative to the IMAGE element (not viewport)
+      const centerX = (textRegion.boundingBox.xPercent / 100) * rect.width + (textRegion.boundingBox.widthPercent / 100) * rect.width / 2;
+      const centerY = (textRegion.boundingBox.yPercent / 100) * rect.height + (textRegion.boundingBox.heightPercent / 100) * rect.height / 2;
+      setCursorPosition({ x: centerX, y: centerY });
+      console.log('[Magnetic Cursor] ✅ Initialized position:', { x: centerX, y: centerY, imageWidth: rect.width, imageHeight: rect.height });
+      console.log('[Magnetic Cursor] ✅ State set:', { active: true, textRegion: textRegion.text });
+    } else {
+      console.error('[Magnetic Cursor] ❌ imageRef.current is null!');
+    }
+  };
+
+  const handleDropMagneticText = async (dropX: number, dropY: number) => {
+    if (!magneticCursor.textRegion || !currentSrc || !imageRef.current) return;
+
+    const rect = imageRef.current.getBoundingClientRect();
+    const xPercent = (dropX / rect.width) * 100;
+    const yPercent = (dropY / rect.height) * 100;
+
+    const sourceRegion = magneticCursor.textRegion;
+    const sourceX = sourceRegion.boundingBox.xPercent;
+    const sourceY = sourceRegion.boundingBox.yPercent;
+
+    // Calculate natural language direction
+    const deltaX = xPercent - sourceX;
+    const deltaY = yPercent - sourceY;
+
+    // Determine horizontal direction (lower threshold for better detection)
+    let horizontalDirection = '';
+    if (Math.abs(deltaX) > 5) {
+      if (deltaX < 0) {
+        horizontalDirection = 'left';
+      } else {
+        horizontalDirection = 'right';
+      }
+    }
+
+    // Determine simplified vertical direction
+    let verticalPart = '';
+    if (deltaY < -15) {
+      verticalPart = 'top';
+    } else if (deltaY > 15) {
+      verticalPart = 'bottom';
+    } else {
+      verticalPart = 'center';
+    }
+
+    // Combine into natural language (e.g., "top-left", "center-right", "bottom")
+    let direction = '';
+    if (verticalPart === 'center' && horizontalDirection) {
+      direction = horizontalDirection;
+    } else if (horizontalDirection && verticalPart !== 'center') {
+      direction = `${verticalPart}-${horizontalDirection}`;
+    } else {
+      direction = verticalPart;
+    }
+
+    console.log('[Magnetic Cursor] 📍 REPOSITIONING TEXT:', {
+      text: sourceRegion.text,
+      fromPosition: { x: `${sourceX.toFixed(1)}%`, y: `${sourceY.toFixed(1)}%` },
+      toPosition: { x: `${xPercent.toFixed(1)}%`, y: `${yPercent.toFixed(1)}%` },
+      distance: { deltaX: `${deltaX.toFixed(1)}%`, deltaY: `${deltaY.toFixed(1)}%` },
+      naturalLanguage: direction
+    });
+
+    // Keep the blue box visible at drop position during processing for visual feedback
+    // Don't reset magnetic cursor yet - keep it showing where text will be placed
+
+    // Execute the move via AI using TWO-STEP INPAINTING
+    setIsGenerating(true);
+    setError(null);
+    const truncatedText = sourceRegion.text.length > 20 ? sourceRegion.text.substring(0, 20) + '...' : sourceRegion.text;
+    setProcessingStatus(`Deckr is moving "${truncatedText}" to ${direction}`);
+
+    try {
+      const base64Src = await convertToBase64(currentSrc);
+
+      // STEP 1: Create mask to remove text from old position
+      if (!maskCanvasRef.current || !imageRef.current) {
+        throw new Error('Canvas reference not available');
+      }
+
+      const imgRect = imageRef.current.getBoundingClientRect();
+      const canvas = maskCanvasRef.current;
+      canvas.width = imgRect.width;
+      canvas.height = imgRect.height;
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) {
+        throw new Error('Failed to get canvas context');
+      }
+
+      // Create black mask with white rectangle over old text position
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'white';
+
+      const maskX = (sourceRegion.boundingBox.xPercent / 100) * canvas.width;
+      const maskY = (sourceRegion.boundingBox.yPercent / 100) * canvas.height;
+      const maskWidth = (sourceRegion.boundingBox.widthPercent / 100) * canvas.width;
+      const maskHeight = (sourceRegion.boundingBox.heightPercent / 100) * canvas.height;
+
+      ctx.fillRect(maskX, maskY, maskWidth, maskHeight);
+
+      const base64Mask = canvas.toDataURL('image/png');
+
+      console.log('[Magnetic Cursor - Step 1] Removing text from old position');
+
+      // Inpaint to remove old text
+      const { getInpaintingVariations } = await import('../services/geminiService');
+      const removeResult = await getInpaintingVariations(
+        `Remove the text "${sourceRegion.text}" and fill the area with appropriate background content that matches the surrounding area.`,
+        base64Src,
+        base64Mask,
+        isDeepMode,
+        (msg) => setProcessingStatus(msg)
+      );
+
+      if (!removeResult.images || removeResult.images.length === 0) {
+        throw new Error('Failed to remove text');
+      }
+
+      const imageWithTextRemoved = removeResult.images[0];
+
+      // STEP 2: Add text at new position
+      // Keep same status message for simplicity
+      console.log('[Magnetic Cursor - Step 2] Adding text at new position:', direction);
+
+      const addPrompt = `Recreate the heading text "${sourceRegion.text}" in the ${direction} area of the slide. The text must maintain its EXACT original styling: same font family, same font size, same font weight (bold), same text color, and same text alignment. Position it clearly in the ${direction} area. All other slide elements must remain completely unchanged.`;
+
+      const finalResult = await getGenerativeVariations(
+        selectedModel,
+        addPrompt,
+        imageWithTextRemoved,
+        isDeepMode,
+        handleProgressUpdate,
+        false
+      );
+
+      if (!finalResult || !finalResult.images || !finalResult.variationPrompts) {
+        throw new Error('Invalid response from API: missing images or prompts');
+      }
+
+      const { images } = finalResult;
+
+      if (images.length > 0) {
+        const context = {
+          workflow: 'Move (Inpaint)',
+          userIntentPrompt: `Move "${sourceRegion.text}" to ${direction}`,
+          model: selectedModel,
+          deepMode: isDeepMode
+        };
+
+        if (images.length === 1) {
+          onNewSlideVersion(slide.id, images[0]);
+          onSuccessfulSingleSlideEdit(context);
+          setCachedTextRegions([]); // Clear cache, will re-detect
+        } else {
+          setVariants({ images, prompts: finalResult.variationPrompts, context });
+          onSuccessfulSingleSlideEdit(context);
+        }
+      }
+    } catch (err: any) {
+      console.error('[Magnetic Cursor] Error:', err);
+      setError(err.message || 'Failed to move text');
+    } finally {
+      // Reset magnetic cursor visual feedback
+      setMagneticCursor({ active: false, textRegion: null });
+      setCursorPosition(null);
+      setIsGenerating(false);
+      setProcessingStatus(null);
+    }
+  };
+
   // Anchored AI Chat handlers
   const handleSlideClick = async (e: React.MouseEvent<HTMLImageElement>) => {
     // Don't open chat if in inpainting mode or if image generation is in progress
@@ -751,25 +1148,48 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     const clickX = e.clientX;
     const clickY = e.clientY;
 
+    // Calculate click position as percentage for matching with cached regions
+    const xPercent = (clickXImage / rect.width) * 100;
+    const yPercent = (clickYImage / rect.height) * 100;
+
+    // MAGNETIC CURSOR MODE: If active, drop text at clicked position
+    if (magneticCursor.active) {
+      console.log('[Magnetic Cursor] Dropping at position:', { xPercent, yPercent });
+      handleDropMagneticText(clickXImage, clickYImage);
+      return;
+    }
+
+    // NORMAL MODE: Regular click behavior
     setAnchoredChatPosition({ x: clickX, y: clickY });
     setClickedTextRegion(null);
 
-    // Detect which text was clicked (async, won't block UI)
-    setIsDetectingText(true);
-    try {
-      const detectedRegion = await detectClickedText(
-        currentSrc,
-        clickXImage,
-        clickYImage,
-        rect.width,
-        rect.height
-      );
-      console.log('[Text Detection] Detected region:', detectedRegion);
-      setClickedTextRegion(detectedRegion);
-    } catch (error) {
-      console.error('Failed to detect clicked text:', error);
-    } finally {
-      setIsDetectingText(false);
+    // Try using cached text regions first for instant response (0ms)
+    if (cachedTextRegions.length > 0) {
+      const region = findTextAtPoint(cachedTextRegions, xPercent, yPercent);
+      setClickedTextRegion(region);
+      console.log('[Click - Cache Hit] Found region instantly:', region);
+      // No need to set isDetectingText since we're using cache
+    } else {
+      // Fallback to per-click detection if cache is empty (shouldn't happen after pre-load)
+      console.log('[Click - Cache Miss] Falling back to per-click detection');
+      setIsDetectingText(true);
+      try {
+        // Convert to base64 first (needed for Firebase URLs)
+        const base64Src = await convertToBase64(currentSrc);
+        const detectedRegion = await detectClickedText(
+          base64Src,
+          clickXImage,
+          clickYImage,
+          rect.width,
+          rect.height
+        );
+        console.log('[Click - Fallback] Detected region:', detectedRegion);
+        setClickedTextRegion(detectedRegion);
+      } catch (error) {
+        console.error('[Click - Fallback] Failed to detect clicked text:', error);
+      } finally {
+        setIsDetectingText(false);
+      }
     }
   };
 
@@ -783,35 +1203,42 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
   const handleChatSubmit = async (message: string) => {
     if (!message.trim() || !currentSrc) return;
 
-    // Transition from floating bubble to right panel (Canva-style)
-    setRightPanelInitialMessage(message);
-    setAnchoredChatPosition(null); // Close floating bubble
-    setIsRightPanelOpen(true); // Open right panel
+    // In batch edit mode, keep the chat open. In regular mode, transition to right panel
+    if (!isBatchEditMode) {
+      setRightPanelInitialMessage(message);
+      setAnchoredChatPosition(null); // Close floating bubble
+      setIsRightPanelOpen(true); // Open right panel
+    }
+    // In batch mode, chat stays open at its current position
 
     setIsGenerating(true);
     setError(null);
 
     // Enhance the message with clicked text context for precision
     let enhancedMessage = message;
-    let shouldBypassAnalyst = false;
 
     if (clickedTextRegion?.text) {
       console.log('[Prompt Enhancement] Detected text from region:', clickedTextRegion.text);
 
-      // Detect if this is a removal intent
-      if (isRemovalIntent(message)) {
-        // Removal prompt
-        enhancedMessage = `Remove the text "${clickedTextRegion.text}" from the slide. Keep everything else exactly the same - same fonts, colors, layout, logos, and all other text. Just delete this specific text element.`;
-        console.log('[Prompt Enhancement] Using REMOVAL prompt:', enhancedMessage);
-        setProcessingStatus(`Deckr is removing this...`);
-      } else {
-        // Text change prompt
-        enhancedMessage = `Change the text "${clickedTextRegion.text}" to: ${message}. Keep everything else exactly the same - same fonts, colors, layout, logos, and all other text.`;
-        console.log('[Prompt Enhancement] Using CHANGE prompt:', enhancedMessage);
-        const truncatedMsg = message.length > 30 ? message.substring(0, 30) + '...' : message;
-        setProcessingStatus(`Deckr is updating to "${truncatedMsg}"`);
+      // Strip common prompt prefixes from user input to avoid redundancy
+      let cleanMessage = message.trim();
+      const prefixesToStrip = [
+        /^change\s+to\s+/i,
+        /^change\s+/i,
+        /^update\s+to\s+/i,
+        /^replace\s+with\s+/i,
+        /^make\s+it\s+/i
+      ];
+
+      for (const prefix of prefixesToStrip) {
+        cleanMessage = cleanMessage.replace(prefix, '');
       }
-      shouldBypassAnalyst = true; // Use direct prompt without Design Analyst
+
+      // Enhance message with context about which text to change
+      enhancedMessage = `Change the text "${clickedTextRegion.text}" to "${cleanMessage}"`;
+      console.log('[Prompt Enhancement] Enhanced prompt with context:', enhancedMessage);
+      const truncatedMsg = cleanMessage.length > 30 ? cleanMessage.substring(0, 30) + '...' : cleanMessage;
+      setProcessingStatus(`Deckr is updating to "${truncatedMsg}"`);
     } else {
       console.log('[Prompt Enhancement] No text detected, using original message:', message);
       setProcessingStatus('Deckr is working on it...');
@@ -829,15 +1256,34 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
       finalImages: [],
     };
 
+    console.log('[API Call] About to call getGenerativeVariations with:', {
+      model: selectedModel,
+      enhancedMessage
+    });
+
     try {
-      const { images, prompts: variationPrompts, logs } = await getGenerativeVariations(
+      // Convert currentSrc to base64 if needed (fixes Firebase Storage URL issue)
+      const base64Src = await convertToBase64(currentSrc);
+      console.log('[API Call] Converted image to base64, length:', base64Src.length);
+
+      const result = await getGenerativeVariations(
         selectedModel,
         enhancedMessage,
-        currentSrc,
+        base64Src,
         isDeepMode,
         handleProgressUpdate,
-        shouldBypassAnalyst
+        false // Use Design Analyst for quality text changes
       );
+
+      console.log('[API Call] Raw response:', result);
+
+      if (!result || !result.images || !result.variationPrompts) {
+        throw new Error('Invalid response from API: missing images or prompts');
+      }
+
+      const { images, variationPrompts, logs } = result;
+
+      console.log('[API Call] Received response:', { imageCount: images.length, promptCount: variationPrompts.length });
 
       if (images.length > 0) {
         const context = { workflow: 'Edit', userIntentPrompt: message, model: selectedModel, deepMode: isDeepMode };
@@ -846,9 +1292,31 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
         if (images.length === 1) {
           onNewSlideVersion(slide.id, images[0]);
           onSuccessfulSingleSlideEdit(context);
+
+          // Invalidate cache - new image will trigger automatic re-detection via useEffect
+          console.log('[Cache Invalidation] Clearing stale cache after edit');
+          setCachedTextRegions([]);
+
+          // Keep batch edit mode active - user can continue editing
+          if (isBatchEditMode) {
+            console.log('[Batch Edit] Execution complete, staying in Edit Mode');
+            // Clear the queue since changes were applied
+            setEditQueue([]);
+            // Keep selectedTextForEdit and anchoredChatPosition so chat stays open
+            // DON'T exit batch mode - keep it active for continued editing
+          }
         } else {
           setVariants({ images, prompts: variationPrompts, context });
           onSuccessfulSingleSlideEdit(context);
+
+          // Keep batch edit mode active - user can continue editing
+          if (isBatchEditMode) {
+            console.log('[Batch Edit] Execution complete, staying in Edit Mode');
+            // Clear the queue since changes were applied
+            setEditQueue([]);
+            // Keep selectedTextForEdit and anchoredChatPosition so chat stays open
+            // DON'T exit batch mode - keep it active for continued editing
+          }
         }
 
         if (isDebugMode) {
@@ -858,6 +1326,9 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
       }
 
     } catch (err: any) {
+      console.error('[API Call] Error occurred:', err);
+      console.error('[API Call] Error message:', err.message);
+      console.error('[API Call] Error stack:', err.stack);
       setError(err.message || 'An unknown error occurred while refining the slide.');
       session = { ...session, status: 'Failed', error: err.message, logs: [], finalImages: [] };
     } finally {
@@ -872,6 +1343,48 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
   const handleCloseChat = () => {
     setAnchoredChatPosition(null);
     setClickedTextRegion(null); // Clear the text overlay
+  };
+
+  // Batch Edit Mode: Queue management handlers
+  const handleAddToQueue = (action: 'change' | 'remove', newText?: string) => {
+    if (!selectedTextForEdit) return;
+
+    const queueItem = {
+      id: Date.now().toString(),
+      region: selectedTextForEdit,
+      action,
+      newText
+    };
+
+    // Check if this text is already in the queue - update it instead of adding duplicate
+    const existingIndex = editQueue.findIndex(q => q.region.text === selectedTextForEdit.text);
+    if (existingIndex !== -1) {
+      const updatedQueue = [...editQueue];
+      updatedQueue[existingIndex] = queueItem;
+      setEditQueue(updatedQueue);
+      console.log('[Batch Edit] Updated existing queue item:', queueItem);
+    } else {
+      setEditQueue([...editQueue, queueItem]);
+      console.log('[Batch Edit] Added to queue:', queueItem);
+    }
+  };
+
+  const handleClearQueue = () => {
+    setEditQueue([]);
+    setSelectedTextForEdit(null); // Clear selected text so user can type general requests
+    console.log('[Batch Edit] Cleared queue and selected text');
+  };
+
+  // Transition from floating bubble to right side (Canva-style)
+  const handleTransitionToRightPanel = () => {
+    console.log('[Batch Edit] Moving bubble to right side');
+    // Move the bubble to the far right edge (completely off the slide)
+    const rightPosition = {
+      x: window.innerWidth - 360, // Closer to right edge
+      y: 120 // Higher position for better visibility
+    };
+    setAnchoredChatPosition(rightPosition);
+    // Keep Edit Mode active and queue visible
   };
 
   const handleCloseRightPanel = () => {
@@ -889,25 +1402,29 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
 
     // Apply same text detection enhancement
     let enhancedMessage = message;
-    let shouldBypassAnalyst = false;
 
     if (clickedTextRegion?.text) {
       console.log('[Right Panel] Detected text from region:', clickedTextRegion.text);
 
-      // Detect if this is a removal intent
-      if (isRemovalIntent(message)) {
-        // Removal prompt
-        enhancedMessage = `Remove the text "${clickedTextRegion.text}" from the slide. Keep everything else exactly the same - same fonts, colors, layout, logos, and all other text. Just delete this specific text element.`;
-        console.log('[Right Panel] Using REMOVAL prompt:', enhancedMessage);
-        setProcessingStatus(`Deckr is removing this...`);
-      } else {
-        // Text change prompt
-        enhancedMessage = `Change the text "${clickedTextRegion.text}" to: ${message}. Keep everything else exactly the same - same fonts, colors, layout, logos, and all other text.`;
-        console.log('[Right Panel] Using CHANGE prompt:', enhancedMessage);
-        const truncatedMsg = message.length > 30 ? message.substring(0, 30) + '...' : message;
-        setProcessingStatus(`Deckr is updating to "${truncatedMsg}"`);
+      // Strip common prompt prefixes from user input to avoid redundancy
+      let cleanMessage = message.trim();
+      const prefixesToStrip = [
+        /^change\s+to\s+/i,
+        /^change\s+/i,
+        /^update\s+to\s+/i,
+        /^replace\s+with\s+/i,
+        /^make\s+it\s+/i
+      ];
+
+      for (const prefix of prefixesToStrip) {
+        cleanMessage = cleanMessage.replace(prefix, '');
       }
-      shouldBypassAnalyst = true;
+
+      // Enhance message with context about which text to change
+      enhancedMessage = `Change the text "${clickedTextRegion.text}" to "${cleanMessage}"`;
+      console.log('[Right Panel] Enhanced prompt with context:', enhancedMessage);
+      const truncatedMsg = cleanMessage.length > 30 ? cleanMessage.substring(0, 30) + '...' : cleanMessage;
+      setProcessingStatus(`Deckr is updating to "${truncatedMsg}"`);
     } else {
       console.log('[Right Panel] No text detected, using original message:', message);
       setProcessingStatus('Deckr is working on it...');
@@ -926,14 +1443,25 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     };
 
     try {
-      const { images, prompts: variationPrompts, logs } = await getGenerativeVariations(
+      // Convert currentSrc to base64 if needed (fixes Firebase Storage URL issue)
+      const base64Src = await convertToBase64(currentSrc);
+
+      const result = await getGenerativeVariations(
         selectedModel,
         enhancedMessage,
-        currentSrc,
+        base64Src,
         isDeepMode,
         handleProgressUpdate,
-        shouldBypassAnalyst
+        false // Use Design Analyst for quality text changes
       );
+
+      console.log('[Right Panel] Raw response:', result);
+
+      if (!result || !result.images || !result.variationPrompts) {
+        throw new Error('Invalid response from API: missing images or prompts');
+      }
+
+      const { images, variationPrompts, logs } = result;
 
       if (images.length > 0) {
         const context = { workflow: 'Edit', userIntentPrompt: message, model: selectedModel, deepMode: isDeepMode };
@@ -942,6 +1470,10 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
         if (images.length === 1) {
           onNewSlideVersion(slide.id, images[0]);
           onSuccessfulSingleSlideEdit(context);
+
+          // Invalidate cache - new image will trigger automatic re-detection via useEffect
+          console.log('[Cache Invalidation] Clearing stale cache after edit');
+          setCachedTextRegions([]);
         } else {
           setVariants({ images, prompts: variationPrompts, context });
           onSuccessfulSingleSlideEdit(context);
@@ -954,6 +1486,9 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
       }
 
     } catch (err: any) {
+      console.error('[API Call] Error occurred:', err);
+      console.error('[API Call] Error message:', err.message);
+      console.error('[API Call] Error stack:', err.stack);
       setError(err.message || 'An unknown error occurred while refining the slide.');
       session = { ...session, status: 'Failed', error: err.message, logs: [], finalImages: [] };
     } finally {
@@ -1356,16 +1891,129 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
                             src={currentSrc}
                             alt={slide.name}
                             onClick={handleSlideClick}
-                            className={`object-contain w-full h-full transition-all select-none ${isInpaintingMode ? 'cursor-crosshair' : (isImagenSelected ? '' : 'group-hover:scale-[1.02] cursor-pointer')}`}
+                            className={`object-contain w-full h-full transition-all select-none ${
+                                isInpaintingMode ? 'cursor-crosshair' :
+                                magneticCursor.active ? 'cursor-move' :
+                                (isImagenSelected ? '' : 'group-hover:scale-[1.02] cursor-pointer')
+                            }`}
                             draggable={false}
                         />
                     )
                 }
 
-                {/* Text region overlay - shows detected text box with magic status */}
-                {!isInpaintingMode && !creationModeInfo && clickedTextRegion?.boundingBox && imageRef.current && (
+                {/* Hidden canvas for mask generation - used by both inpainting and magnetic cursor */}
+                <canvas ref={maskCanvasRef} className="hidden" />
+
+                {/* Magnetic Cursor: Text follows mouse */}
+                {magneticCursor.active && magneticCursor.textRegion && cursorPosition && imageRef.current && (
                     <div
-                        className={`absolute border-2 ${processingStatus ? 'border-purple-600 bg-purple-600/20' : 'border-purple-500 bg-purple-500/10'} rounded pointer-events-none ${processingStatus ? 'animate-pulse' : ''}`}
+                        className={`absolute border-4 rounded-lg pointer-events-none shadow-2xl ${
+                            isGenerating
+                                ? 'border-purple-500 bg-purple-500/30 animate-pulse'
+                                : 'border-blue-500 bg-blue-500/30'
+                        }`}
+                        style={{
+                            left: `${cursorPosition.x}px`,
+                            top: `${cursorPosition.y}px`,
+                            width: `${(magneticCursor.textRegion.boundingBox.widthPercent / 100) * imageRef.current.offsetWidth}px`,
+                            height: `${(magneticCursor.textRegion.boundingBox.heightPercent / 100) * imageRef.current.offsetHeight}px`,
+                            transform: 'translate(-50%, -50%)',
+                            zIndex: 9999,
+                            transition: 'none'
+                        }}
+                    >
+                        {/* Corner handles */}
+                        <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-blue-500 border-2 border-white rounded-full" />
+                        <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-blue-500 border-2 border-white rounded-full" />
+                        <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-blue-500 border-2 border-white rounded-full" />
+                        <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-blue-500 border-2 border-white rounded-full" />
+
+                        {/* Text preview with processing status */}
+                        <div className={`absolute -top-9 left-1/2 -translate-x-1/2 text-white text-xs px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap flex items-center gap-2 ${
+                            isGenerating ? 'bg-gradient-to-r from-pink-500 via-purple-500 via-blue-500 via-green-500 via-yellow-500 to-pink-500 bg-[length:300%_100%] animate-gradient shadow-2xl' : 'bg-blue-500'
+                        }`}>
+                            {isGenerating ? (
+                                <>
+                                    <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span>{processingStatus}</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span>↔️</span>
+                                    <span>{magneticCursor.textRegion.text}</span>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Batch Edit Mode: Show ALL detected text boxes */}
+                {isBatchEditMode && !isInpaintingMode && !creationModeInfo && cachedTextRegions.length > 0 && imageRef.current && (
+                    <>
+                        {cachedTextRegions.map((region, index) => {
+                            const isQueued = editQueue.find(q => q.region.text === region.text);
+                            const isSelected = selectedTextForEdit?.text === region.text;
+
+                            return (
+                                <div
+                                    key={`batch-text-${index}`}
+                                    className={`absolute border rounded-sm transition-all cursor-pointer group ${
+                                        isQueued
+                                            ? isQueued.action === 'remove'
+                                                ? 'border-red-400 bg-red-50/50'
+                                                : 'border-green-400 bg-green-50/50'
+                                            : isSelected
+                                                ? 'border-purple-500 bg-purple-50/30'
+                                                : 'border-gray-300 hover:border-purple-400'
+                                    }`}
+                                    style={{
+                                        left: `${region.boundingBox.xPercent}%`,
+                                        top: `${region.boundingBox.yPercent}%`,
+                                        width: `${region.boundingBox.widthPercent}%`,
+                                        height: `${region.boundingBox.heightPercent}%`,
+                                    }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedTextForEdit(region);
+                                        // Only set position if chat isn't already open
+                                        if (!anchoredChatPosition) {
+                                            const rect = imageRef.current!.getBoundingClientRect();
+                                            const x = rect.left + (region.boundingBox.xPercent / 100) * rect.width;
+                                            const y = rect.top + (region.boundingBox.yPercent / 100) * rect.height;
+                                            setAnchoredChatPosition({ x, y });
+                                        }
+                                        // If chat is already open, just update the selected text (chat stays in same position)
+                                    }}
+                                >
+                                    {/* Canva-style corner handles */}
+                                    <div className="absolute -top-1 -left-1 w-2 h-2 bg-white border border-purple-500 rounded-full opacity-0 group-hover:opacity-100" />
+                                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-white border border-purple-500 rounded-full opacity-0 group-hover:opacity-100" />
+                                    <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-white border border-purple-500 rounded-full opacity-0 group-hover:opacity-100" />
+                                    <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-white border border-purple-500 rounded-full opacity-0 group-hover:opacity-100" />
+
+                                    {/* Minimal status indicator for queued items */}
+                                    {isQueued && (
+                                        <div className={`absolute -top-5 left-0 px-2 py-0.5 rounded-full text-xs font-medium text-white shadow-sm ${
+                                            isQueued.action === 'remove'
+                                                ? 'bg-red-500'
+                                                : 'bg-green-500'
+                                        }`}>
+                                            {isQueued.action === 'remove' ? 'Remove' : 'Edit'}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </>
+                )}
+
+                {/* Text region overlay - shows detected text box with magic status and drag handle */}
+                {!isInpaintingMode && !creationModeInfo && !magneticCursor.active && !isBatchEditMode && clickedTextRegion?.boundingBox && imageRef.current && (
+                    <div
+                        className={`absolute border-2 ${processingStatus ? 'border-purple-600 bg-purple-600/20' : 'border-purple-500 bg-purple-500/10'} rounded ${processingStatus ? 'animate-pulse' : ''} pointer-events-none`}
                         style={{
                             left: `${clickedTextRegion.boundingBox.xPercent}%`,
                             top: `${clickedTextRegion.boundingBox.yPercent}%`,
@@ -1379,8 +2027,24 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
                         <div className={`absolute -bottom-1.5 -left-1.5 w-3 h-3 ${processingStatus ? 'bg-purple-600' : 'bg-purple-500'} border-2 border-white rounded-full`} />
                         <div className={`absolute -bottom-1.5 -right-1.5 w-3 h-3 ${processingStatus ? 'bg-purple-600' : 'bg-purple-500'} border-2 border-white rounded-full`} />
 
-                        {/* Label showing detected text or processing status */}
-                        <div className={`absolute -top-7 left-0 ${processingStatus ? 'bg-gradient-to-r from-pink-500 via-purple-500 via-blue-500 via-green-500 via-yellow-500 to-pink-500 bg-[length:300%_100%] animate-gradient shadow-2xl' : 'bg-purple-500'} text-white text-xs px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap flex items-center gap-2`}>
+                        {/* Label showing detected text or processing status - Click to drag */}
+                        <div
+                            className={`absolute -top-7 left-0 ${processingStatus ? 'bg-gradient-to-r from-pink-500 via-purple-500 via-blue-500 via-green-500 via-yellow-500 to-pink-500 bg-[length:300%_100%] animate-gradient shadow-2xl' : 'bg-purple-500 hover:bg-purple-600 cursor-move active:scale-95'} text-white text-xs px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap flex items-center gap-2 pointer-events-auto transition-all`}
+                            style={{ zIndex: 9999 }}
+                            onMouseDown={(e) => {
+                                // Use onMouseDown instead of onClick for more immediate response
+                                console.log('[Purple Label] 🖱️ MOUSE DOWN!', { processingStatus, hasTextRegion: !!clickedTextRegion, clickedText: clickedTextRegion?.text });
+                                if (!processingStatus && clickedTextRegion) {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    console.log('[Purple Label] 🚀 Calling handleActivateMagneticCursor...');
+                                    handleActivateMagneticCursor(clickedTextRegion);
+                                } else {
+                                    console.warn('[Purple Label] ⚠️ Cannot activate:', { processingStatus, hasTextRegion: !!clickedTextRegion });
+                                }
+                            }}
+                            title={!processingStatus ? "Click to move this text" : undefined}
+                        >
                             {processingStatus ? (
                                 <>
                                     <div className="relative flex items-center justify-center">
@@ -1393,19 +2057,51 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
                                 </>
                             ) : (
                                 <>
-                                    <span>✨</span>
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                                    </svg>
                                     <span>{clickedTextRegion.text}</span>
+                                    <span className="text-purple-200 text-[10px]">(click to drag)</span>
                                 </>
                             )}
                         </div>
                     </div>
                 )}
 
+                {/* Floating Edit Mode button - appears on hover at top-right of slide */}
+                {!creationModeInfo && !isInpaintingMode && (
+                    <div className={`absolute top-4 right-4 z-50 transition-opacity duration-200 ${
+                        isBatchEditMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                    }`}>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsBatchEditMode(!isBatchEditMode);
+                                if (isBatchEditMode) {
+                                    // Exiting Edit Mode - clear queue
+                                    setEditQueue([]);
+                                    setSelectedTextForEdit(null);
+                                    setAnchoredChatPosition(null);
+                                }
+                            }}
+                            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-lg ${
+                                isBatchEditMode
+                                    ? 'bg-gradient-to-r from-purple-500 via-pink-500 to-purple-600 text-white animate-gradient bg-[length:200%_200%]'
+                                    : 'bg-gradient-to-r from-pink-400 to-purple-500 hover:from-purple-500 hover:to-pink-500 text-white'
+                            }`}
+                            disabled={isGenerating}
+                            title={isBatchEditMode ? "Exit Edit Mode" : "Enter Edit Mode to batch edit multiple text elements"}
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            {isBatchEditMode ? '✨ Edit Mode' : '✨ Edit Mode'}
+                        </button>
+                    </div>
+                )}
+
                 {isInpaintingMode && (
                     <>
-                        {/* Hidden canvas for mask generation */}
-                        <canvas ref={maskCanvasRef} className="hidden" />
-
                         {/* Interactive overlay for box selection */}
                         <div
                             className="absolute top-0 left-0 w-full h-full cursor-crosshair"
@@ -1482,12 +2178,30 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
         )}
         {anchoredChatPosition && (
             <AnchoredChatBubble
+                key={isBatchEditMode ? 'batch-chat' : (selectedTextForEdit?.text || clickedTextRegion?.text || 'chat-bubble')}
                 position={anchoredChatPosition}
                 onClose={handleCloseChat}
                 onSubmit={handleChatSubmit}
                 onEnterInpaintMode={handleEnterInpaintingMode}
                 isLoading={isChatRefining}
-                regionText={clickedTextRegion?.text || (isDetectingText ? 'Detecting...' : 'this area')}
+                regionText={
+                    isBatchEditMode
+                        ? (selectedTextForEdit?.text || 'this slide')
+                        : (clickedTextRegion?.text || (isDetectingText ? 'Detecting...' : 'this area'))
+                }
+                // Batch editing props
+                isBatchMode={isBatchEditMode}
+                editQueue={editQueue.map(item => ({
+                    id: item.id,
+                    originalText: item.region.text,
+                    action: item.action,
+                    newText: item.newText
+                }))}
+                onAddToQueue={handleAddToQueue}
+                onClearQueue={handleClearQueue}
+                onTransitionToPanel={handleTransitionToRightPanel}
+                conversationHistory={batchChatHistory}
+                onUpdateHistory={setBatchChatHistory}
             />
         )}
         {isRightPanelOpen && (
@@ -1497,6 +2211,17 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
                 isLoading={isGenerating}
                 initialMessage={rightPanelInitialMessage}
                 loadingStatus={processingStatus || undefined}
+                // Batch editing props
+                isBatchMode={isBatchEditMode}
+                editQueue={editQueue.map(item => ({
+                    id: item.id,
+                    originalText: item.region.text,
+                    action: item.action,
+                    newText: item.newText
+                }))}
+                onAddToQueue={handleAddToQueue}
+                onClearQueue={handleClearQueue}
+                selectedText={selectedTextForEdit?.text}
             />
         )}
 

@@ -1,0 +1,103 @@
+Company: Microsoft
+Customer: Contoso Manufacturing
+Meeting Date: Nov 2024
+Attendees: Sarah Chen (CTO), Mike Rodriguez (Head of IT), Jennifer Park (Business Process Manager)
+
+Topic: Azure Logic Apps for Enterprise Integration
+
+DISCOVERY NOTES:
+- Currently using 15+ different systems: SAP ERP, Salesforce CRM, ServiceNow, legacy AS/400, custom inventory system
+- Manual data entry between systems costing 200+ hours/month
+- Order processing takes 3-5 days due to system silos
+- Failed integration attempts with MuleSoft (too complex, project stalled after 6 months)
+- IT team is only 8 people - need low-code solution
+- Budget approved: $250K annually for integration platform
+
+PAIN POINTS:
+1. Order-to-Cash Process:
+   - Sales rep enters order in Salesforce
+   - Finance manually re-enters into SAP for invoicing
+   - Warehouse gets email notification, manually updates inventory system
+   - Average 47 manual touchpoints per order
+   - 12% error rate causing customer complaints
+
+2. IT Ticket Workflow:
+   - ServiceNow tickets not syncing with internal systems
+   - Engineers waste 30 mins/day checking multiple dashboards
+   - SLA breaches due to delayed notifications
+
+3. Supply Chain Visibility:
+   - Real-time inventory data not available
+   - Weekly batch updates from suppliers
+   - Overstocking costs $2M/year, stockouts losing $500K in sales
+
+SOLUTION DEMO:
+Logic Apps Use Cases to Present:
+1. Automated Order Processing Flow
+   - Salesforce opportunity closed → Logic App triggers
+   - Validate customer credit in SAP
+   - Create sales order in SAP automatically
+   - Send confirmation email via SendGrid
+   - Update inventory reservations
+   - Notify warehouse via Teams webhook
+   - Reduced processing time: 3 days → 2 hours
+
+2. IT Operations Automation
+   - ServiceNow ticket created → Logic App monitors
+   - Severity 1 tickets auto-escalate in Teams
+   - Pull related data from monitoring tools (Datadog, Azure Monitor)
+   - Create unified incident dashboard in Power BI
+   - Engineers save 2 hours/day
+
+3. Supply Chain Integration
+   - Real-time supplier EDI feeds → Logic Apps ingestion
+   - Parse XML/JSON from 12 different suppliers
+   - Normalize data formats
+   - Update central inventory database
+   - Trigger reorder workflows when stock < threshold
+   - Send daily summary reports
+
+COMPETITIVE DIFFERENTIATION:
+vs MuleSoft:
+- Logic Apps: $0.000025/action vs MuleSoft $75K base license
+- Visual designer - no coding required (Jennifer's team can build)
+- Built-in Azure connectors (they're already using Azure VM, Storage, SQL)
+
+vs Workato:
+- Native Microsoft ecosystem integration (Teams, Dynamics 365, Power Platform)
+- Enterprise-grade security with Azure AD, compliance certifications
+- Managed service - no infrastructure to maintain
+
+KEY METRICS TO EMPHASIZE:
+- 200+ pre-built connectors including SAP, Salesforce, ServiceNow
+- 99.9% SLA uptime guarantee
+- 47 manual steps → 0 manual steps (100% automation)
+- ROI: $250K investment saves $850K/year (labor + error reduction + inventory optimization)
+- Implementation timeline: 6-8 weeks vs 6+ months for MuleSoft
+
+OBJECTION HANDLING:
+"We tried integration before and it failed"
+→ MuleSoft requires Java developers, Logic Apps uses visual designer. Jennifer's business analysts can build workflows with 2-day training.
+
+"What about vendor lock-in?"
+→ Open standards (REST, SOAP, EDI), can export workflow definitions, hybrid cloud support
+
+"Security concerns with cloud?"
+→ SOC 2, ISO 27001, HIPAA compliant. Data stays in Azure (already using), private endpoints, managed identities
+
+NEXT STEPS:
+1. 2-week POC: Build Salesforce-to-SAP order flow
+2. Success criteria: Process 100 test orders with <1% error rate
+3. Training sessions for Jennifer's team (3x 4-hour workshops)
+4. Pilot go-live: Dec 15, 2024
+5. Full rollout: Q1 2025
+
+CHAMPIONS:
+- Jennifer (Business Process Manager): Excited about low-code, wants to reduce dependency on IT
+- Mike (Head of IT): Loves managed service model, team is stretched thin
+- Sarah (CTO): Focused on ROI, needs quick wins to justify budget
+
+DECISION TIMELINE:
+- Verbal commitment by Dec 1
+- Contract signed by Dec 15
+- POC starts Jan 2, 2025

@@ -606,6 +606,7 @@ ${JSON.stringify(extractedContentJson, null, 2)}
 Render the content from the JSON BLUEPRINT according to the user's GOAL, ensuring the final output is in the exact STYLE of the reference slide and adheres to all CRITICAL STYLE RULES.
 `;
 
+    // Generate 3 variations for edit mode (gives user choice)
     const basePrompts = [
         basePromptForArtist,
         `${basePromptForArtist}\n\n(For this version, interpret the layout with a slightly more creative or visually distinct style, while staying true to the reference.)`,
@@ -728,6 +729,7 @@ export const executeSlideTask = async (base64Image: string, detailedPrompt: stri
     const artistSystemPrompt = `You are a world-class "High-Fidelity Artist" AI. Your task is to edit the provided slide image based on a specific set of instructions.\n\n**CRITICAL RULES:**\n1.  **Preserve Original Content:** You MUST preserve all original branding, text, fonts, colors, and layout that you are not explicitly told to change.\n2.  **Match the Style:** Any new content (text or images) must perfectly match the visual style of the original slide.\n3.  **Follow Instructions Exactly:** Execute the detailed prompt precisely.\n4.  **Aspect Ratio:** Ensure the final slide maintains a standard 16:9 presentation aspect ratio.\n---\n**Detailed Prompt:** "${detailedPrompt}"`;
     const originalImagePart = fileToGenerativePart(base64Image);
     
+    // Generate 3 variations for edit mode (gives user choice)
     const basePrompts = [
         artistSystemPrompt,
         `${artistSystemPrompt}\n(For this version, interpret the request with a slightly more creative or visually distinct style.)`,
@@ -795,14 +797,13 @@ export const createSlideFromPrompt = async (
         : `You are a "Creative Slide Designer" AI. Your task is to create a brand new slide from scratch based on a detailed prompt.\n\n**CRITICAL RULES:**\n1. **Design Style:** Since no reference image is provided, create a clean, professional, and visually appealing design. Use a modern, minimalist aesthetic with good typography and layout principles.\n2.  **Follow Prompt:** Create the content of the new slide based *only* on the detailed prompt.\n3.  **Aspect Ratio:** The new slide you create MUST be in a 16:9 aspect ratio.\n---\n**Detailed Prompt:** "${detailedPrompt}"${themeInstructions}${logoInstructions}`;
     
     
+    // Generate only 1 variation to save time and cost
     const basePrompts = [
         designerSystemPrompt,
-        `${designerSystemPrompt}\n(For this version, offer a slightly different but equally professional layout.)`,
-        `${designerSystemPrompt}\n(For this version, present a third creative option that still adheres to the style.)`,
     ];
 
-    console.log(`[createSlideFromPrompt] 🎨 Generating ${basePrompts.length} variations in parallel...`);
-    onProgress?.('Generating 3 new slide variations...');
+    console.log(`[createSlideFromPrompt] 🎨 Generating ${basePrompts.length} variation...`);
+    onProgress?.('Generating new slide...');
     const promises = basePrompts.map((p, idx) => {
         console.log(`[createSlideFromPrompt] Variation ${idx + 1}/${basePrompts.length} prompt length: ${p.length} chars`);
         return generateSingleImage('gemini-2.5-flash-image', imageParts, p, deepMode, logs, onProgress);

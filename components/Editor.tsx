@@ -306,8 +306,8 @@ const Editor: React.FC<EditorProps> = ({
         onDeleteSlide={onDeleteSlide}
       />
       <div className="flex-grow flex flex-col min-w-0 bg-brand-background">
-        {/* Deck-level AI customization - Hidden for clean single-input UX */}
-        {false && !newSlideState && (
+        {/* Deck-level AI customization */}
+        {!newSlideState && (
             <div className="bg-brand-surface p-4 border-b border-brand-border flex-shrink-0">
               <div className="flex items-start gap-4 max-w-4xl mx-auto">
                   <textarea
@@ -374,20 +374,6 @@ const Editor: React.FC<EditorProps> = ({
             />
         )}
 
-        {lastSuccessfulEdit && (
-             <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-brand-surface text-brand-text-primary py-3 px-5 rounded-xl shadow-lg border border-brand-border flex items-center gap-4 animate-fade-in z-50">
-                <p className="text-sm font-medium">Liked that change?</p>
-                <button
-                    onClick={handleApplyToAll}
-                    className="px-4 py-1.5 text-sm font-semibold text-white bg-brand-primary rounded-md hover:opacity-90"
-                >
-                    Apply to All Slides
-                </button>
-                <button onClick={() => setLastSuccessfulEdit(null)} className="text-brand-text-tertiary hover:text-brand-text-primary">
-                    &times;
-                </button>
-            </div>
-        )}
     </>
   );
 };

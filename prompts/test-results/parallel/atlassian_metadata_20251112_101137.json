@@ -1,0 +1,62 @@
+{
+  "company": "Atlassian",
+  "timestamp": "20251112_101137",
+  "master_planning_time": 87.77965712547302,
+  "total_slides": 10,
+  "successful_slides": 10,
+  "failed_slides": 0,
+  "slide_times": [
+    {
+      "slide": 1,
+      "time": 37.310970067977905,
+      "success": true
+    },
+    {
+      "slide": 2,
+      "time": 46.294275999069214,
+      "success": true
+    },
+    {
+      "slide": 3,
+      "time": 42.615907192230225,
+      "success": true
+    },
+    {
+      "slide": 4,
+      "time": 43.76310086250305,
+      "success": true
+    },
+    {
+      "slide": 5,
+      "time": 45.936102867126465,
+      "success": true
+    },
+    {
+      "slide": 6,
+      "time": 43.02285099029541,
+      "success": true
+    },
+    {
+      "slide": 7,
+      "time": 35.08966588973999,
+      "success": true
+    },
+    {
+      "slide": 8,
+      "time": 42.136993169784546,
+      "success": true
+    },
+    {
+      "slide": 9,
+      "time": 47.44704794883728,
+      "success": true
+    },
+    {
+      "slide": 10,
+      "time": 43.90114784240723,
+      "success": true
+    }
+  ],
+  "total_generation_time": 135.2267050743103,
+  "parallel_speedup": "9.01x"
+}

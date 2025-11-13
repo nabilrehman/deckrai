@@ -38,7 +38,7 @@ const App: React.FC = () => {
   const [sessionHistory, setSessionHistory] = useState<DebugSession[]>([]);
   const [inspectingSession, setInspectingSession] = useState<DebugSession | null>(null);
   const [isStylePanelVisible, setIsStylePanelVisible] = useState(false); // Hidden by default - not main functionality
-  const [isTestMode, setIsTestMode] = useState(true);
+  const [isTestMode, setIsTestMode] = useState(false); // Production mode: no 5-slide limit
   const [isDeckLibraryOpen, setIsDeckLibraryOpen] = useState(false);
   const [currentDeckName, setCurrentDeckName] = useState('Untitled Deck');
   const [isSaveDeckModalOpen, setIsSaveDeckModalOpen] = useState(false);
