@@ -1,5 +1,11 @@
 # Deckr.ai Development & Deployment Guide
 
+## ⚠️ IMPORTANT: Local Testing Only
+**DO NOT deploy to Cloud Run unless explicitly requested by the user.**
+- All development and testing should be done locally
+- Use `npm run dev` for local testing
+- Only deploy when user explicitly asks to push to production
+
 ## ⚠️ Critical Design Patterns & Anti-Patterns
 
 ### 🚫 Don't Use Regex/Patterns for Natural Language Extraction
@@ -298,6 +304,16 @@ npm run build
 ```
 
 ## Recent Changes
+- **Enterprise Reference Matching System** (Nov 2025)
+  - AI-powered reference matching: Upload company slide deck, AI matches each slide to best reference
+  - Firebase Storage integration: Batch upload 37-page PDFs with parallel processing
+  - Intelligent matching engine: Gemini 2.5 Pro analyzes content type, visual hierarchy, brand context
+  - Deep reference analysis: Extracts design blueprints (background, layout, typography, spacing)
+  - Generation strategies: `full-recreate` vs `input-modify` based on complexity
+  - Mode selector modal: "Use Company Templates" vs "Let Deckr Go Crazy"
+  - Browser logging system: Real-time monitoring with localStorage persistence + downloadable logs
+  - Production validated: 8/8 slides matched with 95-98% quality scores
+  - See: ARCHITECTURE.md, ENTERPRISE-REFERENCE-MATCHING.md, LOGGING.md
 - **Smart AI Generation with Planning Agent pattern**
   - GenerationModeSelector: Toggle between Smart AI and Classic modes
   - SmartDeckGenerator: AI-powered generation with context awareness
@@ -316,15 +332,16 @@ npm run build
 https://deckr-app-948199894623.us-central1.run.app
 
 ## Latest Revision
-- Revision: `deckr-app-00038-xp2`
-- Deployed: Successfully
-- Changes: UI Polish - Modal Design + Icon Improvements
-  - **Dark Modal Theme**: Fixed background clash with dark slate gradient modal background
-  - **High Contrast Text**: White title, light gray subtitle, excellent readability on any background
-  - **Better Icon Contrast**: All text and icons now clearly visible
-  - **Save Deck Icon**: Changed from download arrow to cloud upload icon (more distinctive from Download PDF)
-  - **Professional Look**: Dark elegant modal with purple accents matches brand
-  - **Confetti Celebration**: Full-screen confetti animation when export succeeds
+- Revision: `deckr-app-00040-4sp`
+- Deployed: Successfully (Nov 13, 2025)
+- Branch: `feature/enterprise-reference-matching`
+- Changes: Browser Logging System + Enterprise Reference Matching
+  - **Browser Logger**: Real-time logs in DevTools console, localStorage persistence, downloadable .log files
+  - **Reference Matching**: AI matches slides to uploaded references with 95-98% accuracy
+  - **Name Cleaning Fix**: Strips `.png` and category suffixes from Gemini responses
+  - **Async State Fix**: Fixed modal button passing mode directly to generation handler
+  - **Production Tested**: 37-page PDF upload, 8/8 slides matched successfully
+  - **Logging API**: `window.deckrLogs.printAll()`, `download()`, `clear()`, `getAll()`
 
 **Configuration Required**:
 - OAuth 2.0 Client ID needs to be created in GCP Console
@@ -641,3 +658,449 @@ Whitespace: 70%
 - ✅ Well-known brands: Expect 95-100% quality
 - ⚠️ Startups: Expect 85-90% quality
 - ❌ Fictional: May need manual brand creation first
+
+---
+
+## 🎨 Agentic Chat System Design
+
+Deckr.ai uses a conversational, agentic UX inspired by Claude.ai, Google Gemini, and modern AI interfaces. This section documents the complete chat system architecture, design tokens, and implementation patterns.
+
+### Design Philosophy
+
+**Core Principles:**
+1. **Conversational First** - Every interaction feels like chatting with a professional designer
+2. **Progressive Disclosure** - Reveal complexity gradually, don't overwhelm
+3. **Real-time Feedback** - Show what's happening with context-aware loaders
+4. **Contextual Clarity** - Use appropriate UI for each task (thinking vs. generating)
+5. **Professional Polish** - Designer-grade aesthetics with subtle micro-interactions
+
+### Component Architecture
+
+**Location:** `components/` directory
+
+```
+ChatLandingView.tsx      → Hero landing page with Gemini-style input
+ChatInterface.tsx         → Main chat container with message stream
+ThinkingSection.tsx       → Collapsible AI reasoning ("Thought for 7s")
+ActionSummary.tsx         → File/slide change indicators with diffs
+BrandedLoader.tsx         → Sparkle + arc for general AI tasks
+SlideGenerationLoader.tsx → Stacked slides for slide generation
+```
+
+### ChatLandingView - Hero Input
+
+**Purpose:** First-touch landing page with conversational input
+
+**Key Features:**
+- Auto-expanding textarea (grows to 240px max, then scrolls)
+- Magic Patterns gradient background (4 orbs with 60-80px blur)
+- Circular submit button (40px) with +2% brightness hover
+- Upward-opening upload menu (prevents covering input)
+- Model selector (right-aligned with submit button)
+- Suggested prompts below input
+
+**Design Decisions:**
+- **Input expansion:** Uses `scrollHeight` for smooth auto-resize
+- **Scrollbar timing:** Appears at ~6-7 lines (240px) for optimal UX
+- **Submit button:** Circular (not rounded square) for action-oriented feel
+- **Hover brightness:** Exactly +2% (user-validated through 4 iterations)
+- **Menu direction:** Opens upward to avoid covering text (Gemini pattern)
+
+**Critical CSS:**
+```css
+/* Input Container */
+background: #FFFFFF;
+border-radius: 32px;
+border: 1px solid rgba(0, 0, 0, 0.06);
+padding: 20px 24px;
+minHeight: 96px;
+/* NO maxHeight or overflow on container - allows menu to escape */
+
+/* Submit Button */
+width: 40px;
+height: 40px;
+border-radius: 50%; /* Circular */
+background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+box-shadow: 0 2px 8px rgba(99, 102, 241, 0.28);
+
+/* Hover: +2% brightness */
+background: linear-gradient(135deg, #686BF2 0%, #5349E6 100%);
+transform: scale(1.08);
+```
+
+**Magic Patterns Gradient:**
+```css
+/* 4 orbs with blur filters for depth */
+Orb 1 (top-left):    20s animation, indigo, blur(60px), opacity: 0.8
+Orb 2 (bottom-right): 25s animation, purple, blur(60px), opacity: 0.7
+Orb 3 (center-right): 30s animation, violet, blur(70px), opacity: 0.9
+Orb 4 (center-left):  35s animation, dark indigo, blur(80px), opacity: 0.6
+```
+
+**Upload Menu Pattern:**
+```tsx
+/* Opens UPWARD from button */
+position: 'absolute';
+bottom: '48px'; /* Above button, not below */
+animation: 'slideUp 150ms ease-out';
+
+/* Container must NOT have overflow:auto or menu gets clipped */
+```
+
+### ThinkingSection - AI Reasoning Display
+
+**Purpose:** Show AI's thought process with real-time progress
+
+**Visual Pattern:**
+```
+🤖 Thought for 7s ▾                    ← Collapsed by default
+  ✓ Analyzing presentation goals       ← Completed (green check)
+  ✓ Planning slide structure           ← Completed
+  ⏳ Generating slide 3/10...           ← Active (loader spinning)
+  ○ Adding final polish                ← Pending (gray circle)
+```
+
+**Loader Decision Matrix:**
+
+| Task Type | Loader Used | Why |
+|-----------|------------|-----|
+| Analyzing input | BrandedLoader | General AI thinking |
+| Planning structure | BrandedLoader | Not slide-specific |
+| Generating slide | SlideGenerationLoader | Contextual feedback |
+| Processing files | BrandedLoader | Generic task |
+
+**Implementation:**
+```tsx
+<ThinkingSection
+  steps={[
+    { id: '1', title: 'Analyzing goals', status: 'completed', type: 'thinking' },
+    { id: '2', title: 'Generating slide 3/10', status: 'active', type: 'generating' }
+  ]}
+  duration="7s"
+  defaultExpanded={false}
+/>
+```
+
+**Type System:**
+```typescript
+interface ThinkingStep {
+  id: string;
+  title: string;
+  content?: string; // Optional detailed explanation
+  status: 'pending' | 'active' | 'completed';
+  type?: 'thinking' | 'generating' | 'processing'; // Determines loader
+  timestamp?: number;
+}
+```
+
+### ActionSummary - Change Indicators
+
+**Purpose:** Show what files/slides were created or modified
+
+**Visual Pattern:**
+```
+✨ Generated Slides
+  ✓ Title Slide              +- 142
+  ✓ Problem Statement        +- 98
+  ✓ Solution Overview        +- 156
+```
+
+**Icon Options:**
+- `sparkles` - AI-generated content (default)
+- `check` - Successful operations
+- `edit` - Modifications
+- `file` - File operations
+
+**Diff Format:**
+- `+- 142` - Both additions and deletions
+- `+98` - Only additions
+- `-23` - Only deletions
+
+### Loader Animations
+
+**BrandedLoader (Sparkle + Arc):**
+- **Use for:** General AI processing, analysis, planning
+- **Animation:** Rotating arc (1.2s) + pulsing sparkle (1.2s)
+- **Colors:** Indigo/purple gradient (#6366F1 → #8B5CF6)
+- **Sizes:** 16px (inline), 20-24px (standard), 32px (large)
+
+**Visual:**
+```
+  ╱ ✦ ╲    ← Sparkle icon (4-point star)
+ │     │   ← Rotating gradient arc
+  ╲   ╱
+```
+
+**SlideGenerationLoader (Stacked Slides):**
+- **Use for:** Slide generation, deck building, batch operations
+- **Animation:** 3 slides layering + golden sparkle
+- **Colors:** Indigo gradient for slides, gold for sparkle
+- **Progress:** Can show "Creating slide 3/10..."
+
+**Visual:**
+```
+    ✨       ← Golden sparkle (top-right)
+  ┌─────┐
+  │ ─── │   ← Front slide (bright, animated)
+ ┌│─────│┐
+ ││     ││  ← Middle slide (medium opacity)
+┌││─────││┐
+│││     │││ ← Back slide (faint)
+└┴┴─────┴┴┘
+```
+
+**Sparkle Design Evolution:**
+- **Original:** Multi-star (looked immature)
+- **Refined:** Single 4-point star with stroke (#6366F1 → #7C3AED → #8B5CF6)
+- **Size:** 70% of container (was 65%)
+- **Professional:** Clean, elegant, not childish
+
+### Design Tokens
+
+**Location:** `styles/design-tokens.css`
+
+**Color Palette:**
+```css
+/* Brand Colors */
+--color-brand-500: #6366F1;  /* Primary indigo */
+--color-brand-600: #4F46E5;  /* Hover state */
+--color-purple-600: #9333EA; /* Accent */
+
+/* Loader Gradients */
+BrandedLoader:          #6366F1 → #A855F7 (indigo to purple)
+SlideGenerationLoader:  #6366F1 → #8B5CF6 (indigo to violet)
+Sparkle accent:         #F59E0B → #F97316 (golden)
+
+/* Semantic Colors */
+--color-success: #10B981;  /* Green for checkmarks */
+--color-info: #3B82F6;     /* Blue for info */
+--color-neutral-400: #A1A1AA; /* Gray for pending */
+```
+
+**Typography:**
+```css
+/* Font Stack */
+font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+/* Font Sizes (Chat Components) */
+--text-xs: 0.75rem;    /* 12px - Captions */
+--text-sm: 0.875rem;   /* 14px - Body text */
+--text-base: 1rem;     /* 16px - Input text */
+--text-lg: 1.125rem;   /* 18px - Headers */
+
+/* Font Weights */
+--font-regular: 400;   /* Body text */
+--font-medium: 500;    /* Labels */
+--font-semibold: 600;  /* Headers */
+```
+
+**Spacing (4px base unit):**
+```css
+--space-2: 0.5rem;   /* 8px - Tight gaps */
+--space-3: 0.75rem;  /* 12px - Standard gaps */
+--space-4: 1rem;     /* 16px - Section spacing */
+--space-6: 1.5rem;   /* 24px - Large sections */
+```
+
+**Shadows:**
+```css
+/* Input boxes */
+--shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+
+/* Cards and menus */
+--shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+
+/* Submit button */
+--shadow-brand: 0 10px 30px -5px rgba(99, 102, 241, 0.2);
+```
+
+**Border Radius:**
+```css
+--radius-md: 0.5rem;    /* 8px - Small cards */
+--radius-lg: 0.75rem;   /* 12px - Medium cards */
+--radius-xl: 1rem;      /* 16px - Large cards */
+--radius-2xl: 1.5rem;   /* 24px - Input box */
+--radius-full: 9999px;  /* Circular - Submit button */
+```
+
+**Transitions:**
+```css
+/* Standard timing */
+--transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+--transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+
+/* Micro-interactions */
+Hover effects:  150-200ms
+Loaders:        1.2s (arc), 1.5s (slides)
+Expand/collapse: 150ms
+```
+
+### Animation Principles
+
+**1. Micro-interactions:**
+- Button hover: `scale(1.08)` + brightness +2%
+- Card hover: `translateY(-0.5px)`
+- Menu open: `slideUp` from below (not slideDown)
+
+**2. Loader animations:**
+- Arc rotation: `1.2s linear infinite`
+- Sparkle pulse: `1.2s ease-in-out infinite`
+- Slide stack: `1.5s ease-in-out infinite` (staggered)
+
+**3. State transitions:**
+- Collapse/expand: `150ms ease`
+- Message appear: `200ms fade-in`
+- Scroll: Native `smooth` behavior
+
+**4. User-validated details:**
+- Submit button hover: Exactly +2% brightness (tested through 4 iterations)
+- Menu gap: 48px above button (not 52px - too far)
+- Scrollbar timing: 240px height (~6-7 lines of text)
+
+### UX Patterns from Research
+
+**Sources:** Claude.ai, Google Gemini, Cursor AI, Magic Patterns
+
+**Key Learnings:**
+
+1. **"Thought for Xs" pattern** (from Cursor/Claude)
+   - Shows AI thinking time (builds trust)
+   - Collapsible by default (progressive disclosure)
+   - Real-time step updates (transparency)
+
+2. **Upward-opening menus** (from Gemini)
+   - Prevents covering input text
+   - Feels more natural when typing
+   - Requires `overflow: visible` on container
+
+3. **Context-aware loaders** (from production testing)
+   - Different loaders for different tasks
+   - Sparkle for thinking, slides for generating
+   - Visual clarity > consistency
+
+4. **Action summaries** (from Cursor)
+   - File change indicators with diffs
+   - Checkmarks for completed items
+   - Grouped by action type
+
+### Best Practices
+
+**DO:**
+- ✅ Use BrandedLoader for general AI tasks
+- ✅ Use SlideGenerationLoader when creating slides
+- ✅ Collapse ThinkingSection by default
+- ✅ Show real-time progress updates
+- ✅ Use +2% brightness for hover (user-validated)
+- ✅ Open menus upward to avoid covering input
+- ✅ Remove overflow constraints from menu containers
+
+**DON'T:**
+- ❌ Use generic spinners (too boring)
+- ❌ Show all reasoning expanded (overwhelming)
+- ❌ Use static "Loading..." text (no context)
+- ❌ Open menus downward over input
+- ❌ Guess hover brightness (test with user)
+- ❌ Add overflow:auto to containers with menus
+
+### Performance Notes
+
+- **Bundle size:** ~8KB for all chat components
+- **Animations:** All CSS-based (no JS loops)
+- **Re-renders:** Loaders are self-contained components
+- **Scroll:** Native smooth scroll (no custom implementation)
+- **Images:** Lazy-loaded in chat messages
+
+### Accessibility
+
+- **Color contrast:** All text meets WCAG AA (4.5:1 minimum)
+- **Focus states:** Clear outlines on all interactive elements
+- **Keyboard navigation:** Tab through all buttons/inputs
+- **Screen readers:** Descriptive labels on loaders
+- **Reduced motion:** Respects `prefers-reduced-motion`
+
+### Integration with Existing Systems
+
+**Chat components work alongside:**
+- Editor (modal-based editing)
+- StyleLibraryPanel (reference uploads)
+- PresentationView (full-screen slideshow)
+- DeckLibrary (saved decks)
+
+**Data flow:**
+```
+ChatLandingView → User enters prompt
+      ↓
+ChatInterface → Calls AI services
+      ↓
+ThinkingSection → Shows reasoning
+      ↓
+ActionSummary → Shows results
+      ↓
+Editor → User refines slides
+```
+
+### File Organization
+
+```
+components/
+  ChatLandingView.tsx       (Hero input)
+  ChatInterface.tsx         (Main chat)
+  ThinkingSection.tsx       (AI reasoning)
+  ActionSummary.tsx         (Change indicators)
+  BrandedLoader.tsx         (General loader)
+  SlideGenerationLoader.tsx (Slide loader)
+
+styles/
+  design-tokens.css         (Design system)
+
+docs/
+  CHAT-COMPONENTS-GUIDE.md  (Detailed component docs)
+  CHAT-INTEGRATION-PLAN.md  (Service integration plan)
+```
+
+### Testing Checklist
+
+**ChatLandingView:**
+- [ ] Textarea expands smoothly
+- [ ] Scrollbar appears at 240px
+- [ ] Submit button shows on input
+- [ ] Hover: +2% brightness (exact)
+- [ ] Upload menu opens upward
+- [ ] Menu doesn't get clipped
+- [ ] Gradient animates smoothly
+
+**ThinkingSection:**
+- [ ] Collapses/expands smoothly
+- [ ] Shows correct loader for step type
+- [ ] Checkmarks for completed steps
+- [ ] Real-time updates work
+
+**Loaders:**
+- [ ] BrandedLoader rotates smoothly
+- [ ] SlideGenerationLoader slides animate
+- [ ] No janky animations
+- [ ] Sparkle looks professional (not childish)
+
+### Future Enhancements
+
+**Planned:**
+- Token-by-token streaming responses
+- Inline message editing
+- Conversation branching
+- Voice input support
+- Dark mode
+
+**Under Consideration:**
+- Message reactions (👍 👎)
+- Export conversation as PDF
+- Collaborative chat (multi-user)
+- Custom theme selector
+
+### Documentation References
+
+- **Component Details:** `CHAT-COMPONENTS-GUIDE.md`
+- **Service Integration:** `CHAT-INTEGRATION-PLAN.md`
+- **Design Tokens:** `styles/design-tokens.css`
+- **Loader Comparison:** `/loader-comparison.html` (demo page)
+
+---

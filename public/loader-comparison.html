@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loader Comparison - Deckr.ai</title>
+  <link href="https://rsms.me/inter/inter.css" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(180deg, #FAFBFC 0%, #F5F7FA 100%);
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 600;
+      color: #1F2937;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: #6B7280;
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+
+    .loader-card {
+      background: white;
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    .loader-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1F2937;
+      margin-bottom: 8px;
+    }
+
+    .loader-description {
+      font-size: 14px;
+      color: #6B7280;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    .loader-demo {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      align-items: center;
+      padding: 32px;
+      background: rgba(0, 0, 0, 0.01);
+      border-radius: 12px;
+      border: 1px solid rgba(0, 0, 0, 0.04);
+    }
+
+    .demo-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #9CA3AF;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      min-width: 80px;
+    }
+
+    /* Branded Loader (Sparkle + Arc) */
+    .branded-loader {
+      position: relative;
+      width: 24px;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .branded-loader-arc {
+      position: absolute;
+      animation: rotate-arc 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    @keyframes rotate-arc {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .branded-loader-sparkle {
+      position: relative;
+      animation: pulse-sparkle 1.2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-sparkle {
+      0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      50% {
+        opacity: 0.7;
+        transform: scale(0.95);
+      }
+    }
+
+    /* Slide Generation Loader */
+    .slide-loader {
+      position: relative;
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .slide-1 {
+      position: absolute;
+      width: 21px;
+      height: 18px;
+      borderRadius: 2px;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
+      border: 1.5px solid rgba(99, 102, 241, 0.3);
+      transform: translate(-4px, -2px) rotate(-3deg);
+      animation: fade-slide-1 1.5s ease-in-out infinite;
+    }
+
+    .slide-2 {
+      position: absolute;
+      width: 21px;
+      height: 18px;
+      borderRadius: 2px;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(139, 92, 246, 0.25) 100%);
+      border: 1.5px solid rgba(99, 102, 241, 0.5);
+      transform: translate(-2px, 0px) rotate(-1.5deg);
+      animation: fade-slide-2 1.5s ease-in-out infinite;
+    }
+
+    .slide-3 {
+      position: absolute;
+      width: 21px;
+      height: 18px;
+      borderRadius: 2px;
+      background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+      border: 1.5px solid #4F46E5;
+      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+      animation: fade-slide-3 1.5s ease-in-out infinite;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      flex-direction: column;
+    }
+
+    .slide-line {
+      height: 1.5px;
+      background: white;
+      borderRadius: 1px;
+      opacity: 0.6;
+    }
+
+    .slide-line-1 { width: 11px; }
+    .slide-line-2 { width: 8px; }
+
+    .slide-sparkle {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      animation: sparkle-twinkle 1.5s ease-in-out infinite;
+    }
+
+    @keyframes fade-slide-1 {
+      0%, 100% {
+        opacity: 0.3;
+        transform: translate(-4px, -2px) rotate(-3deg) scale(0.95);
+      }
+      33% {
+        opacity: 0.6;
+        transform: translate(-4px, -2px) rotate(-3deg) scale(1);
+      }
+      66% {
+        opacity: 0.3;
+        transform: translate(-4px, -2px) rotate(-3deg) scale(0.95);
+      }
+    }
+
+    @keyframes fade-slide-2 {
+      0%, 100% {
+        opacity: 0.5;
+        transform: translate(-2px, 0px) rotate(-1.5deg) scale(0.97);
+      }
+      33% {
+        opacity: 0.7;
+        transform: translate(-2px, -1px) rotate(-1.5deg) scale(1);
+      }
+      66% {
+        opacity: 0.5;
+        transform: translate(-2px, 0px) rotate(-1.5deg) scale(0.97);
+      }
+    }
+
+    @keyframes fade-slide-3 {
+      0% {
+        opacity: 0;
+        transform: translateY(4px) scale(0.9);
+      }
+      33% {
+        opacity: 1;
+        transform: translateY(0px) scale(1);
+      }
+      66% {
+        opacity: 1;
+        transform: translateY(0px) scale(1);
+      }
+      100% {
+        opacity: 0.8;
+        transform: translateY(-2px) scale(1.02);
+      }
+    }
+
+    @keyframes sparkle-twinkle {
+      0%, 100% {
+        opacity: 0.4;
+        transform: scale(0.8) rotate(0deg);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.2) rotate(90deg);
+      }
+    }
+
+    .use-case {
+      background: rgba(99, 102, 241, 0.05);
+      border: 1px solid rgba(99, 102, 241, 0.1);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-top: 16px;
+    }
+
+    .use-case-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #4F46E5;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .use-case-list {
+      font-size: 13px;
+      color: #6B7280;
+      line-height: 1.6;
+      padding-left: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Loader Animation Comparison</h1>
+    <p class="subtitle">Choose the loading indicator that best fits Deckr.ai's brand</p>
+
+    <div class="comparison-grid">
+      <!-- Option 1: Branded Loader -->
+      <div class="loader-card">
+        <div class="loader-title">Option 1: Sparkle + Arc</div>
+        <div class="loader-description">
+          Elegant, versatile loader inspired by modern AI interfaces. Works for any loading state.
+        </div>
+
+        <div class="loader-demo">
+          <div class="demo-row">
+            <span class="label">Small</span>
+            <div class="branded-loader" style="width: 16px; height: 16px;">
+              <svg class="branded-loader-arc" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="9" stroke="url(#gradient-arc-1)" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="40 60" opacity="0.8"/>
+                <defs>
+                  <linearGradient id="gradient-arc-1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#6366F1" />
+                    <stop offset="100%" stop-color="#A855F7" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <svg class="branded-loader-sparkle" width="11" height="11" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L13.09 8.26L18 10L13.09 11.74L12 18L10.91 11.74L6 10L10.91 8.26L12 2Z" fill="url(#gradient-sparkle-1)"/>
+                <defs>
+                  <linearGradient id="gradient-sparkle-1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#6366F1" />
+                    <stop offset="100%" stop-color="#8B5CF6" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <span style="font-size: 13px; color: #6B7280;">Analyzing...</span>
+          </div>
+
+          <div class="demo-row">
+            <span class="label">Medium</span>
+            <div class="branded-loader">
+              <svg class="branded-loader-arc" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="9" stroke="url(#gradient-arc-2)" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="40 60" opacity="0.8"/>
+                <defs>
+                  <linearGradient id="gradient-arc-2" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#6366F1" />
+                    <stop offset="100%" stop-color="#A855F7" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <svg class="branded-loader-sparkle" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L13.09 8.26L18 10L13.09 11.74L12 18L10.91 11.74L6 10L10.91 8.26L12 2Z" fill="url(#gradient-sparkle-2)"/>
+                <defs>
+                  <linearGradient id="gradient-sparkle-2" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#6366F1" />
+                    <stop offset="100%" stop-color="#8B5CF6" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <span style="font-size: 13px; color: #6B7280;">Generating plan...</span>
+          </div>
+
+          <div class="demo-row">
+            <span class="label">Large</span>
+            <div class="branded-loader" style="width: 32px; height: 32px;">
+              <svg class="branded-loader-arc" width="32" height="32" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="9" stroke="url(#gradient-arc-3)" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="40 60" opacity="0.8"/>
+                <defs>
+                  <linearGradient id="gradient-arc-3" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#6366F1" />
+                    <stop offset="100%" stop-color="#A855F7" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <svg class="branded-loader-sparkle" width="21" height="21" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L13.09 8.26L18 10L13.09 11.74L12 18L10.91 11.74L6 10L10.91 8.26L12 2Z" fill="url(#gradient-sparkle-3)"/>
+                <defs>
+                  <linearGradient id="gradient-sparkle-3" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#6366F1" />
+                    <stop offset="100%" stop-color="#8B5CF6" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <span style="font-size: 13px; color: #6B7280;">Processing request...</span>
+          </div>
+        </div>
+
+        <div class="use-case">
+          <div class="use-case-title">Best For:</div>
+          <ul class="use-case-list">
+            <li>General AI thinking/processing</li>
+            <li>Plan analysis</li>
+            <li>Theme selection</li>
+            <li>File uploads</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Option 2: Slide Generation Loader -->
+      <div class="loader-card">
+        <div class="loader-title">Option 2: Slide Stack</div>
+        <div class="loader-description">
+          Contextual loader that shows stacked slides appearing. Perfect for slide generation.
+        </div>
+
+        <div class="loader-demo">
+          <div class="demo-row">
+            <span class="label">Small</span>
+            <div class="slide-loader" style="width: 20px; height: 20px;">
+              <div class="slide-1" style="width: 15px; height: 13px;"></div>
+              <div class="slide-2" style="width: 15px; height: 13px;"></div>
+              <div class="slide-3" style="width: 15px; height: 13px;">
+                <div class="slide-line slide-line-1" style="width: 8px;"></div>
+                <div class="slide-line slide-line-2" style="width: 6px;"></div>
+              </div>
+              <svg class="slide-sparkle" width="8" height="8" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L13.09 8.26L18 10L13.09 11.74L12 18L10.91 11.74L6 10L10.91 8.26L12 2Z" fill="url(#gradient-sparkle-gen-1)"/>
+                <defs>
+                  <linearGradient id="gradient-sparkle-gen-1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#F59E0B" />
+                    <stop offset="100%" stop-color="#F97316" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <span style="font-size: 13px; color: #6B7280;">Creating slide 3/10...</span>
+          </div>
+
+          <div class="demo-row">
+            <span class="label">Medium</span>
+            <div class="slide-loader">
+              <div class="slide-1"></div>
+              <div class="slide-2"></div>
+              <div class="slide-3">
+                <div class="slide-line slide-line-1"></div>
+                <div class="slide-line slide-line-2"></div>
+              </div>
+              <svg class="slide-sparkle" width="11" height="11" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L13.09 8.26L18 10L13.09 11.74L12 18L10.91 11.74L6 10L10.91 8.26L12 2Z" fill="url(#gradient-sparkle-gen-2)"/>
+                <defs>
+                  <linearGradient id="gradient-sparkle-gen-2" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#F59E0B" />
+                    <stop offset="100%" stop-color="#F97316" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <span style="font-size: 13px; color: #6B7280;">Generating slides...</span>
+          </div>
+
+          <div class="demo-row">
+            <span class="label">Large</span>
+            <div class="slide-loader" style="width: 36px; height: 36px;">
+              <div class="slide-1" style="width: 27px; height: 23px;"></div>
+              <div class="slide-2" style="width: 27px; height: 23px;"></div>
+              <div class="slide-3" style="width: 27px; height: 23px;">
+                <div class="slide-line slide-line-1" style="width: 14px;"></div>
+                <div class="slide-line slide-line-2" style="width: 10px;"></div>
+              </div>
+              <svg class="slide-sparkle" width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L13.09 8.26L18 10L13.09 11.74L12 18L10.91 11.74L6 10L10.91 8.26L12 2Z" fill="url(#gradient-sparkle-gen-3)"/>
+                <defs>
+                  <linearGradient id="gradient-sparkle-gen-3" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#F59E0B" />
+                    <stop offset="100%" stop-color="#F97316" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <span style="font-size: 13px; color: #6B7280;">Building your deck...</span>
+          </div>
+        </div>
+
+        <div class="use-case">
+          <div class="use-case-title">Best For:</div>
+          <ul class="use-case-list">
+            <li>Slide generation progress</li>
+            <li>Deck building</li>
+            <li>Adding new slides</li>
+            <li>Batch operations</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div style="background: white; border-radius: 16px; padding: 24px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); border: 1px solid rgba(0, 0, 0, 0.06);">
+      <h2 style="font-size: 18px; font-weight: 600; color: #1F2937; margin-bottom: 12px;">Recommendation</h2>
+      <p style="font-size: 14px; color: #6B7280; line-height: 1.6; margin-bottom: 16px;">
+        <strong style="color: #4F46E5;">Use both!</strong> The sparkle loader is perfect for general AI processing (thinking, analyzing), while the slide stack loader provides clear context during slide generation.
+      </p>
+      <div style="display: flex; gap: 16px;">
+        <div style="flex: 1; padding: 16px; background: rgba(99, 102, 241, 0.05); border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.1);">
+          <div style="font-size: 13px; font-weight: 600; color: #4F46E5; margin-bottom: 6px;">✨ Sparkle + Arc</div>
+          <div style="font-size: 12px; color: #6B7280;">Use in: ThinkingSection, plan analysis, theme selection</div>
+        </div>
+        <div style="flex: 1; padding: 16px; background: rgba(245, 158, 11, 0.05); border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.1);">
+          <div style="font-size: 13px; font-weight: 600; color: #D97706; margin-bottom: 6px;">📄 Slide Stack</div>
+          <div style="font-size: 12px; color: #6B7280;">Use in: Slide generation, progress updates, batch operations</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

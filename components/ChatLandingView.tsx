@@ -196,13 +196,12 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({ onStartChat }) => {
             border: '1px solid rgba(0, 0, 0, 0.06)',
             padding: '20px 24px',
             minHeight: '96px',
-            maxHeight: '240px',
-            overflowY: 'auto',
             transition: 'all 180ms cubic-bezier(0.4, 0, 0.2, 1)',
             boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02), 0 2px 4px rgba(0, 0, 0, 0.015)',
             display: 'flex',
             flexDirection: 'column',
-            gap: '16px'
+            gap: '16px',
+            position: 'relative'
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.border = '1px solid rgba(99, 102, 241, 0.2)';
@@ -297,12 +296,12 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({ onStartChat }) => {
                   </svg>
                 </button>
 
-                {/* Dropdown Menu */}
+                {/* Dropdown Menu - Opens Upward */}
                 {showUploadMenu && (
                   <div
                     style={{
                       position: 'absolute',
-                      top: '52px',
+                      bottom: '48px',
                       left: '0',
                       background: '#FFFFFF',
                       borderRadius: '16px',
@@ -311,7 +310,7 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({ onStartChat }) => {
                       minWidth: '220px',
                       padding: '8px',
                       zIndex: 50,
-                      animation: 'slideDown 150ms ease-out'
+                      animation: 'slideUp 150ms ease-out'
                     }}
                   >
                     <button
@@ -677,6 +676,17 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({ onStartChat }) => {
           }
           50% {
             transform: translate(10%, -10%) scale(1.08);
+          }
+        }
+
+        @keyframes slideUp {
+          0% {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
           }
         }
       `}</style>
