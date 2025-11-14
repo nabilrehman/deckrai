@@ -5,6 +5,7 @@ import SessionInspectorPanel from './SessionInspectorPanel';
 import { generateDesignerOutline } from '../services/designerOrchestrator';
 import { buildPromptFromSpec } from '../services/outlineParser';
 import { createSlideFromPrompt } from '../services/geminiService';
+import { createTitleSlideFromTemplate } from '../services/titleSlideGenerator';
 import { autoSaveSession } from '../services/sessionLogger';
 import type { DesignerGenerationProgress } from '../types/designerMode';
 import { matchReferencesToSlides } from '../services/referenceMatchingEngine';
@@ -76,9 +77,13 @@ const DesignerModeGenerator: React.FC<DesignerModeGeneratorProps> = ({
 
   // Core state
   const [rawNotes, setRawNotes] = useState('');
-  const [slideCount, setSlideCount] = useState(10);
+  const [slideCount, setSlideCount] = useState(1);
   const [uploadedStyleReference, setUploadedStyleReference] = useState<{ src: string; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Title slide custom assets
+  const [customerLogo, setCustomerLogo] = useState<string | null>(null);
+  const [customImage, setCustomImage] = useState<string | null>(null);
 
   // Reference matching state
   const [showModeSelector, setShowModeSelector] = useState(false);
@@ -103,8 +108,17 @@ const DesignerModeGenerator: React.FC<DesignerModeGeneratorProps> = ({
   const [showSessionInspector, setShowSessionInspector] = useState(false);
 
   const styleUploadInputRef = useRef<HTMLInputElement>(null);
+  const fileUploadRef = useRef<HTMLInputElement>(null);
   const startTimeRef = useRef<number>(0);
   const timerRef = useRef<number | null>(null);
+
+  // File upload state (for uploading existing slides/PDFs)
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // AI personalization state (for modifying uploaded slides)
+  const [personalizationPrompt, setPersonalizationPrompt] = useState('');
+  const [isPersonalizing, setIsPersonalizing] = useState(false);
 
   /**
    * Extract context from notes using LLM (not regex!)
@@ -273,6 +287,38 @@ Return ONLY valid JSON with all 5 fields:
       };
     }
   };
+
+  /**
+   * Handle customer logo upload
+   */
+  const handleLogoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      setCustomerLogo(result);
+      console.log('✅ Customer logo uploaded');
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  /**
+   * Handle custom image upload
+   */
+  const handleCustomImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      setCustomImage(result);
+      console.log('✅ Custom image uploaded');
+    };
+    reader.readAsDataURL(file);
+  }, []);
 
   /**
    * Main generation handler
@@ -502,19 +548,42 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
           console.log(`🎨 Crazy Mode - Slide ${slideNumber}: generating from brand guidelines only`);
         }
 
-        // Generate slide with brand theme
-        // TODO: Pass blueprint and strategy to createSlideFromPrompt for enhanced generation
-        const { images } = await createSlideFromPrompt(
-          styleRef,
-          prompt,
-          false,
-          [],
-          undefined,
-          theme,
-          null
-        );
+        // Check if this is a title slide
+        const isTitleSlide = spec.slideType === 'title' || slideNumber === 1;
 
-        const finalImage = await launderImageSrc(images[0]);
+        let finalImage: string;
+
+        if (isTitleSlide && matchInfo?.match?.referenceSrc) {
+          // Use edit-based generation for title slides
+          console.log(`🎨 Title Slide Mode - Using edit-based generation`);
+          console.log(`🔍 DEBUG: customerLogo value:`, customerLogo ? 'YES (length: ' + customerLogo.length + ')' : 'NO (null/undefined)');
+
+          const titleSlide = await createTitleSlideFromTemplate(
+            matchInfo.match.referenceSrc,  // Template image
+            spec.headline || spec.title || 'Untitled',  // New title text
+            customerLogo  // Logo (if provided)
+          );
+
+          finalImage = await launderImageSrc(titleSlide);
+          console.log(`✅ Title slide ${slideNumber} created with edit-based approach`);
+        } else {
+          // Use current generation approach for content slides
+          console.log(`🎨 Content Slide Mode - Using generation-based approach`);
+
+          const { images } = await createSlideFromPrompt(
+            styleRef,
+            prompt,
+            false,
+            [],
+            undefined,
+            theme,
+            customerLogo,   // Pass customer logo
+            customImage     // Pass custom image
+          );
+
+          finalImage = await launderImageSrc(images[0]);
+          console.log(`✅ Content slide ${slideNumber} created successfully`);
+        }
 
         slides.push({
           id: `designer-slide-${Date.now()}-${i}`,
@@ -522,8 +591,6 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
           history: [finalImage],
           name: spec.title || `Slide ${i + 1}`,
         });
-
-        console.log(`✅ Slide ${i + 1} created successfully`);
       }
 
       // Stop timer
@@ -617,6 +684,90 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
       setIsGenerating(false);
     }
   }, [rawNotes, slideCount, uploadedStyleReference, styleLibrary, isTestMode, onDeckUpload]);
+
+  /**
+   * Process uploaded files (PDFs and images) and convert them to slides
+   */
+  const processFiles = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setIsUploadingFiles(true);
+    setUploadError(null);
+    const newSlides: Slide[] = [];
+    const filePromises: Promise<void>[] = [];
+
+    const processPdf = async (file: File) => {
+        const fileReader = new FileReader();
+        return new Promise<void>((resolve, reject) => {
+            fileReader.onload = async (e) => {
+                try {
+                    const typedarray = new Uint8Array(e.target?.result as ArrayBuffer);
+                    const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                    const pagePromises: Promise<void>[] = [];
+                    const pdfSlides: Slide[] = [];
+
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        pagePromises.push((async (pageNum) => {
+                            const page = await pdf.getPage(pageNum);
+                            const viewport = page.getViewport({ scale: 1.5 });
+                            const canvas = document.createElement('canvas');
+                            const context = canvas.getContext('2d');
+                            canvas.height = viewport.height;
+                            canvas.width = viewport.width;
+
+                            if (context) {
+                                await page.render({ canvasContext: context, viewport }).promise;
+                                const id = `${file.name}-p${pageNum}-${Date.now()}`;
+                                const src = canvas.toDataURL('image/png');
+                                pdfSlides.push({ id, originalSrc: src, history: [src], name: `Page ${pageNum}` });
+                            }
+                        })(i));
+                    }
+                    await Promise.all(pagePromises);
+                    newSlides.push(...pdfSlides);
+                    resolve();
+                } catch (err) {
+                    console.error("PDF processing error:", err);
+                    reject(new Error("Failed to process PDF file. It might be corrupted or in an unsupported format."));
+                }
+            };
+            fileReader.readAsArrayBuffer(file);
+        });
+    };
+
+    const processImage = (file: File) => {
+        return new Promise<void>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const src = e.target?.result as string;
+                const id = `${file.name}-${Date.now()}`;
+                newSlides.push({ id, originalSrc: src, history: [src], name: file.name.split('.')[0] });
+                resolve();
+            };
+            reader.readAsDataURL(file);
+        });
+    };
+
+    for (const file of Array.from(files)) {
+        if (file.type === 'application/pdf') {
+            filePromises.push(processPdf(file));
+        } else if (file.type.startsWith('image/')) {
+            filePromises.push(processImage(file));
+        }
+    }
+
+    try {
+        await Promise.all(filePromises);
+        if (newSlides.length > 0) {
+            onDeckUpload(newSlides.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })));
+        } else if (filePromises.length > 0){
+            setUploadError("No valid image or PDF files were selected.");
+        }
+    } catch (err: any) {
+        setUploadError(err.message);
+    } finally {
+        setIsUploadingFiles(false);
+    }
+  }, [onDeckUpload]);
 
   /**
    * Style reference upload handler
@@ -924,7 +1075,7 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
                 </label>
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() => setSlideCount(Math.max(5, slideCount - 1))}
+                    onClick={() => setSlideCount(Math.max(1, slideCount - 1))}
                     className="w-8 h-8 rounded-lg bg-brand-surface border border-brand-border hover:border-brand-primary-500 hover:bg-brand-primary-50 transition-all flex items-center justify-center"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-brand-text-primary" viewBox="0 0 20 20" fill="currentColor">
@@ -942,6 +1093,89 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
                       <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
                     </svg>
                   </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Logo and Custom Image Upload */}
+            <div className="mt-4 pt-4 border-t border-brand-border/30">
+              <h4 className="font-display text-sm font-semibold text-brand-text-primary mb-3 text-center">
+                Custom Assets <span className="text-brand-text-tertiary font-normal">(Optional - for title slides)</span>
+              </h4>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Customer Logo Upload */}
+                <div className="text-center">
+                  <label className="block text-xs font-medium text-brand-text-secondary mb-2">
+                    Customer Logo
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                    id="logo-upload"
+                  />
+                  <label
+                    htmlFor="logo-upload"
+                    className="cursor-pointer inline-flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-brand-border rounded-lg hover:border-brand-primary-500 hover:bg-brand-primary-50/50 transition-all"
+                  >
+                    {customerLogo ? (
+                      <img src={customerLogo} alt="Logo" className="max-h-20 max-w-full object-contain" />
+                    ) : (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-brand-text-tertiary mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <span className="text-xs text-brand-text-tertiary">Upload Logo</span>
+                      </>
+                    )}
+                  </label>
+                  {customerLogo && (
+                    <button
+                      onClick={() => setCustomerLogo(null)}
+                      className="mt-2 text-xs text-red-500 hover:text-red-700"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+
+                {/* Custom Image Upload */}
+                <div className="text-center">
+                  <label className="block text-xs font-medium text-brand-text-secondary mb-2">
+                    Custom Image
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleCustomImageUpload}
+                    className="hidden"
+                    id="custom-image-upload"
+                  />
+                  <label
+                    htmlFor="custom-image-upload"
+                    className="cursor-pointer inline-flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-brand-border rounded-lg hover:border-brand-primary-500 hover:bg-brand-primary-50/50 transition-all"
+                  >
+                    {customImage ? (
+                      <img src={customImage} alt="Custom" className="max-h-20 max-w-full object-contain" />
+                    ) : (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-brand-text-tertiary mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span className="text-xs text-brand-text-tertiary">Upload Image</span>
+                      </>
+                    )}
+                  </label>
+                  {customImage && (
+                    <button
+                      onClick={() => setCustomImage(null)}
+                      className="mt-2 text-xs text-red-500 hover:text-red-700"
+                    >
+                      Remove
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1007,12 +1241,87 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
                 ⚡ Uses parallel AI agents • Researches brand • Creates {slideCount} designer-quality slides • ~3-4 minutes
               </p>
             </div>
+
+            {/* Upload Files Button (Temporary - will be integrated into better UX later) */}
+            <div className="pt-4 border-t border-gray-200 mt-6">
+              <p className="text-xs text-brand-text-tertiary text-center mb-3">OR</p>
+              <button
+                onClick={() => fileUploadRef.current?.click()}
+                disabled={isUploadingFiles}
+                className="btn btn-secondary w-full text-base py-4"
+              >
+                {isUploadingFiles ? (
+                  <Spinner size="h-5 w-5" />
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                    </svg>
+                    Upload Existing Slides (PDF/Images)
+                  </>
+                )}
+              </button>
+              <input
+                ref={fileUploadRef}
+                type="file"
+                className="sr-only"
+                accept="application/pdf,image/*"
+                multiple
+                onChange={(e) => processFiles(e.target.files)}
+              />
+              <p className="mt-3 text-xs text-brand-text-tertiary text-center">
+                📤 Upload PDFs or images to edit with AI
+              </p>
+
+              {/* AI Personalization Textbox (After Upload) */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <label className="block text-sm font-semibold text-brand-text-primary mb-3">
+                  ✨ Personalize Uploaded Slides with AI
+                </label>
+                <textarea
+                  value={personalizationPrompt}
+                  onChange={(e) => setPersonalizationPrompt(e.target.value)}
+                  placeholder="E.g., 'Make it more professional for executives at Google' or 'Adapt this for a marketing audience at Nike'"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-primary focus:border-transparent resize-none text-sm"
+                  rows={3}
+                />
+                <button
+                  onClick={() => {
+                    // TODO (Phase 2): Wire up AI personalization with plan creation
+                    // This will use Smart AI planner or personalization service
+                    alert('AI Personalization ready to wire up in Phase 2!\nPrompt: ' + personalizationPrompt);
+                  }}
+                  disabled={!personalizationPrompt.trim() || isPersonalizing}
+                  className="btn btn-primary w-full text-base py-3 mt-3"
+                >
+                  {isPersonalizing ? (
+                    <Spinner size="h-5 w-5" />
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+                      </svg>
+                      Create AI Plan & Personalize
+                    </>
+                  )}
+                </button>
+                <p className="mt-2 text-xs text-brand-text-tertiary text-center">
+                  🤖 AI will create a plan before applying changes
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
         {error && (
           <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl shadow-sm animate-slide-down">
             <p className="text-red-600 text-sm font-medium">{error}</p>
+          </div>
+        )}
+
+        {uploadError && (
+          <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl shadow-sm animate-slide-down">
+            <p className="text-red-600 text-sm font-medium">{uploadError}</p>
           </div>
         )}
       </div>
