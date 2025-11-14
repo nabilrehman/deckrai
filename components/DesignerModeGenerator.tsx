@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Slide, StyleLibraryItem, DebugSession, DebugLog } from '../types';
 import FloatingActionBubble from './FloatingActionBubble';
 import SessionInspectorPanel from './SessionInspectorPanel';
@@ -10,6 +10,7 @@ import type { DesignerGenerationProgress } from '../types/designerMode';
 import { matchReferencesToSlides } from '../services/referenceMatchingEngine';
 import { decideGenerationStrategy } from '../services/referenceStrategyDecider';
 import type { MatchWithBlueprint, StrategyDecision } from '../types/referenceMatching';
+import { browserLogger } from '../services/browserLogger';
 
 declare const pdfjsLib: any;
 
@@ -65,6 +66,14 @@ const DesignerModeGenerator: React.FC<DesignerModeGeneratorProps> = ({
   isTestMode,
   onLibraryUpload,
 }) => {
+  // Debug: Log styleLibrary when component mounts or updates
+  useEffect(() => {
+    console.log(`🔍 DEBUG: DesignerMode - styleLibrary has ${styleLibrary?.length || 0} items`);
+    if (styleLibrary && styleLibrary.length > 0) {
+      console.log('🔍 DEBUG: First 3 items:', styleLibrary.slice(0, 3).map(item => ({ id: item.id, name: item.name })));
+    }
+  }, [styleLibrary]);
+
   // Core state
   const [rawNotes, setRawNotes] = useState('');
   const [slideCount, setSlideCount] = useState(10);
@@ -267,21 +276,42 @@ Return ONLY valid JSON with all 5 fields:
 
   /**
    * Main generation handler
+   * @param overrideMode - Optional mode to use instead of state (fixes async state issue)
    */
-  const handleDesignerGenerate = useCallback(async () => {
+  const handleDesignerGenerate = useCallback(async (overrideMode?: 'template' | 'crazy') => {
+    const effectiveMode = overrideMode || selectedMode;
+
+    console.log('🔍 DEBUG: handleDesignerGenerate called');
+    console.log('🔍 DEBUG: overrideMode:', overrideMode);
+    console.log('🔍 DEBUG: selectedMode:', selectedMode);
+    console.log('🔍 DEBUG: effectiveMode:', effectiveMode);
+    console.log('🔍 DEBUG: rawNotes:', rawNotes.substring(0, 50) + '...');
+    console.log('🔍 DEBUG: styleLibrary.length:', styleLibrary?.length || 0);
+
     if (!rawNotes.trim()) {
+      console.log('❌ DEBUG: No notes provided');
       setError('Please paste your notes or content first.');
       return;
     }
 
     // Check if user has uploaded references (enterprise feature)
     const hasReferences = styleLibrary && styleLibrary.length > 0;
+    console.log('🔍 DEBUG: hasReferences:', hasReferences);
 
     // If user has references, ask for mode selection
-    if (hasReferences && selectedMode === null) {
+    if (hasReferences && effectiveMode === null) {
+      console.log('🔍 DEBUG: Showing mode selector modal');
       setShowModeSelector(true);
       return; // Wait for mode selection
     }
+
+    console.log('✅ DEBUG: Proceeding with generation in', effectiveMode || 'default', 'mode');
+    browserLogger.info('Starting Designer Mode generation', {
+      mode: effectiveMode || 'default',
+      hasReferences,
+      referenceCount: styleLibrary?.length || 0,
+      notesLength: rawNotes.length
+    });
 
     setIsGenerating(true);
     setError(null);
@@ -375,8 +405,13 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
       let matchMap: Map<number, MatchWithBlueprint> | null = null;
       let strategyMap: Map<number, StrategyDecision> | null = null;
 
-      if (selectedMode === 'template' && styleLibrary && styleLibrary.length > 0) {
+      if (effectiveMode === 'template' && styleLibrary && styleLibrary.length > 0) {
         try {
+          browserLogger.info('Template mode: Starting reference matching', {
+            referenceCount: styleLibrary.length,
+            slideCount: result.outline.slideSpecifications.length
+          });
+
           setIsMatchingReferences(true);
           setProgressMessage(`🎯 Matching ${styleLibrary.length} references to ${result.outline.slideSpecifications.length} slides...`);
 
@@ -587,14 +622,20 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
    * Style reference upload handler
    */
   const handleStyleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('🔍 DEBUG: handleStyleFileChange called');
     const files = e.target.files;
-    if (!files || files.length === 0) return;
+    if (!files || files.length === 0) {
+      console.log('🔍 DEBUG: No files selected');
+      return;
+    }
 
     const file = files[0];
+    console.log(`🔍 DEBUG: File selected - name: ${file.name}, type: ${file.type}, size: ${file.size}`);
     setError(null);
 
     try {
       if (file.type === 'application/pdf') {
+        console.log('🔍 DEBUG: Processing PDF file...');
         // Process all pages and add to style library
         const fileReader = new FileReader();
         const pdfPages = await new Promise<StyleLibraryItem[]>((resolve, reject) => {
@@ -602,6 +643,7 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
             try {
               const typedarray = new Uint8Array(event.target?.result as ArrayBuffer);
               const pdf = await pdfjsLib.getDocument(typedarray).promise;
+              console.log(`🔍 DEBUG: PDF loaded. Total pages: ${pdf.numPages}`);
               const pagePromises: Promise<StyleLibraryItem | null>[] = [];
 
               for (let i = 1; i <= pdf.numPages; i++) {
@@ -622,6 +664,7 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
                 })(i));
               }
               const resolvedItems = await Promise.all(pagePromises);
+              console.log(`🔍 DEBUG: Extracted ${resolvedItems.length} pages from PDF`);
               resolve(resolvedItems.filter((item): item is StyleLibraryItem => item !== null));
             } catch (err) {
               console.error("PDF processing error:", err);
@@ -631,10 +674,14 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
           fileReader.readAsArrayBuffer(file);
         });
 
+        console.log(`🔍 DEBUG: pdfPages.length = ${pdfPages.length}, onLibraryUpload exists = ${!!onLibraryUpload}`);
+
         if (pdfPages.length > 0 && onLibraryUpload) {
+          console.log(`🔍 DEBUG: Calling onLibraryUpload with ${pdfPages.length} items`);
           onLibraryUpload(pdfPages);
           setUploadedStyleReference({ src: pdfPages[0].src, name: file.name });
         } else if (pdfPages.length > 0) {
+          console.log(`🔍 DEBUG: onLibraryUpload not defined, setting only first page as reference`);
           setUploadedStyleReference({ src: pdfPages[0].src, name: file.name });
         } else {
           throw new Error('PDF has no pages');
@@ -758,9 +805,11 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
               {/* Template Mode */}
               <button
                 onClick={() => {
+                  console.log('🔍 DEBUG: "Use Company Templates" clicked');
                   setSelectedMode('template');
                   setShowModeSelector(false);
-                  handleDesignerGenerate();
+                  console.log('🔍 DEBUG: Calling handleDesignerGenerate with template mode');
+                  handleDesignerGenerate('template');
                 }}
                 className="group relative overflow-hidden bg-gradient-to-br from-purple-50 to-blue-50 border-2 border-purple-200 hover:border-purple-400 rounded-2xl p-6 text-left transition-all hover:shadow-lg"
               >
@@ -906,22 +955,18 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
                 Style Reference <span className="text-brand-text-tertiary font-normal">(Optional)</span>
               </h4>
 
-              {uploadedStyleReference ? (
+              {styleLibrary && styleLibrary.length > 0 ? (
                 <div className="text-center">
-                  <p className="text-xs text-brand-text-secondary mb-3 font-medium">Using uploaded style reference</p>
+                  <p className="text-xs text-brand-text-secondary mb-3 font-medium">
+                    ✅ {styleLibrary.length} reference slide{styleLibrary.length !== 1 ? 's' : ''} in library
+                  </p>
                   <div className="inline-block relative group">
                     <div className="aspect-video w-36 rounded-xl overflow-hidden border-2 border-brand-primary-500 ring-2 ring-brand-primary-500 ring-offset-2 shadow-premium">
-                      <img src={uploadedStyleReference.src} alt={uploadedStyleReference.name} className="w-full h-full object-cover" />
+                      <img src={styleLibrary[0].src} alt={styleLibrary[0].name} className="w-full h-full object-cover" />
                     </div>
-                    <button
-                      onClick={() => setUploadedStyleReference(null)}
-                      className="absolute -top-2 -right-2 bg-white text-red-500 rounded-full p-1.5 shadow-md hover:bg-red-500 hover:text-white transition-all hover:scale-110 border-2 border-white"
-                      title="Remove uploaded style"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
-                    </button>
+                    <div className="mt-2 text-xs text-brand-text-tertiary">
+                      Showing first of {styleLibrary.length}
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -942,7 +987,7 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
             {/* Generate Button */}
             <div className="pt-6">
               <button
-                onClick={handleDesignerGenerate}
+                onClick={() => handleDesignerGenerate()}
                 disabled={!rawNotes || isGenerating}
                 className="btn btn-primary w-full text-base py-4 shadow-btn hover:shadow-btn-hover"
               >

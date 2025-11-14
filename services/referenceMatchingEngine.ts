@@ -12,6 +12,7 @@ import type {
   DeepDesignBlueprint,
 } from '../types/referenceMatching';
 import { analyzeReferenceSlide } from './deepReferenceAnalyzer';
+import { browserLogger } from './browserLogger';
 
 // Initialize Gemini API
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
@@ -114,12 +115,16 @@ export async function matchReferencesToSlides(
   references: StyleLibraryItem[]
 ): Promise<Map<number, MatchWithBlueprint>> {
   if (references.length === 0) {
+    browserLogger.error('No reference slides provided');
     throw new Error('No reference slides provided');
   }
 
   if (slideSpecs.length === 0) {
+    browserLogger.error('No slide specifications provided');
     throw new Error('No slide specifications provided');
   }
+
+  browserLogger.info(`Starting reference matching: ${slideSpecs.length} slides, ${references.length} references`);
 
   try {
     // Step 1: Prepare reference descriptions with visual analysis
@@ -181,18 +186,35 @@ ${spec.brandContext ? `- Brand Context: ${spec.brandContext}` : ''}
     };
 
     console.log('Matching strategy:', matchingResult.overallStrategy);
+    browserLogger.info('Matching strategy', { strategy: matchingResult.overallStrategy });
 
     // Step 4: Create map of matches with full reference data
     const matchMap = new Map<number, MatchWithBlueprint>();
 
     for (const match of matchingResult.matches) {
+      // Strip category suffix and file extension from referenceName if present
+      // Gemini returns names like "Name (content).png" or "Name.png" but we stored "Name"
+      let cleanReferenceName = match.referenceName
+        .replace(/\.png$/i, '')            // Remove .png extension first
+        .replace(/\s*\([^)]+\)\s*$/, '')  // Then remove (content), (image-content), etc.
+        .trim();
+
       // Find the reference by name
-      const reference = references.find(ref => ref.name === match.referenceName);
+      const reference = references.find(ref => ref.name === cleanReferenceName);
 
       if (!reference) {
-        console.warn(`Reference ${match.referenceName} not found, skipping slide ${match.slideNumber}`);
+        const message = `Reference ${match.referenceName} (cleaned: ${cleanReferenceName}) not found, skipping slide ${match.slideNumber}`;
+        console.warn(message);
+        browserLogger.warn(message);
         continue;
       }
+
+      browserLogger.info(`Matched slide ${match.slideNumber} to reference`, {
+        slideNumber: match.slideNumber,
+        referenceName: cleanReferenceName,
+        matchScore: match.matchScore,
+        category: match.category
+      });
 
       // Create the match object
       const referenceMatch: ReferenceMatch = {
@@ -219,9 +241,11 @@ ${spec.brandContext ? `- Brand Context: ${spec.brandContext}` : ''}
       });
     }
 
+    browserLogger.info(`Reference matching complete: ${matchMap.size} slides matched`);
     return matchMap;
   } catch (error) {
     console.error('Error matching references to slides:', error);
+    browserLogger.error('Error matching references to slides', { error: error instanceof Error ? error.message : 'Unknown error' });
     throw new Error(
       `Failed to match references: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
