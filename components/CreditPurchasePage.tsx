@@ -6,6 +6,7 @@ import { useCredits } from '../hooks/useCredits';
 interface CreditPurchasePageProps {
   onPurchasePack?: (packageId: string) => void;
   onSubscribe?: (planId: string) => void;
+  onBack?: () => void;
 }
 
 const CreditPackCard: React.FC<{
@@ -193,7 +194,8 @@ const SubscriptionPlanCard: React.FC<{
 
 const CreditPurchasePage: React.FC<CreditPurchasePageProps> = ({
   onPurchasePack,
-  onSubscribe
+  onSubscribe,
+  onBack
 }) => {
   const { credits, creditBalance } = useCredits();
   const [activeTab, setActiveTab] = useState<'packs' | 'subscriptions'>('packs');
@@ -201,6 +203,19 @@ const CreditPurchasePage: React.FC<CreditPurchasePageProps> = ({
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-12 px-4">
       <div className="max-w-7xl mx-auto">
+        {/* Back Button */}
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 px-4 py-2 rounded-lg hover:bg-white/50 transition-all"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span className="font-medium">Back to Editor</span>
+          </button>
+        )}
+
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold text-gray-900 mb-4">

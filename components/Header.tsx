@@ -8,6 +8,8 @@ import { useUserUsage } from '../hooks/useUserUsage';
 import { PLAN_LIMITS } from '../types';
 
 import AuthModal from './AuthModal';
+import CreditBadge from './CreditBadge';
+import OutOfCreditsModal from './OutOfCreditsModal';
 
 
 
@@ -37,6 +39,8 @@ interface HeaderProps {
 
   onDeleteAllStyleLibrary: () => void;
 
+  onNavigateToPricing?: () => void;
+
 }
 
 
@@ -55,7 +59,7 @@ const Spinner: React.FC = () => (
 
 
 
-const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPdf, isDownloading, onPresent, isTestMode, onToggleTestMode, onSaveDeck, onOpenDeckLibrary, onExportToGoogleSlides, isExportingToSlides, onDeleteAllStyleLibrary }) => {
+const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPdf, isDownloading, onPresent, isTestMode, onToggleTestMode, onSaveDeck, onOpenDeckLibrary, onExportToGoogleSlides, isExportingToSlides, onDeleteAllStyleLibrary, onNavigateToPricing }) => {
 
   const { user, signOut: authSignOut } = useAuth();
   const { userProfile, usage } = useUserUsage();
@@ -67,6 +71,8 @@ const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPd
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const [imageError, setImageError] = useState(false);
+
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
 
 
 
@@ -267,6 +273,11 @@ const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPd
             )}
 
           </div>
+
+          {/* Credit Badge - New Credit System */}
+          {user && (
+            <CreditBadge onBuyCredits={() => setShowPurchaseModal(true)} />
+          )}
 
           {/* Test Mode Toggle */}
 
@@ -586,6 +597,22 @@ const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPd
       {/* Auth Modal */}
 
       <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+
+      {/* Credit Purchase Modal */}
+      {user && (
+        <OutOfCreditsModal
+          isOpen={showPurchaseModal}
+          onClose={() => setShowPurchaseModal(false)}
+          onPurchase={(packageId) => {
+            console.log('Purchase initiated for package:', packageId);
+            setShowPurchaseModal(false);
+            // Navigate to pricing page for full purchase experience
+            if (onNavigateToPricing) {
+              onNavigateToPricing();
+            }
+          }}
+        />
+      )}
 
     </header>
 

@@ -24,14 +24,18 @@ import {
     deleteAllStyleLibraryItems
 } from './services/firestoreService';
 import { exportToGoogleSlides, handleOAuthCallback } from './services/googleSlidesService';
+import CreditPurchasePage from './components/CreditPurchasePage';
 
 
 declare const jspdf: any;
+
+type AppView = 'main' | 'pricing';
 
 const App: React.FC = () => {
   const { user } = useAuth();
   const [slides, setSlides] = useState<Slide[]>([]);
   const [activeSlideId, setActiveSlideId] = useState<string | null>(null);
+  const [currentView, setCurrentView] = useState<AppView>('main');
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [isExportingToSlides, setIsExportingToSlides] = useState(false);
   const [showExportSuccessModal, setShowExportSuccessModal] = useState(false);
@@ -566,8 +570,8 @@ const App: React.FC = () => {
         <div className="absolute top-10 right-1/4 w-[500px] h-[500px] bg-indigo-200/40 rounded-full mix-blend-multiply filter blur-3xl animate-float" style={{animationDelay: '2s'}}></div>
         <div className="absolute top-40 left-1/2 w-[400px] h-[400px] bg-purple-200/30 rounded-full mix-blend-multiply filter blur-3xl animate-float" style={{animationDelay: '4s'}}></div>
       </div>
-      {/* Only show Header when we have slides */}
-      {slides.length > 0 && (
+      {/* Only show Header when we have slides or on pricing page */}
+      {(slides.length > 0 || currentView === 'pricing') && (
         <Header
           onReset={handleResetProject}
           hasActiveProject={slides.length > 0}
@@ -581,10 +585,13 @@ const App: React.FC = () => {
           onSaveDeck={handleSaveDeck}
           onOpenDeckLibrary={handleOpenDeckLibrary}
           onDeleteAllStyleLibrary={handleDeleteAllStyleLibrary}
+          onNavigateToPricing={() => setCurrentView('pricing')}
         />
       )}
       <main className="flex-grow flex flex-row overflow-hidden w-full">
-        {slides.length > 0 && activeSlide ? (
+        {currentView === 'pricing' ? (
+          <CreditPurchasePage onBack={() => setCurrentView('main')} />
+        ) : slides.length > 0 && activeSlide ? (
           <>
             <Editor
                 slides={slides}

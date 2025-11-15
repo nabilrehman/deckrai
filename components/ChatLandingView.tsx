@@ -8,6 +8,11 @@ import { Slide, StyleLibraryItem } from '../types';
 import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationContext } from '../services/intelligentGeneration';
 import { detectVibeFromNotes, getDesignerStylesForVibe, getDesignerStyleById, generateStylePromptModifier, PresentationVibe } from '../services/vibeDetection';
 import { createSlideFromPrompt, findBestStyleReferenceFromPrompt } from '../services/geminiService';
+import { useAuth } from '../contexts/AuthContext';
+import { useCredits } from '../hooks/useCredits';
+import { consumeCredits } from '../services/creditService';
+import OutOfCreditsModal from './OutOfCreditsModal';
+import LowCreditsWarning from './LowCreditsWarning';
 
 interface ChatMessage {
   id: string;
@@ -64,6 +69,11 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({ styleLibrary, onDeckG
   const uploadMenuRef = useRef<HTMLDivElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
   const chatMessagesRef = useRef<HTMLDivElement>(null);
+
+  // Auth & Credits
+  const { user } = useAuth();
+  const { credits, hasEnoughCredits, isLowOnCredits } = useCredits();
+  const [showOutOfCreditsModal, setShowOutOfCreditsModal] = useState(false);
 
   // Chat State (Gemini Pattern)
   const [chatActive, setChatActive] = useState(false);
@@ -405,6 +415,20 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({ styleLibrary, onDeckG
   const handleGenerateSlides = useCallback(async (plan: any) => {
     console.log('🎨 ChatLandingView: Generating slides...', plan);
 
+    // Check if user is authenticated
+    if (!user) {
+      alert('Please sign in to generate slides');
+      return;
+    }
+
+    // Check if user has enough credits for this generation
+    const requiredCredits = plan.slideCount;
+    if (!hasEnoughCredits(requiredCredits)) {
+      console.log(`⚠️ Insufficient credits: need ${requiredCredits}, have ${credits}`);
+      setShowOutOfCreditsModal(true);
+      return;
+    }
+
     setIsProcessing(true);
     setThinkingStartTime(Date.now());
     setThinkingSteps([]);
@@ -508,6 +532,24 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({ styleLibrary, onDeckG
 
           const finalImage = await launderImageSrc(images[0]);
 
+          // Consume 1 credit for this slide
+          const creditResult = await consumeCredits(
+            user.uid,
+            1,
+            `Generated slide ${slideNumber}: ${description.substring(0, 40)}...`,
+            {
+              slideId: `slide-${Date.now()}-${slideNumber}`,
+              action: 'create'
+            }
+          );
+
+          if (!creditResult.success) {
+            console.error(`⚠️ Failed to consume credit for slide ${slideNumber}:`, creditResult.error);
+            // Continue anyway - slide is already generated
+          } else {
+            console.log(`✅ Consumed 1 credit for slide ${slideNumber}. New balance: ${creditResult.newBalance}`);
+          }
+
           updateThinkingStep(`step-slide-${slideNumber}`, { status: 'completed' });
 
           return {
@@ -561,7 +603,7 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({ styleLibrary, onDeckG
     } finally {
       setIsProcessing(false);
     }
-  }, [detectedVibe, thinkingStartTime, thinkingSteps, addMessage, addThinkingStep, updateThinkingStep, onDeckGenerated]);
+  }, [detectedVibe, thinkingStartTime, thinkingSteps, addMessage, addThinkingStep, updateThinkingStep, onDeckGenerated, user, hasEnoughCredits, credits, styleLibrary]);
 
   /**
    * Handler: Process file uploads (Gemini pattern)
@@ -899,6 +941,11 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({ styleLibrary, onDeckG
           flexDirection: 'column',
           overflow: 'hidden'
         }}>
+          {/* Low Credits Warning Banner */}
+          {user && isLowOnCredits() && (
+            <LowCreditsWarning onBuyCredits={() => setShowOutOfCreditsModal(true)} />
+          )}
+
           {/* HERO VIEW - Before chat active */}
           {!chatActive && (
           <div className="w-full flex-1 flex items-center justify-center">
@@ -2010,6 +2057,19 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({ styleLibrary, onDeckG
             </div>
           </div>
         </div>
+      )}
+
+      {/* Out of Credits Modal */}
+      {user && (
+        <OutOfCreditsModal
+          isOpen={showOutOfCreditsModal}
+          onClose={() => setShowOutOfCreditsModal(false)}
+          onPurchase={(packageId) => {
+            console.log('Purchase initiated for package:', packageId);
+            // TODO: Integrate Stripe payment here
+            setShowOutOfCreditsModal(false);
+          }}
+        />
       )}
 
       <style>{`
