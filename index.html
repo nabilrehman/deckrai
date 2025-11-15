@@ -1203,6 +1203,16 @@
       function initScrollReveal() {
         document.querySelectorAll('.scroll-reveal').forEach(el => observer.observe(el));
       }
+
+      // Auto-launch app on page load
+      window.addEventListener('DOMContentLoaded', () => {
+        // Check if user wants to see landing page (via URL parameter)
+        const urlParams = new URLSearchParams(window.location.search);
+        if (!urlParams.has('landing')) {
+          // Auto-launch the app to show chat interface immediately
+          launchApp();
+        }
+      });
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script type="module" src="/index.tsx"></script>
