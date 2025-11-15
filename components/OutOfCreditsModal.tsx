@@ -21,9 +21,9 @@ const CreditPackCard: React.FC<{
       onClick={onSelect}
       className={`
         relative p-4 rounded-xl border-2 transition-all text-left
-        hover:border-blue-500 hover:shadow-lg hover:scale-105
+        hover:border-indigo-500 hover:shadow-lg hover:scale-105
         ${pack.popular
-          ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-white shadow-md'
+          ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-md'
           : 'border-gray-200 bg-white'
         }
       `}
@@ -31,7 +31,7 @@ const CreditPackCard: React.FC<{
       {/* Popular Badge */}
       {pack.popular && (
         <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
-          <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-3 py-0.5 rounded-full text-xs font-semibold shadow-md">
+          <span className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-3 py-0.5 rounded-full text-xs font-semibold shadow-md">
             Most Popular
           </span>
         </div>
@@ -52,7 +52,7 @@ const CreditPackCard: React.FC<{
 
         {/* Credits */}
         <div className="flex items-baseline gap-1 mb-1">
-          <span className="text-3xl font-bold text-blue-600">{pack.credits}</span>
+          <span className="text-3xl font-bold text-indigo-600">{pack.credits}</span>
           {pack.bonus && (
             <span className="text-lg font-semibold text-green-600">+{pack.bonus}</span>
           )}
@@ -90,7 +90,7 @@ const CreditPackCard: React.FC<{
           className={`
             w-full py-2 px-4 rounded-lg font-semibold text-sm transition-all
             ${pack.popular
-              ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:shadow-xl'
+              ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white hover:shadow-xl'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }
           `}
@@ -154,7 +154,7 @@ const OutOfCreditsModal: React.FC<OutOfCreditsModalProps> = ({
               : `You have ${currentBalance} ${currentBalance === 1 ? 'credit' : 'credits'} remaining. Purchase more to keep creating.`}
           </p>
 
-          <div className="mt-4 inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-lg">
+          <div className="mt-4 inline-flex items-center gap-2 bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -194,7 +194,7 @@ const OutOfCreditsModal: React.FC<OutOfCreditsModalProps> = ({
             </div>
             <button
               onClick={onClose}
-              className="text-blue-600 hover:text-blue-700 font-medium hover:underline"
+              className="text-indigo-600 hover:text-indigo-700 font-medium hover:underline"
             >
               Maybe later
             </button>

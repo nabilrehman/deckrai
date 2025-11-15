@@ -41,9 +41,9 @@ const CreditBadge: React.FC<CreditBadgeProps> = ({ onBuyCredits, className = '' 
       };
     } else {
       return {
-        container: 'bg-blue-50 border-blue-200 border',
-        text: 'text-blue-700',
-        icon: 'text-blue-500',
+        container: 'bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200 border',
+        text: 'text-indigo-700',
+        icon: 'text-indigo-500',
         pulseClass: ''
       };
     }
@@ -81,7 +81,7 @@ const CreditBadge: React.FC<CreditBadgeProps> = ({ onBuyCredits, className = '' 
       {onBuyCredits && (
         <button
           onClick={onBuyCredits}
-          className="ml-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+          className="ml-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline transition-colors"
         >
           Buy more
         </button>
