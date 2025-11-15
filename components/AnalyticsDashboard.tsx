@@ -68,7 +68,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ deckId, deckTit
       revenueImpact,
       timeSavings,
       totalROI,
-      roiMultiple: totalROI / 29 // Assuming $29/mo pricing
+      roiMultiple: totalROI / 35 // Assuming $35/mo Startup pricing
     };
   };
 

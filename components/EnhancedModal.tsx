@@ -219,7 +219,7 @@ export const UpgradeModal: React.FC<{ isOpen: boolean; onClose: () => void; onUp
       title="Unlock the Full Power of deckr.ai"
       message="Join thousands of professionals creating winning presentations"
       primaryAction={{
-        label: 'Upgrade to Pro - $29/mo',
+        label: 'Upgrade to Startup - $35/mo',
         onClick: onUpgrade,
         variant: 'primary'
       }}

@@ -110,13 +110,13 @@ const PricingBadge: React.FC<PricingBadgeProps> = ({
 
           {/* Pro Features Preview */}
           <div className="mb-4">
-            <p className="text-xs font-semibold text-brand-text-secondary mb-2">Unlock with Pro:</p>
+            <p className="text-xs font-semibold text-brand-text-secondary mb-2">Unlock with Startup:</p>
             <ul className="space-y-2">
               {[
-                { icon: '∞', text: 'Unlimited decks' },
+                { icon: '💳', text: '100 credits/month' },
                 { icon: '🎨', text: 'Remove watermarks' },
                 { icon: '📊', text: 'Analytics dashboard' },
-                { icon: '🔗', text: 'Share with tracking' }
+                { icon: '♻️', text: 'Rollover up to 50 credits' }
               ].map((feature, idx) => (
                 <li key={idx} className="flex items-center gap-2 text-xs text-brand-text-secondary">
                   <span className="flex items-center justify-center w-5 h-5 rounded-md bg-brand-primary-100 text-brand-primary-600 font-semibold">
@@ -136,8 +136,8 @@ const PricingBadge: React.FC<PricingBadgeProps> = ({
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:scale-110 transition-transform" viewBox="0 0 20 20" fill="currentColor">
               <path d="M5 4a1 1 0 00-2 0v7.268a2 2 0 000 3.464V16a1 1 0 102 0v-1.268a2 2 0 000-3.464V4zM11 4a1 1 0 10-2 0v1.268a2 2 0 000 3.464V16a1 1 0 102 0V8.732a2 2 0 000-3.464V4zM16 3a1 1 0 011 1v7.268a2 2 0 010 3.464V16a1 1 0 11-2 0v-1.268a2 2 0 010-3.464V4a1 1 0 011-1z" />
             </svg>
-            Upgrade to Pro
-            <span className="ml-auto text-xs opacity-90">$29/mo</span>
+            Upgrade to Startup
+            <span className="ml-auto text-xs opacity-90">$35/mo</span>
           </button>
 
           {/* Money-back Guarantee */}
