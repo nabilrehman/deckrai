@@ -4,6 +4,7 @@ import {
     setDoc,
     updateDoc,
     collection,
+    addDoc,
     query,
     where,
     orderBy,
@@ -17,7 +18,8 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
-import { UserProfile, UserPlan, UserUsage, SavedDeck, Slide, PLAN_LIMITS, StyleLibraryItem } from '../types';
+import { UserProfile, UserPlan, UserUsage, SavedDeck, Slide, PLAN_LIMITS, StyleLibraryItem, CreditBalance } from '../types';
+import { FREE_STARTER_CREDITS } from '../config/pricing';
 
 // ============================================================================
 // USER PROFILE OPERATIONS
@@ -46,13 +48,21 @@ export const createOrUpdateUserProfile = async (
         });
         return userSnap.data() as UserProfile;
     } else {
-        // Create new user with default free plan
+        // Create new user with default free plan and starter credits
+        const initialCredits: CreditBalance = {
+            totalCredits: FREE_STARTER_CREDITS,
+            usedCreditsLifetime: 0,
+            usedCreditsThisMonth: 0,
+            lastUpdated: now
+        };
+
         const newUser: UserProfile = {
             uid,
             email,
             displayName,
             photoURL,
             plan: 'free',
+            credits: initialCredits,  // NEW: Initialize credits
             usage: {
                 slidesThisMonth: 0,
                 decksThisMonth: 0,
@@ -67,6 +77,19 @@ export const createOrUpdateUserProfile = async (
         };
 
         await setDoc(userRef, newUser);
+
+        // Log the initial credit grant as a transaction
+        const transactionRef = collection(db, 'creditTransactions');
+        await addDoc(transactionRef, {
+            userId: uid,
+            type: 'bonus',
+            amount: FREE_STARTER_CREDITS,
+            balanceAfter: FREE_STARTER_CREDITS,
+            description: 'Welcome bonus - Free starter credits',
+            timestamp: now
+        });
+
+        console.log(`✅ Created new user ${email} with ${FREE_STARTER_CREDITS} starter credits`);
         return newUser;
     }
 };

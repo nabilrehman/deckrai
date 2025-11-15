@@ -120,7 +120,7 @@ export type PersonalizationAction = TextReplacementAction | ImageReplacementActi
 
 
 // USER MANAGEMENT & PRICING TYPES
-export type UserPlan = 'free' | 'pro' | 'enterprise';
+export type UserPlan = 'free' | 'startup' | 'business' | 'enterprise' | 'enterprise-plus';
 
 export interface UserUsage {
   slidesThisMonth: number;
@@ -129,12 +129,83 @@ export interface UserUsage {
   lastUpdated: number; // timestamp
 }
 
+// NEW: Credit Balance
+export interface CreditBalance {
+  totalCredits: number;          // Current available credits
+  usedCreditsLifetime: number;   // Total credits consumed (all-time)
+  usedCreditsThisMonth: number;  // Credits used this billing period
+  lastCreditPurchase?: number;   // Timestamp of last purchase
+  lastUpdated: number;           // Timestamp
+}
+
+// NEW: Credit Transaction Log
+export interface CreditTransaction {
+  id: string;
+  organizationId?: string;       // If part of an organization
+  userId: string;
+  type: 'purchase' | 'consumption' | 'refund' | 'bonus' | 'subscription_renewal' | 'rollover';
+  amount: number;                // Positive for purchase, negative for consumption
+  balanceAfter: number;          // Balance after this transaction
+  description: string;           // e.g., "Created slide 'Introduction'"
+  metadata?: {
+    slideId?: string;
+    deckId?: string;
+    action?: 'create' | 'edit' | 'regenerate';
+    memberEmail?: string;        // For org tracking
+    invoiceId?: string;          // For enterprise billing
+    packageId?: string;          // Which credit pack was purchased
+  };
+  timestamp: number;
+}
+
+// NEW: Credit Package Definition
+export interface CreditPackage {
+  id: string;
+  name: string;
+  credits: number;
+  price: number;                 // USD
+  pricePerCredit: number;        // Calculated for display
+  bonus?: number;                // Extra credits (e.g., "Buy 100, get 10 free")
+  popular?: boolean;
+  bestFor?: string;
+  neverExpires: boolean;
+}
+
+// NEW: Subscription Plan Definition
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  type: 'free' | 'subscription' | 'custom';
+  monthlyCredits: number | 'custom';
+  price: number | 'custom';
+  pricePerCredit?: number;
+  description?: string;
+  features: string[];
+  limits: {
+    creditsPerMonth: number | 'custom';
+    teamMembers: number | 'unlimited';
+    decksPerMonth: number | 'unlimited';
+    storageGB: number | 'unlimited';
+    rolloverCredits?: number;    // Unused credits that carry over
+  };
+  overage?: {
+    enabled: boolean;
+    costPerCredit: number;
+    description: string;
+  };
+  popular?: boolean;
+  badge?: string;
+  contactSales?: boolean;
+}
+
 export interface UserSubscription {
   status: 'active' | 'trialing' | 'past_due' | 'canceled' | 'none';
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
-  currentPeriodEnd?: number; // timestamp
+  currentPeriodStart?: number;   // timestamp
+  currentPeriodEnd?: number;     // timestamp
   cancelAtPeriodEnd?: boolean;
+  trialEndsAt?: number;          // timestamp
 }
 
 export interface UserProfile {
@@ -143,15 +214,100 @@ export interface UserProfile {
   displayName: string;
   photoURL?: string;
   plan: UserPlan;
-  usage: UserUsage;
+  credits: CreditBalance;        // NEW: Replaces usage tracking
+  organizationId?: string;       // NEW: Link to organization (if member)
   subscription: UserSubscription;
   createdAt: number; // timestamp
   lastLoginAt: number; // timestamp
+
+  // DEPRECATED: Keep for migration purposes
+  usage?: UserUsage;
+}
+
+// NEW: Organization/Team Management
+export interface TeamMember {
+  uid: string;
+  email: string;
+  displayName: string;
+  role: 'admin' | 'member' | 'viewer';
+  addedAt: number;
+  lastActive?: number;
+  creditsUsed: number;           // Track individual member usage
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  plan: UserPlan;
+  ownerId: string;               // Primary admin
+  members: TeamMember[];
+
+  // Shared credit pool
+  credits: {
+    totalCredits: number;
+    monthlyAllocation: number;   // Credits allocated per billing period
+    rolloverCredits: number;     // Unused credits from previous month
+    usedThisMonth: number;
+    lastReset: number;           // Monthly reset timestamp
+    lastUpdated: number;
+  };
+
+  // Subscription details
+  subscription: {
+    status: 'active' | 'trialing' | 'past_due' | 'canceled';
+    stripeCustomerId?: string;
+    stripeSubscriptionId?: string;
+    currentPeriodStart: number;
+    currentPeriodEnd: number;
+    cancelAtPeriodEnd?: boolean;
+    trialEndsAt?: number;
+  };
+
+  // Enterprise settings
+  settings: {
+    brandingEnabled: boolean;
+    customLogo?: string;
+    customColors?: {
+      primary: string;
+      secondary: string;
+    };
+    ssoEnabled: boolean;
+    ssoProvider?: 'google' | 'microsoft' | 'saml';
+    apiEnabled: boolean;
+    apiKeys?: string[];
+    webhookUrl?: string;
+    allowExternalSharing: boolean;
+    requireApprovalForExport: boolean;
+  };
+
+  // Usage analytics
+  analytics: {
+    totalSlidesCreated: number;
+    totalDecksCreated: number;
+    mostActiveMembers: string[]; // UIDs
+    averageSlidesPerWeek: number;
+  };
+
+  // Billing
+  billing: {
+    billingEmail: string;
+    paymentMethod: 'card' | 'invoice';
+    invoiceDetails?: {
+      companyName: string;
+      taxId?: string;
+      address: string;
+      purchaseOrderRequired: boolean;
+    };
+  };
+
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface SavedDeck {
   id: string;
   userId: string;
+  organizationId?: string;       // NEW: Link to organization if shared
   name: string;
   slides: Slide[];
   createdAt: number; // timestamp
@@ -160,8 +316,11 @@ export interface SavedDeck {
   thumbnailUrl?: string; // First slide thumbnail
 }
 
+// DEPRECATED: Old monthly limits (keep for backward compatibility)
 export const PLAN_LIMITS: Record<UserPlan, { slidesPerMonth: number; decksPerMonth: number }> = {
   free: { slidesPerMonth: 10, decksPerMonth: 3 },
-  pro: { slidesPerMonth: 100, decksPerMonth: 50 },
-  enterprise: { slidesPerMonth: 500, decksPerMonth: 200 }
+  startup: { slidesPerMonth: 100, decksPerMonth: 50 },
+  business: { slidesPerMonth: 300, decksPerMonth: 100 },
+  enterprise: { slidesPerMonth: 1000, decksPerMonth: 500 },
+  'enterprise-plus': { slidesPerMonth: 9999, decksPerMonth: 9999 }
 };
