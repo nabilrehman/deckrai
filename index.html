@@ -569,7 +569,6 @@
             <div class="hidden md:flex items-center gap-8">
               <a href="#features" class="text-brand-text-secondary hover:text-brand-primary-500 font-medium transition-colors">Features</a>
               <a href="#pricing" class="text-brand-text-secondary hover:text-brand-primary-500 font-medium transition-colors">Pricing</a>
-              <a href="#demo" class="text-brand-text-secondary hover:text-brand-primary-500 font-medium transition-colors">Demo</a>
               <button onclick="launchApp()" class="btn btn-primary">
                 Start Creating
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -617,12 +616,6 @@
               </svg>
               Start Creating Free
             </button>
-            <button onclick="scrollToDemo()" class="btn btn-secondary text-lg px-8 py-4">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
-              </svg>
-              Watch Demo
-            </button>
           </div>
 
           <!-- Trust Indicators -->
@@ -637,7 +630,7 @@
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
               </svg>
-              <span>10 free decks per month</span>
+              <span>10 free slides • 1 credit = 1 slide</span>
             </div>
             <div class="flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
@@ -794,33 +787,6 @@
         </div>
       </section>
 
-      <!-- Demo Video Section -->
-      <section id="demo" class="relative py-32 bg-gradient-to-br from-slate-900 to-slate-800 overflow-hidden">
-        <div class="max-w-6xl mx-auto px-6">
-          <div class="text-center mb-16 scroll-reveal">
-            <h2 class="font-display font-bold text-4xl md:text-5xl text-white mb-6">
-              See deckr.ai in Action
-            </h2>
-            <p class="text-xl text-slate-300 max-w-3xl mx-auto">
-              Watch how easy it is to create professional presentations in minutes
-            </p>
-          </div>
-
-          <div class="relative rounded-3xl overflow-hidden shadow-premium border-2 border-white/10 scroll-reveal">
-            <div class="aspect-video bg-gradient-to-br from-slate-800 to-slate-700 flex items-center justify-center">
-              <div class="text-center">
-                <div class="w-24 h-24 rounded-full bg-white/10 backdrop-blur-sm border-2 border-white/20 flex items-center justify-center mx-auto mb-6 cursor-pointer hover:scale-110 transition-transform">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-white" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
-                  </svg>
-                </div>
-                <p class="text-white/70 text-sm">Video demo coming soon</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <!-- Pricing Section -->
       <section id="pricing" class="relative py-32 overflow-hidden">
         <div class="max-w-7xl mx-auto px-6">
@@ -843,7 +809,7 @@
                   <span class="text-5xl font-display font-bold text-brand-text-primary">$0</span>
                   <span class="text-brand-text-tertiary">/month</span>
                 </div>
-                <p class="text-brand-text-secondary">Perfect for trying out deckr.ai</p>
+                <p class="text-brand-text-secondary">10 credits • Create 1-2 decks</p>
               </div>
 
               <button onclick="launchApp()" class="w-full btn btn-secondary mb-8">
@@ -855,7 +821,19 @@
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                   </svg>
-                  <span class="text-brand-text-secondary">10 decks per month</span>
+                  <span class="text-brand-text-secondary">10 credits/month (10 slides)</span>
+                </div>
+                <div class="flex items-start gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                  </svg>
+                  <span class="text-brand-text-secondary">1 credit = 1 slide creation or edit</span>
+                </div>
+                <div class="flex items-start gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                  </svg>
+                  <span class="text-brand-text-secondary">Create 1-2 complete decks</span>
                 </div>
                 <div class="flex items-start gap-3">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
@@ -892,12 +870,12 @@
                 </span>
               </div>
               <div class="mb-6">
-                <h3 class="font-display font-bold text-2xl mb-2">Pro</h3>
+                <h3 class="font-display font-bold text-2xl mb-2">Startup</h3>
                 <div class="flex items-baseline gap-2 mb-4">
-                  <span class="text-5xl font-display font-bold">$29</span>
+                  <span class="text-5xl font-display font-bold">$35</span>
                   <span class="text-white/70">/month</span>
                 </div>
-                <p class="text-white/90">For professionals and teams</p>
+                <p class="text-white/90">100 credits • Create 10-15 decks</p>
               </div>
 
               <button onclick="launchApp()" class="w-full bg-white text-brand-primary-600 font-bold px-6 py-3 rounded-xl hover:shadow-lg transition-all hover:-translate-y-1 mb-8">
@@ -909,7 +887,13 @@
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                   </svg>
-                  <span><strong>Unlimited</strong> decks and slides</span>
+                  <span><strong>100 credits/month</strong> (100 slides)</span>
+                </div>
+                <div class="flex items-start gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                  </svg>
+                  <span><strong>Rollover</strong> up to 50 unused credits</span>
                 </div>
                 <div class="flex items-start gap-3">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
@@ -947,12 +931,12 @@
             <!-- Team Tier -->
             <div class="bg-white rounded-3xl p-8 shadow-card border-2 border-brand-border/30 scroll-reveal" style="animation-delay: 0.2s;">
               <div class="mb-6">
-                <h3 class="font-display font-bold text-2xl text-brand-text-primary mb-2">Team</h3>
+                <h3 class="font-display font-bold text-2xl text-brand-text-primary mb-2">Business</h3>
                 <div class="flex items-baseline gap-2 mb-4">
-                  <span class="text-5xl font-display font-bold text-brand-text-primary">$99</span>
+                  <span class="text-5xl font-display font-bold text-brand-text-primary">$90</span>
                   <span class="text-brand-text-tertiary">/month</span>
                 </div>
-                <p class="text-brand-text-secondary">For growing teams (5+ users)</p>
+                <p class="text-brand-text-secondary">300 credits • Teams of 5-15 users</p>
               </div>
 
               <button onclick="launchApp()" class="w-full btn btn-secondary mb-8">
@@ -1109,32 +1093,26 @@
             </div>
           </div>
 
-          <!-- Security Badges -->
+          <!-- Security & Trust -->
           <div class="py-8 border-t border-slate-800">
             <div class="flex flex-wrap items-center justify-center gap-6">
               <div class="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 border border-slate-700">
                 <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-sm font-bold">
                   🔒
                 </div>
-                <span class="text-sm font-medium">SOC 2 Type II</span>
+                <span class="text-sm font-medium">Bank-level encryption (AES-256)</span>
               </div>
               <div class="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 border border-slate-700">
                 <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-white text-sm font-bold">
-                  🇪🇺
+                  ☁️
                 </div>
-                <span class="text-sm font-medium">GDPR Compliant</span>
+                <span class="text-sm font-medium">Hosted on Google Cloud</span>
               </div>
               <div class="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 border border-slate-700">
                 <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
-                  ✓
+                  🤖
                 </div>
-                <span class="text-sm font-medium">ISO 27001</span>
-              </div>
-              <div class="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 border border-slate-700">
-                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-cyan-600 flex items-center justify-center text-white text-sm font-bold">
-                  🛡️
-                </div>
-                <span class="text-sm font-medium">256-bit SSL</span>
+                <span class="text-sm font-medium">Powered by Gemini AI</span>
               </div>
             </div>
           </div>
