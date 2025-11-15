@@ -35,6 +35,8 @@ interface HeaderProps {
 
   isExportingToSlides: boolean;
 
+  onDeleteAllStyleLibrary: () => void;
+
 }
 
 
@@ -53,7 +55,7 @@ const Spinner: React.FC = () => (
 
 
 
-const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPdf, isDownloading, onPresent, isTestMode, onToggleTestMode, onSaveDeck, onOpenDeckLibrary, onExportToGoogleSlides, isExportingToSlides }) => {
+const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPdf, isDownloading, onPresent, isTestMode, onToggleTestMode, onSaveDeck, onOpenDeckLibrary, onExportToGoogleSlides, isExportingToSlides, onDeleteAllStyleLibrary }) => {
 
   const { user, signOut: authSignOut } = useAuth();
   const { userProfile, usage } = useUserUsage();
@@ -302,7 +304,15 @@ const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPd
 
           </div>
 
+          {/* Delete from Firestorage Button */}
 
+          <button
+            onClick={onDeleteAllStyleLibrary}
+            className="px-4 py-2 rounded-xl glass border border-red-300/50 hover:border-red-500 transition-all text-xs font-semibold text-red-600 hover:text-red-700 hover:bg-red-50/50"
+            title="Delete all reference slides from Firebase Storage and Firestore"
+          >
+            Delete from Firestorage
+          </button>
 
           <div className="w-px h-8 bg-gradient-to-b from-transparent via-brand-border to-transparent"></div>
 

@@ -443,6 +443,51 @@ export const removeFromStyleLibrary = async (
 };
 
 /**
+ * Delete ALL items from user's style library (Firestore + Storage)
+ * WARNING: This permanently deletes all reference slides!
+ */
+export const deleteAllStyleLibraryItems = async (userId: string): Promise<void> => {
+    try {
+        console.log('🗑️ Starting deletion of all style library items...');
+
+        // Step 1: Get all items from Firestore
+        const libraryRef = collection(db, 'users', userId, 'styleLibrary');
+        const querySnapshot = await getDocs(libraryRef);
+
+        console.log(`📋 Found ${querySnapshot.size} items to delete`);
+
+        // Step 2: Delete from Storage and Firestore
+        const deletePromises = querySnapshot.docs.map(async (docSnapshot) => {
+            const itemId = docSnapshot.id;
+
+            // Delete from Storage
+            try {
+                const storagePath = `users/${userId}/styleLibrary/${itemId}.png`;
+                const storageRef = ref(storage, storagePath);
+                await deleteObject(storageRef);
+                console.log(`✅ Deleted from Storage: ${itemId}`);
+            } catch (storageError: any) {
+                // Ignore "object not found" errors (item might have been deleted manually)
+                if (storageError.code !== 'storage/object-not-found') {
+                    console.error(`❌ Failed to delete from Storage: ${itemId}`, storageError);
+                }
+            }
+
+            // Delete from Firestore
+            await deleteDoc(docSnapshot.ref);
+            console.log(`✅ Deleted from Firestore: ${itemId}`);
+        });
+
+        await Promise.all(deletePromises);
+
+        console.log('✅ Successfully deleted all style library items');
+    } catch (error) {
+        console.error('❌ Error deleting style library items:', error);
+        throw new Error(`Failed to delete style library: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+};
+
+/**
  * Batch add multiple items to style library
  *
  * Uploads images to Firebase Storage and stores metadata in Firestore.

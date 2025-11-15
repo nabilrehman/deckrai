@@ -205,6 +205,7 @@ ${spec.brandContext ? `- Brand Context: ${spec.brandContext}` : ''}
       if (!reference) {
         const message = `Reference ${match.referenceName} (cleaned: ${cleanReferenceName}) not found, skipping slide ${match.slideNumber}`;
         console.warn(message);
+        console.warn(`Available references: ${references.map(r => r.name).join(', ')}`);
         browserLogger.warn(message);
         continue;
       }
@@ -284,7 +285,7 @@ async function quickCategorizeReference(referenceUrl: string): Promise<string> {
 Respond with ONLY the category name, nothing else.`;
 
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-pro',
+      model: 'gemini-2.5-flash-lite',
       contents: [
         {
           inlineData: {

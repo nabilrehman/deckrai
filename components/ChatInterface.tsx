@@ -1,43 +1,37 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ThinkingSection, { ThinkingStep } from './ThinkingSection';
+import ActionSummary, { ActionItem } from './ActionSummary';
 
-interface Message {
+interface ChatMessage {
   id: string;
-  type: 'user' | 'thinking' | 'plan' | 'progress' | 'complete';
-  content?: string;
-  planData?: {
-    description: string;
-    tasks: Array<{
-      id: string;
-      title: string;
-      status: 'pending' | 'in_progress' | 'completed';
-    }>;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+  thinking?: {
+    steps: ThinkingStep[];
+    duration: string;
   };
+  actions?: {
+    label: string;
+    icon: 'sparkles' | 'check' | 'edit' | 'file';
+    items: ActionItem[];
+  };
+  component?: React.ReactNode;
 }
 
 interface ChatInterfaceProps {
-  initialPrompt: string;
-  initialFiles?: File[];
-  onComplete: (slides: any[]) => void;
+  messages: ChatMessage[];
+  isProcessing: boolean;
+  onSendMessage: (message: string) => void;
   onCancel: () => void;
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
-  initialPrompt,
-  initialFiles,
-  onComplete,
+  messages,
+  isProcessing,
+  onSendMessage,
   onCancel
 }) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      type: 'user',
-      content: initialPrompt || (initialFiles && initialFiles.length > 0 ? `Uploaded ${initialFiles.length} file(s)` : '')
-    },
-    {
-      id: '2',
-      type: 'thinking'
-    }
-  ]);
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -47,15 +41,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   }, [messages]);
 
   const handleSendMessage = () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || isProcessing) return;
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      type: 'user',
-      content: inputValue
-    };
-
-    setMessages(prev => [...prev, newMessage]);
+    onSendMessage(inputValue);
     setInputValue('');
   };
 
@@ -179,9 +167,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         width: '100%'
       }}>
         <div className="space-y-12">
-          {messages.map((message, index) => (
+          {messages.map((message) => (
             <div key={message.id}>
-              {message.type === 'user' && (
+              {/* User Message */}
+              {message.role === 'user' && (
                 <div className="flex items-start gap-4">
                   <div style={{
                     width: '36px',
@@ -213,7 +202,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 </div>
               )}
 
-              {message.type === 'thinking' && (
+              {/* Assistant Message */}
+              {message.role === 'assistant' && (
                 <div className="flex items-start gap-4">
                   <div className="bg-gradient-brand" style={{
                     width: '36px',
@@ -229,171 +219,113 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     </svg>
                   </div>
                   <div style={{
-                    padding: 'var(--space-4) var(--space-5)',
-                    background: 'rgba(99, 102, 241, 0.05)',
-                    border: '1px solid rgba(99, 102, 241, 0.2)',
-                    borderRadius: 'var(--radius-2xl)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--space-2)'
+                    flex: 1,
+                    maxWidth: '80%'
                   }}>
-                    <div className="flex gap-1">
-                      <div className="dot-pulse" style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: 'var(--color-brand-500)',
-                        animation: 'pulse 1.4s ease-in-out infinite'
-                      }} />
-                      <div className="dot-pulse" style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: 'var(--color-brand-500)',
-                        animation: 'pulse 1.4s ease-in-out 0.2s infinite'
-                      }} />
-                      <div className="dot-pulse" style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: 'var(--color-brand-500)',
-                        animation: 'pulse 1.4s ease-in-out 0.4s infinite'
-                      }} />
-                    </div>
-                    <span style={{
-                      fontSize: 'var(--text-sm)',
-                      color: 'var(--color-brand-600)',
-                      fontWeight: 'var(--font-medium)'
-                    }}>
-                      Thinking...
-                    </span>
-                  </div>
-                </div>
-              )}
+                    {/* Thinking Section */}
+                    {message.thinking && (
+                      <ThinkingSection
+                        steps={message.thinking.steps}
+                        duration={message.thinking.duration}
+                      />
+                    )}
 
-              {message.type === 'plan' && message.planData && (
-                <div className="flex items-start gap-4">
-                  <div className="bg-gradient-brand" style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: 'var(--radius-full)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                  </div>
-                  <div style={{
-                    padding: 'var(--space-6)',
-                    background: 'var(--color-bg-surface)',
-                    border: '1px solid var(--color-neutral-200)',
-                    borderRadius: 'var(--radius-2xl)',
-                    maxWidth: '80%',
-                    flex: 1
-                  }}>
-                    <p style={{
+                    {/* Main Content */}
+                    <div style={{
+                      padding: 'var(--space-4) var(--space-5)',
+                      background: 'var(--color-bg-surface)',
+                      border: '1px solid var(--color-neutral-200)',
+                      borderRadius: 'var(--radius-2xl)',
                       fontSize: 'var(--text-base)',
                       color: 'var(--color-neutral-900)',
-                      marginBottom: 'var(--space-4)',
-                      lineHeight: 'var(--leading-relaxed)'
+                      lineHeight: 'var(--leading-relaxed)',
+                      marginTop: message.thinking ? 'var(--space-4)' : '0'
                     }}>
-                      {message.planData.description}
-                    </p>
-                    <div className="space-y-2" style={{ marginTop: 'var(--space-5)' }}>
-                      {message.planData.tasks.map(task => (
-                        <div key={task.id} className="flex items-center gap-3" style={{
-                          padding: 'var(--space-3)',
-                          background: 'var(--color-neutral-50)',
-                          borderRadius: 'var(--radius-lg)'
-                        }}>
-                          <div style={{
-                            width: '20px',
-                            height: '20px',
-                            borderRadius: 'var(--radius-full)',
-                            border: `2px solid ${task.status === 'completed' ? 'var(--color-success)' : task.status === 'in_progress' ? 'var(--color-brand-500)' : 'var(--color-neutral-300)'}`,
-                            background: task.status === 'completed' ? 'var(--color-success)' : 'transparent',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
-                            {task.status === 'completed' && (
-                              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={3}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                            {task.status === 'in_progress' && (
-                              <div style={{
-                                width: '8px',
-                                height: '8px',
-                                borderRadius: '50%',
-                                background: 'var(--color-brand-500)',
-                                animation: 'pulse 1s ease-in-out infinite'
-                              }} />
-                            )}
-                          </div>
-                          <span style={{
-                            fontSize: 'var(--text-sm)',
-                            color: task.status === 'completed' ? 'var(--color-neutral-600)' : 'var(--color-neutral-900)',
-                            fontWeight: task.status === 'in_progress' ? 'var(--font-medium)' : 'var(--font-regular)',
-                            textDecoration: task.status === 'completed' ? 'line-through' : 'none'
-                          }}>
-                            {task.title}
-                          </span>
-                        </div>
-                      ))}
+                      {message.content}
                     </div>
-                    <div className="flex gap-3" style={{ marginTop: 'var(--space-6)' }}>
-                      <button className="bg-gradient-brand" style={{
-                        padding: '12px 24px',
-                        color: 'white',
-                        fontWeight: 'var(--font-semibold)',
-                        fontSize: 'var(--text-sm)',
-                        borderRadius: 'var(--radius-lg)',
-                        border: 'none',
-                        cursor: 'pointer',
-                        transition: 'all var(--transition-fast)',
-                        boxShadow: 'var(--shadow-brand)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                        e.currentTarget.style.boxShadow = 'var(--shadow-brand-lg)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = 'var(--shadow-brand)';
-                      }}>
-                        Looks good, proceed
-                      </button>
-                      <button style={{
-                        padding: '12px 24px',
-                        color: 'var(--color-neutral-700)',
-                        fontWeight: 'var(--font-medium)',
-                        fontSize: 'var(--text-sm)',
-                        borderRadius: 'var(--radius-lg)',
-                        border: '1px solid var(--color-neutral-300)',
-                        background: 'white',
-                        cursor: 'pointer',
-                        transition: 'all var(--transition-fast)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'var(--color-neutral-50)';
-                        e.currentTarget.style.borderColor = 'var(--color-neutral-400)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'white';
-                        e.currentTarget.style.borderColor = 'var(--color-neutral-300)';
-                      }}>
-                        Modify plan
-                      </button>
-                    </div>
+
+                    {/* Action Summary */}
+                    {message.actions && (
+                      <div style={{ marginTop: 'var(--space-4)' }}>
+                        <ActionSummary
+                          label={message.actions.label}
+                          icon={message.actions.icon}
+                          items={message.actions.items}
+                        />
+                      </div>
+                    )}
+
+                    {/* Inline Component (e.g., plan approval buttons, theme preview) */}
+                    {message.component && (
+                      <div style={{ marginTop: 'var(--space-4)' }}>
+                        {message.component}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
             </div>
           ))}
+
+          {/* Loading indicator when processing */}
+          {isProcessing && (
+            <div className="flex items-start gap-4">
+              <div className="bg-gradient-brand" style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: 'var(--radius-full)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div style={{
+                padding: 'var(--space-4) var(--space-5)',
+                background: 'rgba(99, 102, 241, 0.05)',
+                border: '1px solid rgba(99, 102, 241, 0.2)',
+                borderRadius: 'var(--radius-2xl)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)'
+              }}>
+                <div className="flex gap-1">
+                  <div className="dot-pulse" style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: 'var(--color-brand-500)',
+                    animation: 'pulse 1.4s ease-in-out infinite'
+                  }} />
+                  <div className="dot-pulse" style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: 'var(--color-brand-500)',
+                    animation: 'pulse 1.4s ease-in-out 0.2s infinite'
+                  }} />
+                  <div className="dot-pulse" style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: 'var(--color-brand-500)',
+                    animation: 'pulse 1.4s ease-in-out 0.4s infinite'
+                  }} />
+                </div>
+                <span style={{
+                  fontSize: 'var(--text-sm)',
+                  color: 'var(--color-brand-600)',
+                  fontWeight: 'var(--font-medium)'
+                }}>
+                  Thinking...
+                </span>
+              </div>
+            </div>
+          )}
+
           <div ref={messagesEndRef} />
         </div>
       </div>
@@ -542,7 +474,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           }
         }
       `}</style>
-    </div>
+      </div>
     </div>
   );
 };

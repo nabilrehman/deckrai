@@ -22,6 +22,8 @@ interface EditorProps {
   styleLibrary: StyleLibraryItem[];
   onToggleStyleLibrary: (slide: Slide) => void;
   onAddSessionToHistory: (session: DebugSession) => void;
+  pendingExecutionPlan?: DeckAiExecutionPlan | null;
+  onClearPendingPlan?: () => void;
 }
 
 const launderImageSrc = (src: string): Promise<string> => {
@@ -47,12 +49,12 @@ const launderImageSrc = (src: string): Promise<string> => {
 };
 
 
-const Editor: React.FC<EditorProps> = ({ 
-    slides, 
-    activeSlide, 
-    onSlideSelect, 
-    onNewSlideVersion, 
-    onUndo, 
+const Editor: React.FC<EditorProps> = ({
+    slides,
+    activeSlide,
+    onSlideSelect,
+    onNewSlideVersion,
+    onUndo,
     onResetSlide,
     onSetPendingPersonalization,
     onConfirmPersonalization,
@@ -62,6 +64,8 @@ const Editor: React.FC<EditorProps> = ({
     styleLibrary,
     onToggleStyleLibrary,
     onAddSessionToHistory,
+    pendingExecutionPlan,
+    onClearPendingPlan,
 }) => {
   const [deckAiPrompt, setDeckAiPrompt] = useState('');
   const [isCreatingPlan, setIsCreatingPlan] = useState(false);
@@ -80,6 +84,16 @@ const Editor: React.FC<EditorProps> = ({
         setLastSuccessfulEdit(null);
     }
   }, [activeSlide.id]);
+
+  // Auto-execute pending plan from Designer Mode
+  useEffect(() => {
+    if (pendingExecutionPlan && onClearPendingPlan) {
+      // Set the plan and it will trigger the modal to show
+      setExecutionPlan(pendingExecutionPlan);
+      // Clear the pending plan from App state
+      onClearPendingPlan();
+    }
+  }, [pendingExecutionPlan, onClearPendingPlan]);
 
   const handleCreateAiPlan = useCallback(async () => {
     if (!deckAiPrompt.trim() || slides.length === 0) return;

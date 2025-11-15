@@ -81,7 +81,10 @@ const StyleLibraryPanel: React.FC<StyleLibraryPanelProps> = ({
                   await page.render({ canvasContext: context, viewport }).promise;
                   const id = `${file.name}-p${pageNum}-${Date.now() + pageNum}`;
                   const src = canvas.toDataURL('image/png');
-                  return { id, src, name: `${file.name.replace(/\.pdf$/i, '')} - Page ${pageNum}` };
+                  const baseName = file.name.replace(/\.pdf$/i, '');
+                  // For single-page PDFs, use base name. For multi-page, append page number
+                  const displayName = pdf.numPages === 1 ? baseName : `${baseName}_p${pageNum}`;
+                  return { id, src, name: displayName };
                 }
                 return null;
               })(i));
@@ -136,6 +139,19 @@ const StyleLibraryPanel: React.FC<StyleLibraryPanelProps> = ({
   }, [onLibraryUpload]);
 
 
+  const handleDebugLibrary = () => {
+    console.log('='.repeat(80));
+    console.log('🔍 STYLE LIBRARY DEBUG INFO');
+    console.log('='.repeat(80));
+    console.log(`📊 Total items: ${library.length}`);
+    library.forEach((item, index) => {
+      console.log(`\n[${index + 1}] ${item.name}`);
+      console.log(`   ID: ${item.id}`);
+      console.log(`   URL: ${item.src.substring(0, 100)}...`);
+    });
+    console.log('='.repeat(80));
+  };
+
   const renderStyleLibrary = () => (
     <>
       <div className="flex-grow overflow-y-auto pr-2 -mr-2">
@@ -171,18 +187,29 @@ const StyleLibraryPanel: React.FC<StyleLibraryPanelProps> = ({
       </div>
       <div className="mt-4 pt-4 border-t border-brand-border flex-shrink-0">
           {error && <p className="text-red-500 text-xs mb-2 text-center">{error}</p>}
-          <label 
-              htmlFor="style-library-upload" 
+
+          {/* Debug Button */}
+          {library.length > 0 && (
+            <button
+              onClick={handleDebugLibrary}
+              className="w-full mb-2 px-4 py-2 text-xs font-semibold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+            >
+              🔍 Debug Library ({library.length} items)
+            </button>
+          )}
+
+          <label
+              htmlFor="style-library-upload"
               className={`cursor-pointer w-full inline-block text-center px-4 py-2.5 text-sm font-semibold text-brand-primary bg-brand-primary-light rounded-lg transition-colors ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-brand-primary hover:text-white'}`}
           >
               {isLoading ? 'Processing...' : 'Import Styles'}
           </label>
-          <input 
-              id="style-library-upload" 
-              type="file" 
-              className="sr-only" 
-              multiple 
-              accept="application/pdf,image/*" 
+          <input
+              id="style-library-upload"
+              type="file"
+              className="sr-only"
+              multiple
+              accept="application/pdf,image/*"
               onChange={handleFilesSelected}
               disabled={isLoading}
           />

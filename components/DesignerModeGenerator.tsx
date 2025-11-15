@@ -1,10 +1,11 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Slide, StyleLibraryItem, DebugSession, DebugLog } from '../types';
+import { Slide, StyleLibraryItem, DebugSession, DebugLog, DeckAiExecutionPlan } from '../types';
 import FloatingActionBubble from './FloatingActionBubble';
 import SessionInspectorPanel from './SessionInspectorPanel';
+import DeckAiPlanModal from './DeckAiPlanModal';
 import { generateDesignerOutline } from '../services/designerOrchestrator';
 import { buildPromptFromSpec } from '../services/outlineParser';
-import { createSlideFromPrompt } from '../services/geminiService';
+import { createSlideFromPrompt, generateDeckExecutionPlan } from '../services/geminiService';
 import { createTitleSlideFromTemplate } from '../services/titleSlideGenerator';
 import { autoSaveSession } from '../services/sessionLogger';
 import type { DesignerGenerationProgress } from '../types/designerMode';
@@ -16,7 +17,7 @@ import { browserLogger } from '../services/browserLogger';
 declare const pdfjsLib: any;
 
 interface DesignerModeGeneratorProps {
-  onDeckUpload: (slides: Slide[]) => void;
+  onDeckUpload: (slides: Slide[], executionPlan?: DeckAiExecutionPlan | null) => void;
   styleLibrary: StyleLibraryItem[];
   isTestMode: boolean;
   onLibraryUpload?: (items: StyleLibraryItem[]) => void;
@@ -115,10 +116,13 @@ const DesignerModeGenerator: React.FC<DesignerModeGeneratorProps> = ({
   // File upload state (for uploading existing slides/PDFs)
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadedSlides, setUploadedSlides] = useState<Slide[]>([]);
 
   // AI personalization state (for modifying uploaded slides)
   const [personalizationPrompt, setPersonalizationPrompt] = useState('');
   const [isPersonalizing, setIsPersonalizing] = useState(false);
+  const [aiExecutionPlan, setAiExecutionPlan] = useState<DeckAiExecutionPlan | null>(null);
+  const [showAiPlanModal, setShowAiPlanModal] = useState(false);
 
   /**
    * Extract context from notes using LLM (not regex!)
@@ -758,7 +762,10 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
     try {
         await Promise.all(filePromises);
         if (newSlides.length > 0) {
-            onDeckUpload(newSlides.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })));
+            // Store slides locally instead of immediately going to editor
+            const sortedSlides = newSlides.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+            setUploadedSlides(sortedSlides);
+            setUploadError(null);
         } else if (filePromises.length > 0){
             setUploadError("No valid image or PDF files were selected.");
         }
@@ -767,7 +774,60 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
     } finally {
         setIsUploadingFiles(false);
     }
-  }, [onDeckUpload]);
+  }, []);
+
+  /**
+   * Handle AI plan approval - send slides to editor for execution
+   */
+  const handleConfirmAiPlan = useCallback(() => {
+    setShowAiPlanModal(false);
+    // Send slides AND execution plan to editor
+    onDeckUpload(uploadedSlides, aiExecutionPlan);
+  }, [uploadedSlides, aiExecutionPlan, onDeckUpload]);
+
+  /**
+   * Handle AI plan cancellation
+   */
+  const handleCancelAiPlan = useCallback(() => {
+    setShowAiPlanModal(false);
+    setAiExecutionPlan(null);
+  }, []);
+
+  /**
+   * Handle personalization of uploaded slides
+   */
+  const handlePersonalizeUploadedSlides = useCallback(async () => {
+    if (!uploadedSlides || uploadedSlides.length === 0) {
+      setUploadError("Please upload slides first before personalizing.");
+      return;
+    }
+    if (!personalizationPrompt.trim()) {
+      setUploadError("Please enter a personalization prompt.");
+      return;
+    }
+
+    setIsPersonalizing(true);
+    setUploadError(null);
+
+    try {
+      // Create slide info for AI planner
+      const slidesInfo = uploadedSlides.map((slide) => ({
+        id: slide.id,
+        name: slide.name,
+      }));
+
+      // Generate AI execution plan
+      const plan = await generateDeckExecutionPlan(personalizationPrompt, slidesInfo);
+
+      // Show plan modal for user approval
+      setAiExecutionPlan(plan);
+      setShowAiPlanModal(true);
+    } catch (err: any) {
+      setUploadError(err.message || 'Failed to create AI execution plan');
+    } finally {
+      setIsPersonalizing(false);
+    }
+  }, [uploadedSlides, personalizationPrompt]);
 
   /**
    * Style reference upload handler
@@ -1273,6 +1333,15 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
                 📤 Upload PDFs or images to edit with AI
               </p>
 
+              {/* Upload Success Message */}
+              {uploadedSlides.length > 0 && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-xl">
+                  <p className="text-green-700 text-sm font-medium text-center">
+                    ✅ {uploadedSlides.length} slide{uploadedSlides.length > 1 ? 's' : ''} uploaded successfully!
+                  </p>
+                </div>
+              )}
+
               {/* AI Personalization Textbox (After Upload) */}
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <label className="block text-sm font-semibold text-brand-text-primary mb-3">
@@ -1286,12 +1355,8 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
                   rows={3}
                 />
                 <button
-                  onClick={() => {
-                    // TODO (Phase 2): Wire up AI personalization with plan creation
-                    // This will use Smart AI planner or personalization service
-                    alert('AI Personalization ready to wire up in Phase 2!\nPrompt: ' + personalizationPrompt);
-                  }}
-                  disabled={!personalizationPrompt.trim() || isPersonalizing}
+                  onClick={handlePersonalizeUploadedSlides}
+                  disabled={!personalizationPrompt.trim() || isPersonalizing || uploadedSlides.length === 0}
                   className="btn btn-primary w-full text-base py-3 mt-3"
                 >
                   {isPersonalizing ? (
@@ -1348,6 +1413,15 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
         <SessionInspectorPanel
           session={selectedSession}
           onClose={() => setShowSessionInspector(false)}
+        />
+      )}
+
+      {/* AI Execution Plan Modal */}
+      {showAiPlanModal && aiExecutionPlan && (
+        <DeckAiPlanModal
+          plan={aiExecutionPlan}
+          onConfirm={handleConfirmAiPlan}
+          onCancel={handleCancelAiPlan}
         />
       )}
     </div>

@@ -20,12 +20,13 @@ interface ThinkingSectionProps {
 const ThinkingSection: React.FC<ThinkingSectionProps> = ({
   steps,
   duration,
-  defaultExpanded = false
+  defaultExpanded = true
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   // Calculate total thinking time if not provided
-  const thinkingTime = duration || `${Math.max(...steps.map(s => s.timestamp || 0)) / 1000}s`;
+  // Use provided duration, or default to "a few seconds" if not available
+  const thinkingTime = duration || 'a few seconds';
 
   return (
     <div style={{
@@ -40,15 +41,15 @@ const ThinkingSection: React.FC<ThinkingSectionProps> = ({
           width: '100%',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
-          padding: '10px 14px',
+          gap: '10px',
+          padding: '12px 16px',
           background: 'rgba(0, 0, 0, 0.02)',
           border: '1px solid rgba(0, 0, 0, 0.06)',
           borderRadius: isExpanded ? '12px 12px 0 0' : '12px',
           cursor: 'pointer',
-          fontSize: '13px',
+          fontSize: '14px',
           fontWeight: '500',
-          color: '#6B7280',
+          color: '#374151',
           transition: 'all 150ms ease',
           textAlign: 'left'
         }}
@@ -59,11 +60,8 @@ const ThinkingSection: React.FC<ThinkingSectionProps> = ({
           e.currentTarget.style.background = 'rgba(0, 0, 0, 0.02)';
         }}
       >
-        {/* AI Icon */}
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-          <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
-        </svg>
+        {/* AI Icon - Using BrandedLoader */}
+        <BrandedLoader size={20} variant="inline" />
 
         {/* Thought duration */}
         <span>Thought for {thinkingTime}</span>
@@ -113,8 +111,8 @@ const ThinkingSection: React.FC<ThinkingSectionProps> = ({
             >
               {/* Status Icon */}
               <div style={{
-                width: '20px',
-                height: '20px',
+                width: '24px',
+                height: '24px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -122,7 +120,7 @@ const ThinkingSection: React.FC<ThinkingSectionProps> = ({
                 marginTop: '2px'
               }}>
                 {step.status === 'completed' && (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                     <circle cx="12" cy="12" r="10" fill="#10B981" opacity="0.1"/>
                     <path
                       d="M9 12l2 2 4-4"
@@ -137,15 +135,15 @@ const ThinkingSection: React.FC<ThinkingSectionProps> = ({
                 {step.status === 'active' && (
                   <>
                     {step.type === 'generating' ? (
-                      <SlideGenerationLoader size={16} />
+                      <SlideGenerationLoader size={20} />
                     ) : (
-                      <BrandedLoader size={16} variant="inline" />
+                      <BrandedLoader size={20} variant="inline" />
                     )}
                   </>
                 )}
 
                 {step.status === 'pending' && (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                     <circle
                       cx="12"
                       cy="12"
@@ -161,7 +159,7 @@ const ThinkingSection: React.FC<ThinkingSectionProps> = ({
               {/* Step Content */}
               <div style={{ flex: 1 }}>
                 <div style={{
-                  fontSize: '13px',
+                  fontSize: '14px',
                   fontWeight: '600',
                   color: step.status === 'active' ? '#4F46E5' : '#374151',
                   marginBottom: step.content ? '4px' : '0',
@@ -172,7 +170,7 @@ const ThinkingSection: React.FC<ThinkingSectionProps> = ({
 
                 {step.content && (
                   <div style={{
-                    fontSize: '12px',
+                    fontSize: '13px',
                     color: '#6B7280',
                     lineHeight: '1.5',
                     letterSpacing: '-0.006em'

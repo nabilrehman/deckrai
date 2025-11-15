@@ -1,9 +1,11 @@
 
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { Slide, StyleLibraryItem, DebugSession, Template } from './types';
+import { Slide, StyleLibraryItem, DebugSession, Template, DeckAiExecutionPlan } from './types';
 import Header from './components/Header';
 import Editor from './components/Editor';
+import ChatLandingView from './components/ChatLandingView';
+import ChatController from './components/ChatController';
 import GenerationModeSelector from './components/GenerationModeSelector';
 import PresentationView from './components/PresentationView';
 import SessionInspectorPanel from './components/SessionInspectorPanel';
@@ -18,7 +20,8 @@ import {
     getUserStyleLibrary,
     addToStyleLibrary,
     removeFromStyleLibrary,
-    batchAddToStyleLibrary
+    batchAddToStyleLibrary,
+    deleteAllStyleLibraryItems
 } from './services/firestoreService';
 import { exportToGoogleSlides, handleOAuthCallback } from './services/googleSlidesService';
 
@@ -44,6 +47,8 @@ const App: React.FC = () => {
   const [isSaveDeckModalOpen, setIsSaveDeckModalOpen] = useState(false);
   const [isSavingDeck, setIsSavingDeck] = useState(false);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [pendingExecutionPlan, setPendingExecutionPlan] = useState<DeckAiExecutionPlan | null>(null);
+  const [chatState, setChatState] = useState<{ active: boolean; initialPrompt?: string; initialFiles?: File[] }>({ active: false });
 
   // Load session history from localStorage on initial render
   useEffect(() => {
@@ -74,12 +79,18 @@ const App: React.FC = () => {
     const loadStyleLibrary = async () => {
       if (user) {
         try {
+          console.log(`🔍 DEBUG: Loading style library for user ${user.uid}`);
           const library = await getUserStyleLibrary(user.uid);
+          console.log(`🔍 DEBUG: Loaded ${library.length} items from Firestore`);
+          if (library.length > 0) {
+            console.log('🔍 DEBUG: First 3 items:', library.slice(0, 3).map(item => ({ id: item.id, name: item.name })));
+          }
           setStyleLibrary(library);
         } catch (error) {
-          console.error('Error loading style library:', error);
+          console.error('❌ Error loading style library:', error);
         }
       } else {
+        console.log('🔍 DEBUG: User signed out, clearing style library');
         // Clear style library when user signs out
         setStyleLibrary([]);
       }
@@ -125,10 +136,15 @@ const App: React.FC = () => {
   }, []);
 
 
-  const handleDeckUpload = useCallback((newSlides: Slide[]) => {
+  const handleDeckUpload = useCallback((newSlides: Slide[], executionPlan?: DeckAiExecutionPlan | null) => {
     setSlides(newSlides);
     setActiveSlideId(newSlides[0]?.id || null);
     setStyleLibrary([]); // Reset library on new deck
+
+    // If an execution plan was passed, store it for the Editor to execute
+    if (executionPlan) {
+      setPendingExecutionPlan(executionPlan);
+    }
   }, []);
 
   const handleToggleTestMode = useCallback(() => {
@@ -172,26 +188,59 @@ const App: React.FC = () => {
   }, [user, styleLibrary]);
 
   const handleLibraryUpload = useCallback(async (newItems: StyleLibraryItem[]) => {
+    console.log(`🔍 DEBUG: handleLibraryUpload called with ${newItems.length} items`);
     const existingSrcs = new Set(styleLibrary.map(item => item.src));
     const trulyNewItems = newItems.filter(item => !existingSrcs.has(item.src));
+    console.log(`🔍 DEBUG: ${trulyNewItems.length} new items after deduplication (existing: ${styleLibrary.length})`);
 
     if (trulyNewItems.length > 0) {
-      setStyleLibrary(prevLibrary => [...prevLibrary, ...trulyNewItems]);
+      setStyleLibrary(prevLibrary => {
+        const newLibrary = [...prevLibrary, ...trulyNewItems];
+        console.log(`🔍 DEBUG: Updated styleLibrary state - now has ${newLibrary.length} items`);
+        return newLibrary;
+      });
 
       // Save to Firestore if user is signed in
       if (user) {
         try {
-          console.log(`📤 Uploading ${trulyNewItems.length} reference slides to Firestore...`);
+          console.log(`📤 Uploading ${trulyNewItems.length} reference slides to Firebase Storage...`);
           await batchAddToStyleLibrary(user.uid, trulyNewItems);
-          console.log(`✅ Successfully uploaded ${trulyNewItems.length} reference slides`);
+          console.log(`✅ Successfully uploaded ${trulyNewItems.length} reference slides to Storage + Firestore`);
         } catch (error) {
           console.error('❌ Error batch uploading to style library:', error);
           alert(`Failed to upload reference slides: ${error instanceof Error ? error.message : 'Unknown error'}. Please try uploading fewer slides at once.`);
         }
+      } else {
+        console.log('⚠️ WARNING: User not signed in, slides only stored in local state');
       }
+    } else {
+      console.log('ℹ️ No new items to upload (all duplicates)');
     }
   }, [user, styleLibrary]);
 
+  const handleDeleteAllStyleLibrary = useCallback(async () => {
+    if (!user) {
+      alert('You must be signed in to delete from Firestore');
+      return;
+    }
+
+    const confirmDelete = window.confirm(
+      `⚠️ WARNING: This will permanently delete ALL ${styleLibrary.length} reference slides from Firebase Storage and Firestore.\n\nThis action CANNOT be undone.\n\nAre you sure you want to continue?`
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      console.log('🗑️ Deleting all style library items...');
+      await deleteAllStyleLibraryItems(user.uid);
+      setStyleLibrary([]);
+      console.log('✅ All style library items deleted successfully');
+      alert('✅ Successfully deleted all reference slides from Firestore and Storage!');
+    } catch (error) {
+      console.error('❌ Error deleting style library:', error);
+      alert(`Failed to delete style library: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }, [user, styleLibrary.length]);
 
   const handleNewSlideVersion = useCallback((slideId: string, newSrc: string) => {
     setSlides(prevSlides =>
@@ -517,20 +566,24 @@ const App: React.FC = () => {
         <div className="absolute top-10 right-1/4 w-[500px] h-[500px] bg-indigo-200/40 rounded-full mix-blend-multiply filter blur-3xl animate-float" style={{animationDelay: '2s'}}></div>
         <div className="absolute top-40 left-1/2 w-[400px] h-[400px] bg-purple-200/30 rounded-full mix-blend-multiply filter blur-3xl animate-float" style={{animationDelay: '4s'}}></div>
       </div>
-      <Header
-        onReset={handleResetProject}
-        hasActiveProject={slides.length > 0}
-        onDownloadPdf={handleDownloadPdf}
-        isDownloading={isDownloadingPdf}
-        onExportToGoogleSlides={handleExportToGoogleSlides}
-        isExportingToSlides={isExportingToSlides}
-        onPresent={handlePresent}
-        isTestMode={isTestMode}
-        onToggleTestMode={handleToggleTestMode}
-        onSaveDeck={handleSaveDeck}
-        onOpenDeckLibrary={handleOpenDeckLibrary}
-      />
-      <main className="flex-grow flex flex-row overflow-hidden">
+      {/* Only show Header when we have slides */}
+      {slides.length > 0 && (
+        <Header
+          onReset={handleResetProject}
+          hasActiveProject={slides.length > 0}
+          onDownloadPdf={handleDownloadPdf}
+          isDownloading={isDownloadingPdf}
+          onExportToGoogleSlides={handleExportToGoogleSlides}
+          isExportingToSlides={isExportingToSlides}
+          onPresent={handlePresent}
+          isTestMode={isTestMode}
+          onToggleTestMode={handleToggleTestMode}
+          onSaveDeck={handleSaveDeck}
+          onOpenDeckLibrary={handleOpenDeckLibrary}
+          onDeleteAllStyleLibrary={handleDeleteAllStyleLibrary}
+        />
+      )}
+      <main className="flex-grow flex flex-row overflow-hidden w-full">
         {slides.length > 0 && activeSlide ? (
           <>
             <Editor
@@ -549,6 +602,8 @@ const App: React.FC = () => {
                 styleLibrary={styleLibrary}
                 onToggleStyleLibrary={handleToggleStyleLibrary}
                 onAddSessionToHistory={handleAddSessionToHistory}
+                pendingExecutionPlan={pendingExecutionPlan}
+                onClearPendingPlan={() => setPendingExecutionPlan(null)}
             />
             <StyleLibraryPanel 
                 isVisible={isStylePanelVisible}
@@ -562,14 +617,14 @@ const App: React.FC = () => {
             />
           </>
         ) : (
-          <div className="flex-grow flex items-center justify-center p-4">
-            <GenerationModeSelector
-                onDeckUpload={handleDeckUpload}
-                styleLibrary={styleLibrary}
-                isTestMode={isTestMode}
-                onLibraryUpload={handleLibraryUpload}
-            />
-          </div>
+          <ChatLandingView
+            styleLibrary={styleLibrary}
+            onDeckGenerated={(generatedSlides) => {
+              console.log('✅ Deck generated with slides:', generatedSlides);
+              setSlides(generatedSlides);
+              setActiveSlideId(generatedSlides[0]?.id || null);
+            }}
+          />
         )}
       </main>
 

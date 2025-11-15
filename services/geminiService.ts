@@ -762,7 +762,8 @@ export const createSlideFromPrompt = async (
     logs: DebugLog[],
     onProgress?: (message: string) => void,
     theme?: CompanyTheme | null,
-    logoImage?: string | null
+    logoImage?: string | null,
+    customImage?: string | null
 ): Promise<{ images: string[], prompts: string[], logs: DebugLog[] }> => {
     console.log(`\n[createSlideFromPrompt] 📝 FUNCTION CALLED`);
     console.log(`[createSlideFromPrompt] Reference Image: ${referenceSlideImage ? 'YES' : 'NO'}`);
@@ -780,21 +781,31 @@ export const createSlideFromPrompt = async (
     }
 
     let logoInstructions = '';
+    let customImageInstructions = '';
     const imageParts = [];
     if (referenceSlideImage) {
         imageParts.push({ text: "--- REFERENCE SLIDE (FOR STYLE) ---" });
         imageParts.push(fileToGenerativePart(referenceSlideImage));
     }
      if (logoImage) {
-        logoInstructions = `\n\n**LOGO INSTRUCTION:** You have been provided with an additional image which is the company's logo. You MUST incorporate this logo into the slide design in an appropriate and professional manner (e.g., in a corner or alongside the title).`;
-        imageParts.push({ text: "--- CUSTOMER LOGO (TO INCLUDE) ---" });
+        logoInstructions = `\n\n**CRITICAL LOGO INSTRUCTION:** A logo image has been provided ONLY for reference to understand the brand. You MUST NOT attempt to draw, recreate, or include any logo in the generated image. AI image generators cannot reliably reproduce logos or text. Instead, you have two options:
+1. PREFERRED: Completely ignore the logo and do not reserve any space for it. Generate the slide without any logo placeholder.
+2. ALTERNATIVE: If you must acknowledge it, add a small subtle gray rectangle placeholder in the bottom corner (max 150px wide) with the text "LOGO" in tiny letters.
+
+DO NOT attempt to recreate the logo design, colors, or text. This is a reference only.`;
+        imageParts.push({ text: "--- BRAND LOGO REFERENCE (DO NOT DRAW OR RECREATE THIS IN THE OUTPUT) ---" });
         imageParts.push(fileToGenerativePart(logoImage));
+    }
+    if (customImage) {
+        customImageInstructions = `\n\n**CUSTOM IMAGE INSTRUCTION:** You have been provided with a custom image. Incorporate this image into the slide design in a visually appealing and professional manner that complements the overall layout.`;
+        imageParts.push({ text: "--- CUSTOM IMAGE (TO INCLUDE) ---" });
+        imageParts.push(fileToGenerativePart(customImage));
     }
 
 
     const designerSystemPrompt = referenceSlideImage
-        ? `You are a "Creative Slide Designer" AI. Your task is to create a brand new slide from scratch based on a detailed prompt.\n\n**CRITICAL RULES:**\n1.  **Reference Style:** You are provided with a reference slide image. The new slide you create MUST perfectly match the visual style, aesthetics, color palette, font choices, and general layout principles of this reference slide.\n2.  **Follow Prompt:** Create the content of the new slide based *only* on the detailed prompt.\n3.  **Aspect Ratio:** The new slide you create MUST be in a 16:9 aspect ratio.\n---\n**Detailed Prompt:** "${detailedPrompt}"${themeInstructions}${logoInstructions}`
-        : `You are a "Creative Slide Designer" AI. Your task is to create a brand new slide from scratch based on a detailed prompt.\n\n**CRITICAL RULES:**\n1. **Design Style:** Since no reference image is provided, create a clean, professional, and visually appealing design. Use a modern, minimalist aesthetic with good typography and layout principles.\n2.  **Follow Prompt:** Create the content of the new slide based *only* on the detailed prompt.\n3.  **Aspect Ratio:** The new slide you create MUST be in a 16:9 aspect ratio.\n---\n**Detailed Prompt:** "${detailedPrompt}"${themeInstructions}${logoInstructions}`;
+        ? `You are a "Creative Slide Designer" AI. Your task is to create a brand new slide from scratch based on a detailed prompt.\n\n**CRITICAL RULES:**\n1.  **Reference Style:** You are provided with a reference slide image. The new slide you create MUST perfectly match the visual style, aesthetics, color palette, font choices, and general layout principles of this reference slide.\n2.  **Follow Prompt:** Create the content of the new slide based *only* on the detailed prompt.\n3.  **Aspect Ratio:** The new slide you create MUST be in a 16:9 aspect ratio.\n---\n**Detailed Prompt:** "${detailedPrompt}"${themeInstructions}${logoInstructions}${customImageInstructions}`
+        : `You are a "Creative Slide Designer" AI. Your task is to create a brand new slide from scratch based on a detailed prompt.\n\n**CRITICAL RULES:**\n1. **Design Style:** Since no reference image is provided, create a clean, professional, and visually appealing design. Use a modern, minimalist aesthetic with good typography and layout principles.\n2.  **Follow Prompt:** Create the content of the new slide based *only* on the detailed prompt.\n3.  **Aspect Ratio:** The new slide you create MUST be in a 16:9 aspect ratio.\n---\n**Detailed Prompt:** "${detailedPrompt}"${themeInstructions}${logoInstructions}${customImageInstructions}`;
     
     
     // Generate only 1 variation to save time and cost
