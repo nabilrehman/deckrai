@@ -30,3 +30,7 @@ dist-ssr
 
 # Session logs (for debugging)
 logs/
+
+# Playwright test artifacts
+playwright-report/
+test-results/
