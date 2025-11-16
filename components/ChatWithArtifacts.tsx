@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ChatLandingView from './ChatLandingView';
 import ArtifactsPanel from './ArtifactsPanel';
+import ArtifactsVariationView from './ArtifactsVariationView';
 import { Slide, StyleLibraryItem } from '../types';
 
 interface ChatWithArtifactsProps {
@@ -17,6 +18,12 @@ const ChatWithArtifacts: React.FC<ChatWithArtifactsProps> = ({ user, onSignOut, 
   const [splitRatio, setSplitRatio] = useState(60); // 60% artifacts, 40% chat
   const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Variation selection mode state
+  const [artifactsMode, setArtifactsMode] = useState<'normal' | 'variation-selection'>('normal');
+  const [pendingVariations, setPendingVariations] = useState<string[]>([]);
+  const [variationTargetSlideId, setVariationTargetSlideId] = useState<string>('');
+  const [variationSlideName, setVariationSlideName] = useState<string>('');
 
   // Save current state to history (for undo)
   const saveToHistory = () => {
@@ -245,6 +252,12 @@ const ChatWithArtifacts: React.FC<ChatWithArtifactsProps> = ({ user, onSignOut, 
           onAddSlide={handleAddSlide}
           artifactSlides={artifactSlides}
           onUndoLastChange={undoLastChange}
+          onVariationModeChange={setArtifactsMode}
+          onSetPendingVariations={setPendingVariations}
+          onSetVariationTargetSlide={(slideId, slideName) => {
+            setVariationTargetSlideId(slideId);
+            setVariationSlideName(slideName);
+          }}
         />
       </div>
 
@@ -297,36 +310,69 @@ const ChatWithArtifacts: React.FC<ChatWithArtifactsProps> = ({ user, onSignOut, 
         style={{
           width: `${splitRatio}%`,
           height: '100%',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          position: 'relative'
         }}
       >
-        <ArtifactsPanel
-          slides={artifactSlides}
-          onSlideClick={(slide) => {
-            console.log('Slide clicked:', slide);
-          }}
-          onSlideEdit={(slide) => {
-            // TODO: Implement inline editing or chat-based editing
-            console.log('Edit slide:', slide);
-          }}
-          onSlideDuplicate={(slide) => {
-            const newSlide: Slide = {
-              ...slide,
-              id: `${slide.id}-copy-${Date.now()}`,
-              name: `${slide.name} (Copy)`,
-              originalSrc: slide.history && slide.history.length > 0
-                ? slide.history[slide.history.length - 1]
-                : slide.originalSrc,
-              history: slide.history && slide.history.length > 0
-                ? [slide.history[slide.history.length - 1]]
-                : [slide.originalSrc]
-            };
-            setArtifactSlides(prev => [...prev, newSlide]);
-          }}
-          onSlideDelete={handleDeleteSlide}
-          onOpenInEditor={handleOpenInEditor}
-          onDownloadPDF={handleDownloadPDF}
-        />
+        {artifactsMode === 'variation-selection' ? (
+          <ArtifactsVariationView
+            variations={pendingVariations}
+            slideId={variationTargetSlideId}
+            slideName={variationSlideName}
+            onApply={(slideId, variationIndex) => {
+              // Apply the selected variation
+              const selectedImage = pendingVariations[variationIndex];
+              handleSlideUpdate(slideId, {
+                history: [...(artifactSlides.find(s => s.id === slideId)?.history || []), selectedImage]
+              });
+
+              // Exit variation mode (zoom out transition)
+              setArtifactsMode('normal');
+              setPendingVariations([]);
+              setVariationTargetSlideId('');
+              setVariationSlideName('');
+            }}
+            onRegenerate={() => {
+              // TODO: Trigger regeneration
+              console.log('Regenerate variations');
+            }}
+            onCancel={() => {
+              // Exit variation mode without applying
+              setArtifactsMode('normal');
+              setPendingVariations([]);
+              setVariationTargetSlideId('');
+              setVariationSlideName('');
+            }}
+          />
+        ) : (
+          <ArtifactsPanel
+            slides={artifactSlides}
+            onSlideClick={(slide) => {
+              console.log('Slide clicked:', slide);
+            }}
+            onSlideEdit={(slide) => {
+              // TODO: Implement inline editing or chat-based editing
+              console.log('Edit slide:', slide);
+            }}
+            onSlideDuplicate={(slide) => {
+              const newSlide: Slide = {
+                ...slide,
+                id: `${slide.id}-copy-${Date.now()}`,
+                name: `${slide.name} (Copy)`,
+                originalSrc: slide.history && slide.history.length > 0
+                  ? slide.history[slide.history.length - 1]
+                  : slide.originalSrc,
+                history: slide.history && slide.history.length > 0
+                  ? [slide.history[slide.history.length - 1]]
+                  : [slide.originalSrc]
+              };
+              setArtifactSlides(prev => [...prev, newSlide]);
+            }}
+            onSlideDelete={handleDeleteSlide}
+            onOpenInEditor={handleOpenInEditor}
+            onDownloadPDF={handleDownloadPDF}
+          />
+        )}
       </div>
         </>
       )}

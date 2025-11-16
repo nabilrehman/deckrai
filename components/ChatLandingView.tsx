@@ -8,6 +8,7 @@ import SlidePreviewInline from './SlidePreviewInline';
 import UndoActionButton from './UndoActionButton';
 import ChatInputWithMentions from './ChatInputWithMentions';
 import VariationThumbnailGrid from './VariationThumbnailGrid';
+import ArtifactsVariationView from './ArtifactsVariationView';
 import { Slide, StyleLibraryItem, StoredChatMessage} from '../types';
 import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationContext } from '../services/intelligentGeneration';
 import { detectVibeFromNotes, getDesignerStylesForVibe, getDesignerStyleById, generateStylePromptModifier, PresentationVibe } from '../services/vibeDetection';
@@ -54,6 +55,11 @@ interface ChatLandingViewProps {
   // Props for 10/10 chat features
   artifactSlides?: Slide[];         // Current slides for @mentions
   onUndoLastChange?: () => void;    // Undo callback
+
+  // Props for variation selection mode
+  onVariationModeChange?: (mode: 'normal' | 'variation-selection') => void;
+  onSetPendingVariations?: (variations: string[]) => void;
+  onSetVariationTargetSlide?: (slideId: string, slideName: string) => void;
 }
 
 /**
@@ -123,7 +129,10 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
   onSlideUpdate,
   onAddSlide,
   artifactSlides = [],
-  onUndoLastChange
+  onUndoLastChange,
+  onVariationModeChange,
+  onSetPendingVariations,
+  onSetVariationTargetSlide
 }) => {
   // UI State
   const [inputValue, setInputValue] = useState('');
@@ -498,31 +507,48 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
 
         const editedSlides = (await Promise.all(editPromises)).filter(Boolean) as any[];
 
-        // Add success message with variation thumbnail grid
-        addMessage({
-          role: 'assistant',
-          content: `✨ Created ${editedSlides.length > 0 && editedSlides[0].variations ? editedSlides[0].variations.length : 3} variations for ${editedSlides.length} slide${editedSlides.length > 1 ? 's' : ''}!`,
-          component: editedSlides.length === 1 && editedSlides[0].variations ? (
-            <VariationThumbnailGrid
-              variations={editedSlides[0].variations}
-              slideId={editedSlides[0].slideId}
-              onApplyVariation={(slideId, variationIndex) => {
-                // Apply the selected variation
-                const selectedImage = editedSlides[0].variations[variationIndex];
-                if (onSlideUpdate) {
-                  onSlideUpdate(slideId, {
-                    history: [...(artifactSlides.find(s => s.id === slideId)?.history || []), selectedImage]
+        // If single slide with variations, trigger artifacts variation view
+        if (editedSlides.length === 1 && editedSlides[0].variations) {
+          const targetSlide = artifactSlides.find(s => s.id === editedSlides[0].slideId);
+          const slideName = targetSlide?.name || `Slide ${artifactSlides.findIndex(s => s.id === editedSlides[0].slideId) + 1}`;
+
+          // Trigger variation selection mode in artifacts panel via callbacks
+          onSetPendingVariations?.(editedSlides[0].variations);
+          onSetVariationTargetSlide?.(editedSlides[0].slideId, slideName);
+          onVariationModeChange?.('variation-selection');
+
+          // Add message about variation generation
+          addMessage({
+            role: 'assistant',
+            content: `✨ Created 3 variations! Review them in the artifacts panel and choose your favorite.`
+          });
+        } else {
+          // Multiple slides or no variations - fallback to inline grid
+          addMessage({
+            role: 'assistant',
+            content: `✨ Created ${editedSlides.length > 0 && editedSlides[0].variations ? editedSlides[0].variations.length : 3} variations for ${editedSlides.length} slide${editedSlides.length > 1 ? 's' : ''}!`,
+            component: editedSlides.length === 1 && editedSlides[0].variations ? (
+              <VariationThumbnailGrid
+                variations={editedSlides[0].variations}
+                slideId={editedSlides[0].slideId}
+                onApplyVariation={(slideId, variationIndex) => {
+                  // Apply the selected variation
+                  const selectedImage = editedSlides[0].variations[variationIndex];
+                  if (onSlideUpdate) {
+                    onSlideUpdate(slideId, {
+                      history: [...(artifactSlides.find(s => s.id === slideId)?.history || []), selectedImage]
+                    });
+                  }
+                  // Add confirmation message
+                  addMessage({
+                    role: 'assistant',
+                    content: `✅ Applied variation ${variationIndex + 1} to the slide!`
                   });
-                }
-                // Add confirmation message
-                addMessage({
-                  role: 'assistant',
-                  content: `✅ Applied variation ${variationIndex + 1} to the slide!`
-                });
-              }}
-            />
-          ) : undefined
-        });
+                }}
+              />
+            ) : undefined
+          });
+        }
       } catch (error) {
         console.error('Error editing slides:', error);
         addMessage({
