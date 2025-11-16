@@ -784,3 +784,153 @@ docs/
 - UI components: 1 hour
 - Integration: 1 hour
 - Testing: 30 minutes
+
+---
+
+## 🚨 Critical Production Incident (November 16, 2025)
+
+**Date:** November 16, 2025
+**Status:** ✅ RESOLVED
+**Branch:** `main` (merged from `feature/unified-editor-chat-design`)
+
+### What Happened
+
+**Initial Problem:**
+- User attempted to add credit system to production
+- Credit system caused multiple breaking bugs:
+  1. ❌ "Out of credits" popup appeared even when user had 100 credits
+  2. ❌ String vs number type mismatch in credit check (`"8-10 slides"` passed to function expecting `number`)
+  3. ❌ `window.addCreditsToMe()` function not available (useEffect dependency issue)
+  4. ❌ Old slides appearing in editor instead of newly generated ones
+  5. ❌ `parsePlanModification is not a function` error after reverting files
+
+**Root Cause Analysis:**
+- Credit system was added on top of working `feature/unified-editor-chat-design` branch
+- Integration broke existing functionality:
+  - `ChatLandingView.tsx:535` - Passed string to `hasEnoughCredits(number)` function
+  - `App.tsx` - useEffect with `[user]` dependency prevented admin functions from loading
+  - Partial git revert created inconsistent state (missing functions)
+
+**User Frustration:**
+> "i really need to think if we can ditch credit and go back to the branch which has artifacts layout"
+> "all the slides have old stuff"
+> "everything was working just before we added credit functionality"
+
+### Resolution
+
+**Actions Taken:**
+1. ✅ Reverted credit system changes via `git checkout HEAD` for affected files
+2. ✅ Switched to stable branch: `feature/unified-editor-chat-design`
+3. ✅ Verified all features intact (chat continuity, reference matching, Designer Mode, Smart AI)
+4. ✅ Merged to main: `git merge feature/unified-editor-chat-design --no-edit`
+5. ✅ Pushed to production: `git push origin main`
+
+**Branch Analysis Performed:**
+- Created `BRANCH_ANALYSIS.md` documenting all 7 branches with feature breakdowns
+- Confirmed `main` now has all 27 production features
+- Confirmed credit system is ONLY thing missing (intentionally reverted)
+
+### Second Production Issue: Missing API Key
+
+**Date:** November 16, 2025 (same day, after merge)
+**Status:** ✅ RESOLVED
+
+**Problem:**
+User reported deckrai.com showing errors:
+1. ❌ "An API Key must be set when running in a browser"
+2. ⚠️ Tailwind CSS production warning
+
+**Root Cause:**
+- No `.env` or `.env.production` file existed (only `.env.local` which is gitignored)
+- Production build had no access to `VITE_GEMINI_API_KEY`
+- Tailwind loaded via CDN (`<script src="https://cdn.tailwindcss.com">`) causing performance warning
+
+**Resolution:**
+1. ✅ Created `.env.production` with Gemini API key
+2. ✅ Created `.env` with same key (for local dev consistency)
+3. ✅ Deployed to Cloud Run: revision `deckr-app-00047-j89`
+4. ✅ Verified domain mapping: `deckrai.com` → `deckr-app` service
+5. ⚠️ Tailwind warning acknowledged (CDN version works, just slower - can optimize later)
+
+**Deployment Details:**
+- Service URL: `https://deckr-app-948199894623.us-central1.run.app`
+- Custom Domain: `https://deckrai.com` (DNS mapped via Cloud Run)
+- Region: `us-central1`
+- Revision: `deckr-app-00047-j89`
+- Status: 100% traffic to latest revision
+
+### Lessons Learned
+
+**What Went Wrong:**
+1. ❌ Credit system was added without preserving existing functionality (violated additive design principle)
+2. ❌ Type safety was broken (string passed to function expecting number)
+3. ❌ Git revert was incomplete (some files reverted, others not - created broken state)
+4. ❌ Environment variables not properly configured for production deployment
+5. ❌ No `.env` files committed to repo (only `.env.local` which is gitignored)
+
+**What Went Right:**
+1. ✅ User had stable branch (`feature/unified-editor-chat-design`) to fall back to
+2. ✅ Git history preserved all working states
+3. ✅ Branch analysis identified exactly what was in each branch
+4. ✅ Domain mapping already configured, just needed deployment
+5. ✅ Fast recovery time (~2 hours from incident to resolution)
+
+**Best Practices for Next Time:**
+1. ✅ **Additive Changes Only:** New features must NOT break existing functionality
+2. ✅ **Feature Flags:** Use conditional rendering for new UI (only show when explicitly enabled)
+3. ✅ **Type Safety:** Always validate types at boundaries (user input → function calls)
+4. ✅ **Complete Reverts:** Either revert entire feature or none of it (no partial reverts)
+5. ✅ **Environment Files:** Always maintain both `.env` and `.env.production` with same keys
+6. ✅ **Test Before Merge:** Verify all existing workflows still work before merging new features
+7. ✅ **Incremental Integration:** Add features piece-by-piece with testing between each step
+
+### Current Stable State
+
+**Branch:** `main`
+**Features Working:**
+- ✅ Chat storage and persistence with Firebase
+- ✅ Artifacts panel with grid/filmstrip/presenter views
+- ✅ Resizable split-view interface
+- ✅ Chat continuity (preserves conversation state)
+- ✅ Gemini-style conversational chat
+- ✅ Enterprise reference matching with AI
+- ✅ Designer Mode with parallel AI agents
+- ✅ Smart AI slide generation
+- ✅ Canva-style AI chat interface
+- ✅ Export to Google Slides
+- ✅ Firebase Storage for style library
+- ✅ All 27 production features (see BRANCH_ANALYSIS.md)
+
+**Not in Production (Intentionally):**
+- ❌ Credit system (13 features in `credit-pricing-system` branch)
+- ❌ UX/branding improvements (16 features in `review-unified-designer-ux` branch)
+
+### What's Next
+
+**Recommended Approach for Credit System (When Ready):**
+1. Create new branch: `feature/credit-system-v2` from current stable `main`
+2. Cherry-pick commits one-by-one from `credit-pricing-system` branch
+3. Test after each cherry-pick (especially commit `72d4bae` - UI integration)
+4. Fix bugs found during testing:
+   - String vs number type mismatch in `ChatLandingView.tsx`
+   - useEffect dependency array in `App.tsx`
+   - Any other breaking changes
+5. Only merge when ALL existing features still work
+
+**Recommended Approach for UX/Branding:**
+- Safe to merge `review-unified-designer-ux` branch (no breaking changes)
+- Contains: logo concepts, pricing page, UX audit fixes
+- No code conflicts with existing functionality
+
+**Current Priority:**
+- ✅ Keep `main` stable and production-ready
+- ✅ Gather user feedback on core product
+- ✅ Consider adding UX/branding improvements (non-breaking)
+- 🔮 Add credit system later when ready to monetize
+
+---
+
+**Last Updated:** November 16, 2025
+**Current Status:** ✅ **STABLE & DEPLOYED TO PRODUCTION**
+**Production URL:** https://deckrai.com
+**Latest Revision:** `deckr-app-00047-j89`
