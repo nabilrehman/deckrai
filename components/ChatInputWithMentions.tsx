@@ -166,7 +166,34 @@ const ChatInputWithMentions: React.FC<ChatInputWithMentionsProps> = ({
   const handleSubmitMessage = () => {
     if (!value.trim() && attachedImages.length === 0) return;
 
-    onSubmit(value, mentionedSlideIds.length > 0 ? mentionedSlideIds : undefined, attachedImages.length > 0 ? attachedImages : undefined);
+    // Parse mentions from text if they weren't set via autocomplete
+    let finalMentionedSlideIds = mentionedSlideIds;
+    if (mentionedSlideIds.length === 0) {
+      // Extract @slide1, @slide2, etc. from text
+      const mentionRegex = /@slide(\d+)|@all/g;
+      const matches = [...value.matchAll(mentionRegex)];
+
+      if (matches.length > 0) {
+        const extractedIds: string[] = [];
+        for (const match of matches) {
+          if (match[0] === '@all') {
+            // @all means all slides
+            extractedIds.push(...slides.map(s => s.id));
+            break;
+          } else if (match[1]) {
+            // @slide3 -> get the 3rd slide (index 2)
+            const slideIndex = parseInt(match[1]) - 1;
+            if (slideIndex >= 0 && slideIndex < slides.length) {
+              extractedIds.push(slides[slideIndex].id);
+            }
+          }
+        }
+        finalMentionedSlideIds = extractedIds;
+        console.log('📌 Parsed mentions from text:', finalMentionedSlideIds);
+      }
+    }
+
+    onSubmit(value, finalMentionedSlideIds.length > 0 ? finalMentionedSlideIds : undefined, attachedImages.length > 0 ? attachedImages : undefined);
 
     // Reset
     onChange('');
