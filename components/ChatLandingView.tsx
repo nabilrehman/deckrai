@@ -523,31 +523,50 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
             content: `✨ Created 3 variations! Review them in the artifacts panel and choose your favorite.`
           });
         } else {
-          // Multiple slides or no variations - fallback to inline grid
-          addMessage({
-            role: 'assistant',
-            content: `✨ Created ${editedSlides.length > 0 && editedSlides[0].variations ? editedSlides[0].variations.length : 3} variations for ${editedSlides.length} slide${editedSlides.length > 1 ? 's' : ''}!`,
-            component: editedSlides.length === 1 && editedSlides[0].variations ? (
-              <VariationThumbnailGrid
-                variations={editedSlides[0].variations}
-                slideId={editedSlides[0].slideId}
-                onApplyVariation={(slideId, variationIndex) => {
-                  // Apply the selected variation
-                  const selectedImage = editedSlides[0].variations[variationIndex];
-                  if (onSlideUpdate) {
-                    onSlideUpdate(slideId, {
-                      history: [...(artifactSlides.find(s => s.id === slideId)?.history || []), selectedImage]
+          // Multiple slides - apply first variation to all automatically
+          if (editedSlides.length > 1) {
+            // Apply first variation (Professional style) to each slide
+            editedSlides.forEach(editedSlide => {
+              if (editedSlide.variations && editedSlide.variations.length > 0 && onSlideUpdate) {
+                const firstVariation = editedSlide.variations[0];
+                onSlideUpdate(editedSlide.slideId, {
+                  history: [...(artifactSlides.find(s => s.id === editedSlide.slideId)?.history || []), firstVariation]
+                });
+              }
+            });
+
+            // Confirm changes
+            addMessage({
+              role: 'assistant',
+              content: `✅ Updated ${editedSlides.length} slides with Professional style! Each slide was generated with 3 variations, and I applied the Professional version to all.`
+            });
+          } else {
+            // Fallback for edge cases
+            addMessage({
+              role: 'assistant',
+              content: `✨ Created ${editedSlides.length > 0 && editedSlides[0].variations ? editedSlides[0].variations.length : 3} variations for ${editedSlides.length} slide${editedSlides.length > 1 ? 's' : ''}!`,
+              component: editedSlides.length === 1 && editedSlides[0].variations ? (
+                <VariationThumbnailGrid
+                  variations={editedSlides[0].variations}
+                  slideId={editedSlides[0].slideId}
+                  onApplyVariation={(slideId, variationIndex) => {
+                    // Apply the selected variation
+                    const selectedImage = editedSlides[0].variations[variationIndex];
+                    if (onSlideUpdate) {
+                      onSlideUpdate(slideId, {
+                        history: [...(artifactSlides.find(s => s.id === slideId)?.history || []), selectedImage]
+                      });
+                    }
+                    // Add confirmation message
+                    addMessage({
+                      role: 'assistant',
+                      content: `✅ Applied variation ${variationIndex + 1} to the slide!`
                     });
-                  }
-                  // Add confirmation message
-                  addMessage({
-                    role: 'assistant',
-                    content: `✅ Applied variation ${variationIndex + 1} to the slide!`
-                  });
-                }}
-              />
-            ) : undefined
-          });
+                  }}
+                />
+              ) : undefined
+            });
+          }
         }
       } catch (error) {
         console.error('Error editing slides:', error);
