@@ -815,7 +815,15 @@ export const generateDeckExecutionPlan = async (userPrompt: string, slidesInfo: 
     *   \`insertAfterSlideId\`: string (The ID of the slide that should come *before* the new one. Use "START" to add to the beginning.)
     *   \`detailed_prompt\`: string (Your instructions for creating the new slide)
 
-**CRITICAL:** If a slide does not need to be changed, DO NOT include it in the plan.`;
+**CRITICAL RULES:**
+1. If a slide does not need to be changed, DO NOT include it in the plan.
+2. **VERSIONS/VARIATIONS HANDLING:** If the user requests "N versions", "N variations", or "N different designs" of a slide:
+   - Create ONLY ONE 'EDIT_SLIDE' task for that slide
+   - In the detailed_prompt, explicitly state: "Generate N variations with different themes: [list the N distinct design directions]"
+   - The system will automatically generate multiple variations from a single EDIT_SLIDE task
+   - Example: "Give me 3 versions of slide 2" → ONE EDIT_SLIDE task with prompt: "Generate 3 variations: 1) Professional theme with corporate colors, 2) Creative theme with bold graphics, 3) Minimalist theme with elegant spacing"
+3. DO NOT create multiple EDIT_SLIDE tasks for the same slideId - this will cause overwrites.
+4. Only use 'ADD_SLIDE' when the user wants to INSERT a completely new slide into the deck.`;
     
     const slideListForPrompt = slidesInfo.map(s => `- ID: "${s.id}", Name: "${s.name}"`).join('\n');
     const fullPrompt = `User Request: "${userPrompt}"\n\nSlide Deck Structure:\n${slideListForPrompt}`;

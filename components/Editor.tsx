@@ -9,6 +9,7 @@ import VariantSelector from './VariantSelector';
 import ChatInterface from './ChatInterface';
 import ThinkingSection, { ThinkingStep } from './ThinkingSection';
 import ActionSummary, { ActionItem } from './ActionSummary';
+import ChatInputWithMentions from './ChatInputWithMentions';
 
 interface EditorProps {
   slides: Slide[];
@@ -103,6 +104,7 @@ const Editor: React.FC<EditorProps> = ({
   const [isProcessingChat, setIsProcessingChat] = useState(false);
   const [isChatExpanded, setIsChatExpanded] = useState(true);
   const [chatScope, setChatScope] = useState<'slide' | 'deck'>('slide');
+  const [chatInputValue, setChatInputValue] = useState('');
 
   useEffect(() => {
     if (lastSuccessfulEdit) {
@@ -159,7 +161,7 @@ const Editor: React.FC<EditorProps> = ({
   }, [deckAiPrompt, slides]);
 
   // Chat message handler - reuses existing AI plan logic
-  const handleChatMessage = useCallback(async (message: string) => {
+  const handleChatMessage = useCallback(async (message: string, mentionedSlideIds?: string[], attachedImages?: string[]) => {
     // Add user message
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -289,6 +291,17 @@ const Editor: React.FC<EditorProps> = ({
     });
 
     await Promise.all(executionPromises);
+
+    // Auto-show VariantSelector for slides with variations
+    const slidesWithVariations = slides.filter(s =>
+      s.pendingPersonalization?.variations && s.pendingPersonalization.variations.length > 0
+    );
+
+    if (slidesWithVariations.length === 1) {
+      // Auto-trigger modal for single slide with variations
+      setSlideUnderReview(slidesWithVariations[0]);
+    }
+
     setIsExecutingPlan(false);
     setPersonalizingSlideIds([]);
   }, [executionPlan, slides, onSetPendingPersonalization, onAddNewSlide, isDeckDeepMode]);
@@ -773,82 +786,22 @@ const Editor: React.FC<EditorProps> = ({
                     </div>
                   )}
 
-                  {/* Input Area - Larger and Better */}
-                  <div style={{
-                    background: '#FFFFFF',
-                    borderRadius: '24px',
-                    border: '1px solid rgba(0, 0, 0, 0.06)',
-                    padding: '12px 16px',
-                    transition: 'all 180ms cubic-bezier(0.4, 0, 0.2, 1)',
-                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04), 0 4px 8px rgba(0, 0, 0, 0.02)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '16px'
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.3)';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.1), 0 4px 12px rgba(0, 0, 0, 0.08)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.06)';
-                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.04), 0 4px 8px rgba(0, 0, 0, 0.02)';
-                  }}
-                  >
-                    <input
-                      type="text"
-                      placeholder={chatScope === 'slide'
-                        ? `Ask AI to edit slide ${slides.findIndex(s => s.id === activeSlide.id) + 1} or @mention slides...`
-                        : `Ask AI to update the whole deck or @mention specific slides...`}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && !isProcessingChat && e.currentTarget.value.trim()) {
-                          handleChatMessage(e.currentTarget.value);
-                          e.currentTarget.value = '';
-                        }
-                      }}
-                      disabled={isProcessingChat}
-                      style={{
-                        flex: 1,
-                        fontSize: '16px',
-                        fontWeight: '400',
-                        color: '#2D3748',
-                        background: 'transparent',
-                        border: 'none',
-                        outline: 'none',
-                        lineHeight: '1.5',
-                        padding: '12px 4px',
-                        letterSpacing: '-0.011em'
-                      }}
-                      className="placeholder:text-gray-400"
-                    />
-                    <button
-                      onClick={(e) => {
-                        const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                        if (input && input.value.trim()) {
-                          handleChatMessage(input.value);
-                          input.value = '';
-                        }
-                      }}
-                      disabled={isProcessingChat}
-                      className="bg-gradient-brand"
-                      style={{
-                        width: '48px',
-                        height: '48px',
-                        borderRadius: 'var(--radius-xl)',
-                        border: 'none',
-                        cursor: isProcessingChat ? 'not-allowed' : 'pointer',
-                        opacity: isProcessingChat ? 0.5 : 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all var(--transition-fast)',
-                        boxShadow: 'var(--shadow-md)'
-                      }}
-                    >
-                      <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                      </svg>
-                    </button>
-                  </div>
+                  {/* Input Area with @ mentions support */}
+                  <ChatInputWithMentions
+                    slides={slides}
+                    value={chatInputValue}
+                    onChange={setChatInputValue}
+                    onSubmit={(value, mentionedSlideIds, attachedImages) => {
+                      handleChatMessage(value, mentionedSlideIds, attachedImages);
+                      setChatInputValue('');
+                    }}
+                    placeholder={chatScope === 'slide'
+                      ? `Ask AI to edit slide ${slides.findIndex(s => s.id === activeSlide.id) + 1} or @mention slides...`
+                      : `Ask AI to update the whole deck or @mention specific slides...`}
+                    disabled={isProcessingChat}
+                    showUploadButton={false}
+                    showToolsButton={false}
+                  />
                 </div>
               </div>
             )}

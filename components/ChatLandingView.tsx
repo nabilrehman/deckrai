@@ -7,7 +7,8 @@ import PlanDisplay from './PlanDisplay';
 import SlidePreviewInline from './SlidePreviewInline';
 import UndoActionButton from './UndoActionButton';
 import ChatInputWithMentions from './ChatInputWithMentions';
-import { Slide, StyleLibraryItem, StoredChatMessage } from '../types';
+import VariationThumbnailGrid from './VariationThumbnailGrid';
+import { Slide, StyleLibraryItem, StoredChatMessage} from '../types';
 import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationContext } from '../services/intelligentGeneration';
 import { detectVibeFromNotes, getDesignerStylesForVibe, getDesignerStyleById, generateStylePromptModifier, PresentationVibe } from '../services/vibeDetection';
 import { createSlideFromPrompt, findBestStyleReferenceFromPrompt, executeSlideTask } from '../services/geminiService';
@@ -484,28 +485,43 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
           // Call the same function Editor uses for AI edits
           const { executeSlideTask } = await import('../services/geminiService');
           const result = await executeSlideTask(currentSrc, userPrompt, false);
-          const newImageDataUrl = result.images[0];
 
+          // Store ALL variations (not just first one)
           return {
             ...slide,
-            history: [...(slide.history || [slide.originalSrc]), newImageDataUrl]
+            slideId,
+            variations: result.images,  // All 3 variations
+            variationPrompts: result.prompts,
+            taskPrompt: userPrompt
           };
         });
 
-        const editedSlides = (await Promise.all(editPromises)).filter(Boolean) as Slide[];
+        const editedSlides = (await Promise.all(editPromises)).filter(Boolean) as any[];
 
-        // Update slides via callback
-        if (onSlideUpdate && editedSlides.length > 0) {
-          editedSlides.forEach(slide => {
-            onSlideUpdate(slide.id, { history: slide.history });
-          });
-        }
-
-        // Add success message
+        // Add success message with variation thumbnail grid
         addMessage({
           role: 'assistant',
-          content: `✅ Updated ${editedSlides.length} slide${editedSlides.length > 1 ? 's' : ''}!`,
-          slidePreview: editedSlides
+          content: `✨ Created ${editedSlides.length > 0 && editedSlides[0].variations ? editedSlides[0].variations.length : 3} variations for ${editedSlides.length} slide${editedSlides.length > 1 ? 's' : ''}!`,
+          component: editedSlides.length === 1 && editedSlides[0].variations ? (
+            <VariationThumbnailGrid
+              variations={editedSlides[0].variations}
+              slideId={editedSlides[0].slideId}
+              onApplyVariation={(slideId, variationIndex) => {
+                // Apply the selected variation
+                const selectedImage = editedSlides[0].variations[variationIndex];
+                if (onSlideUpdate) {
+                  onSlideUpdate(slideId, {
+                    history: [...(artifactSlides.find(s => s.id === slideId)?.history || []), selectedImage]
+                  });
+                }
+                // Add confirmation message
+                addMessage({
+                  role: 'assistant',
+                  content: `✅ Applied variation ${variationIndex + 1} to the slide!`
+                });
+              }}
+            />
+          ) : undefined
         });
       } catch (error) {
         console.error('Error editing slides:', error);
