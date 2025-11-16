@@ -1,10 +1,192 @@
 # Deckr.ai Development & Deployment Guide
 
-## ⚠️ IMPORTANT: Local Testing Only
-**DO NOT deploy to Cloud Run unless explicitly requested by the user.**
+## 🎯 Core Development Principles
+
+### Git Workflow & Commit Strategy
+
+**CRITICAL: Commit after EVERY logical unit of work.**
+
+#### When to Commit (Commit Checklist)
+Before making a commit, verify ALL of these conditions:
+- ✅ **Code compiles successfully** - No TypeScript/build errors
+- ✅ **Tests pass** - All existing functionality still works
+- ✅ **Feature is complete** - Change makes sense on its own
+- ✅ **Can describe in one sentence** - Clear, focused change
+- ✅ **Would revert independently** - This change can stand alone
+- ✅ **Leaves code in working state** - App runs without errors
+
+#### Commit Granularity Rules
+
+**✅ GOOD - Atomic Commits (One Logical Unit):**
+```bash
+# Each commit is focused and complete
+git add components/CreditBadge.tsx
+git commit -m "feat: Add credit balance display component with real-time updates"
+
+git add services/creditService.ts
+git commit -m "feat: Implement credit transaction service with atomic operations"
+
+git add components/ChatLandingView.tsx
+git commit -m "feat: Integrate credit checks into chat interface"
+```
+
+**❌ BAD - Micro-commits (Too Small):**
+```bash
+# Don't do this - too granular
+git commit -m "Add import statement"
+git commit -m "Add function"
+git commit -m "Fix typo"
+```
+
+**❌ BAD - Mega-commits (Too Large):**
+```bash
+# Don't do this - too many unrelated changes
+git commit -m "Add credit system, fix bugs, update docs, refactor CSS"
+# (47 files changed, 12,453 insertions) ← TOO BIG!
+```
+
+#### Conventional Commit Format (REQUIRED)
+```bash
+<type>: <short description>
+
+[optional body with details]
+[optional footer with references]
+```
+
+**Commit Types:**
+- `feat:` - New feature (user-facing functionality)
+- `fix:` - Bug fix (corrects broken behavior)
+- `docs:` - Documentation only (README, comments, guides)
+- `style:` - Code formatting, whitespace (no logic change)
+- `refactor:` - Code restructuring (same behavior, better structure)
+- `test:` - Adding/updating tests
+- `chore:` - Build/tooling changes, dependencies
+- `perf:` - Performance improvements
+
+**Examples:**
+```bash
+feat: Add user authentication with Firebase
+fix: Resolve credit check type mismatch in ChatLandingView
+docs: Document credit system architecture and incident report
+refactor: Extract slide generation logic into separate service
+perf: Optimize image loading with lazy loading
+```
+
+#### Commit Workflow (Step-by-Step)
+
+**After making changes:**
+```bash
+# 1. Check what changed
+git status
+
+# 2. Review your changes
+git diff
+
+# 3. Stage related files (only files for THIS logical unit)
+git add path/to/file1.tsx path/to/file2.ts
+
+# 4. Commit with descriptive message
+git commit -m "feat: Add credit purchase modal with Stripe integration
+
+- Implement modal UI with plan selection
+- Add Stripe payment flow
+- Handle success/error states
+- Update credit balance on successful purchase"
+
+# 5. Verify commit
+git log -1 --stat
+```
+
+#### When to Push to GitHub
+
+**Push after:**
+- ✅ Each complete feature (1-3 related commits)
+- ✅ Each bug fix (verified working)
+- ✅ End of work session (to backup progress)
+- ✅ Before switching branches
+- ✅ Before major refactoring
+
+**Command:**
+```bash
+git push origin <branch-name>
+```
+
+---
+
+## 🚀 Deployment Strategy
+
+### ⚠️ IMPORTANT: Ask Before Deploying
+
+**NEVER deploy to Cloud Run automatically.**
+
+After completing a **major feature or fix**, Claude should:
+
+1. **✅ Commit all changes** (following rules above)
+2. **✅ Push to GitHub** (`git push origin main`)
+3. **🤔 ASK THE USER:**
+
+> "I've completed [feature name] and pushed to GitHub. Would you like me to deploy this to Cloud Run now? This will update the production site at deckrai.com."
+
+**Only deploy if user responds with explicit approval:**
+- "yes, deploy"
+- "push to production"
+- "deploy to cloud run"
+- "update the site"
+
+### What Qualifies as "Major Change" (Ask to Deploy)
+
+**Major Changes (Ask to Deploy):**
+- ✅ New user-facing features (chat interface, artifacts panel, credit system)
+- ✅ Bug fixes affecting production users (API key errors, broken workflows)
+- ✅ Performance improvements (loading speed, API optimization)
+- ✅ UI/UX updates (design changes, new components)
+- ✅ Security fixes (authentication, data validation)
+
+**Minor Changes (Don't Ask):**
+- ⏸️ Documentation updates (README, comments)
+- ⏸️ Internal refactoring (no behavior change)
+- ⏸️ Dev-only changes (test files, build config)
+- ⏸️ Typo fixes in code comments
+
+### Deployment Workflow
+
+**When user approves deployment:**
+
+```bash
+# 1. Set correct GCP account and project
+gcloud config set account anam.nabil1@gmail.com
+gcloud config set project deckr-477706
+
+# 2. Deploy to Cloud Run
+gcloud run deploy deckr-app --source . --region us-central1 --allow-unauthenticated
+
+# 3. Report deployment status to user
+# ✅ Service URL: https://deckr-app-948199894623.us-central1.run.app
+# ✅ Custom Domain: https://deckrai.com
+# ✅ Revision: deckr-app-00XXX-xxx
+```
+
+**After deployment, inform user:**
+> "✅ Deployed successfully!
+> - Revision: `deckr-app-00047-j89`
+> - Production URL: https://deckrai.com
+> - Changes are live (may need hard refresh: Cmd+Shift+R)"
+
+---
+
+## 🛡️ Safety Rules (NEVER Break These)
+
+### 1. Local Testing Only
 - All development and testing should be done locally
 - Use `npm run dev` for local testing
-- Only deploy when user explicitly asks to push to production
+- Deploy ONLY when user explicitly approves
+
+### 2. Additive Changes Only
+**CRITICAL:** New features must NOT break existing functionality
+- Add new code paths without modifying existing ones
+- Use feature flags/conditional rendering for new UI
+- Test ALL existing workflows after changes
+- If something breaks, revert immediately
 
 ## ⚠️ Critical Design Patterns & Anti-Patterns
 
