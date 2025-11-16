@@ -268,52 +268,6 @@ const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPd
 
           </div>
 
-          {/* Test Mode Toggle */}
-
-          <div className="flex items-center gap-3 px-4 py-2 rounded-xl glass border border-brand-border/30">
-
-            <span className={`text-xs font-semibold transition-colors ${isTestMode ? 'text-brand-primary-500' : 'text-brand-text-tertiary'}`}>
-
-              Test Mode
-
-            </span>
-
-            <button
-
-              onClick={onToggleTestMode}
-
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 ${
-
-                isTestMode ? 'bg-gradient-to-r from-brand-primary-500 to-brand-accent-500 shadow-premium' : 'bg-slate-200'
-
-              }`}
-
-            >
-
-              <span
-
-                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-300 ${
-
-                  isTestMode ? 'translate-x-6' : 'translate-x-1'
-
-                }`}
-
-              />
-
-            </button>
-
-          </div>
-
-          {/* Delete from Firestorage Button */}
-
-          <button
-            onClick={onDeleteAllStyleLibrary}
-            className="px-4 py-2 rounded-xl glass border border-red-300/50 hover:border-red-500 transition-all text-xs font-semibold text-red-600 hover:text-red-700 hover:bg-red-50/50"
-            title="Delete all reference slides from Firebase Storage and Firestore"
-          >
-            Delete from Firestorage
-          </button>
-
           <div className="w-px h-8 bg-gradient-to-b from-transparent via-brand-border to-transparent"></div>
 
 
@@ -558,23 +512,39 @@ const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPd
 
 
           <button
-
             onClick={onReset}
-
             disabled={isDownloading}
-
-            className="btn btn-primary shadow-btn hover:shadow-btn-hover"
-
+            className="bg-gradient-brand"
+            style={{
+              padding: '10px 20px',
+              borderRadius: 'var(--radius-lg)',
+              border: 'none',
+              color: 'white',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: isDownloading ? 'not-allowed' : 'pointer',
+              opacity: isDownloading ? 0.5 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all var(--transition-fast)',
+              boxShadow: 'var(--shadow-md)'
+            }}
+            onMouseEnter={(e) => {
+              if (!isDownloading) {
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 8px 16px rgba(99, 102, 241, 0.3)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+            }}
           >
-
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-
               <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-
             </svg>
-
             New Deck
-
           </button>
 
         </div>

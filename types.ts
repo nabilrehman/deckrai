@@ -165,3 +165,49 @@ export const PLAN_LIMITS: Record<UserPlan, { slidesPerMonth: number; decksPerMon
   pro: { slidesPerMonth: 100, decksPerMonth: 50 },
   enterprise: { slidesPerMonth: 500, decksPerMonth: 200 }
 };
+
+// CHAT STORAGE TYPES
+export interface ThinkingStep {
+  id: string;
+  title: string;
+  content?: string;
+  status: 'pending' | 'active' | 'completed';
+  timestamp?: number;
+  type?: 'thinking' | 'generating' | 'processing';
+}
+
+export interface StoredChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+  // For assistant messages with slides (store Storage URLs, not base64)
+  slideImages?: string[]; // Firebase Storage URLs
+  slideData?: {
+    id: string;
+    name: string;
+    storageUrl: string; // Firebase Storage URL
+  }[];
+  // For assistant messages with thinking steps
+  thinkingSteps?: ThinkingStep[];
+  // Generation metadata
+  generationMetadata?: {
+    company?: string;
+    audience?: string;
+    style?: string;
+    slideCount?: number;
+    duration?: string;
+  };
+}
+
+export interface SavedChat {
+  id: string;
+  userId: string;
+  title: string; // Auto-generated from first user message
+  createdAt: number;
+  updatedAt: number;
+  lastMessage: string; // Preview text for chat list
+  messageCount: number;
+  // Link to generated deck (if any)
+  generatedDeckId?: string;
+}

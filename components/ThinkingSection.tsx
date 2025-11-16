@@ -36,7 +36,10 @@ const ThinkingSection: React.FC<ThinkingSectionProps> = ({
 
   // If duration is suspiciously large (>1000 seconds = ~16 mins), it's likely a timestamp bug
   if (!isNaN(numericDuration) && numericDuration > 1000) {
-    console.warn('⚠️ Detected timestamp instead of duration:', thinkingTime);
+    // Silent fix - only log in development mode
+    if (import.meta.env.DEV) {
+      console.debug('[ThinkingSection] Auto-corrected invalid duration (likely timestamp):', thinkingTime);
+    }
     thinkingTime = 'a few seconds';
   }
 
@@ -77,13 +80,29 @@ const ThinkingSection: React.FC<ThinkingSectionProps> = ({
 
         {/* Thought duration or Thinking... */}
         {isThinking ? (
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>Thinking</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <span style={{
-              animation: 'blink 1.4s infinite',
-              fontSize: '16px',
-              lineHeight: '1'
-            }}>...</span>
+              background: 'linear-gradient(90deg, #374151 0%, #374151 40%, #A78BFA 50%, #374151 60%, #374151 100%)',
+              backgroundSize: '200% 100%',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              animation: 'shimmer 2s infinite linear'
+            }}>Thinking</span>
+            <span style={{ display: 'flex', gap: '2px' }}>
+              <span style={{
+                animation: 'blink 1.4s infinite',
+                animationDelay: '0s'
+              }}>.</span>
+              <span style={{
+                animation: 'blink 1.4s infinite',
+                animationDelay: '0.2s'
+              }}>.</span>
+              <span style={{
+                animation: 'blink 1.4s infinite',
+                animationDelay: '0.4s'
+              }}>.</span>
+            </span>
           </span>
         ) : (
           <span>Thought for {thinkingTime}</span>
@@ -111,11 +130,20 @@ const ThinkingSection: React.FC<ThinkingSectionProps> = ({
         </svg>
       </button>
 
-      {/* Blinking animation CSS */}
+      {/* Animations CSS */}
       <style>{`
         @keyframes blink {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.3; }
+        }
+
+        @keyframes shimmer {
+          0% {
+            background-position: 200% center;
+          }
+          100% {
+            background-position: -200% center;
+          }
         }
       `}</style>
 
@@ -151,33 +179,24 @@ const ThinkingSection: React.FC<ThinkingSectionProps> = ({
                 marginTop: '2px'
               }}>
                 {step.status === 'completed' && (
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{
-                    filter: 'drop-shadow(0 2px 4px rgba(34, 197, 94, 0.2))'
-                  }}>
-                    <defs>
-                      <linearGradient id="checkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style={{ stopColor: '#10B981', stopOpacity: 1 }} />
-                        <stop offset="50%" style={{ stopColor: '#22C55E', stopOpacity: 1 }} />
-                        <stop offset="100%" style={{ stopColor: '#34D399', stopOpacity: 1 }} />
-                      </linearGradient>
-                      <radialGradient id="checkGlow" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" style={{ stopColor: '#22C55E', stopOpacity: 0.3 }} />
-                        <stop offset="100%" style={{ stopColor: '#10B981', stopOpacity: 0 }} />
-                      </radialGradient>
-                    </defs>
-                    {/* Ambient glow background */}
-                    <circle cx="12" cy="12" r="11" fill="url(#checkGlow)" />
-                    {/* Soft background fill */}
-                    <circle cx="12" cy="12" r="10" fill="url(#checkGradient)" opacity="0.12"/>
-                    {/* Subtle outer ring */}
-                    <circle cx="12" cy="12" r="10" stroke="url(#checkGradient)" strokeWidth="1.5" opacity="0.4"/>
-                    {/* Bold checkmark */}
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    style={{
+                      shapeRendering: 'geometricPrecision'
+                    }}
+                  >
+                    {/* White checkmark on solid green background - matches ✅ emoji */}
+                    <circle cx="10" cy="10" r="9" fill="#5FBA47"/>
                     <path
-                      d="M8 12l3 3 5-5"
-                      stroke="url(#checkGradient)"
-                      strokeWidth="2.5"
+                      d="M6 10l2.5 2.5 5.5-5.5"
+                      stroke="white"
+                      strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
+                      fill="none"
                     />
                   </svg>
                 )}

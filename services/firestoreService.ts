@@ -17,7 +17,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
-import { UserProfile, UserPlan, UserUsage, SavedDeck, Slide, PLAN_LIMITS, StyleLibraryItem } from '../types';
+import { UserProfile, UserPlan, UserUsage, SavedDeck, Slide, PLAN_LIMITS, StyleLibraryItem, SavedChat, StoredChatMessage } from '../types';
 
 // ============================================================================
 // USER PROFILE OPERATIONS
@@ -541,6 +541,214 @@ export const batchAddToStyleLibrary = async (
 
     await batch.commit();
     console.log(`✅ Successfully saved ${items.length} items to Firestore`);
+};
+
+// ============================================================================
+// CHAT STORAGE OPERATIONS
+// ============================================================================
+
+/**
+ * Helper to convert base64 image to blob for Storage upload
+ */
+const imageUrlToBlob = async (imageUrl: string): Promise<Blob> => {
+    if (imageUrl.startsWith('data:image/')) {
+        // Already a data URL - convert directly
+        return base64ToBlob(imageUrl);
+    } else {
+        // External URL - fetch and convert
+        const response = await fetch(imageUrl);
+        return await response.blob();
+    }
+};
+
+/**
+ * Upload chat slide images to Firebase Storage
+ * Returns array of Storage URLs
+ */
+const uploadChatSlideImages = async (
+    userId: string,
+    chatId: string,
+    messageId: string,
+    images: string[]
+): Promise<string[]> => {
+    const uploadPromises = images.map(async (imgUrl, index) => {
+        const blob = await imageUrlToBlob(imgUrl);
+        const storagePath = `users/${userId}/chats/${chatId}/messages/${messageId}/slide_${index}.png`;
+        const storageRef = ref(storage, storagePath);
+        await uploadBytes(storageRef, blob);
+        return await getDownloadURL(storageRef);
+    });
+
+    return await Promise.all(uploadPromises);
+};
+
+/**
+ * Save a complete chat session
+ */
+export const saveChat = async (
+    userId: string,
+    chatId: string,
+    messages: StoredChatMessage[],
+    title?: string,
+    generatedDeckId?: string
+): Promise<void> => {
+    const now = Date.now();
+
+    // Auto-generate title from first user message if not provided
+    const chatTitle = title || messages.find(m => m.role === 'user')?.content.slice(0, 60) || 'Untitled Chat';
+    const lastMessage = messages[messages.length - 1]?.content.slice(0, 100) || '';
+
+    // Upload slide images for all messages to Storage
+    const messagesWithStorageUrls = await Promise.all(
+        messages.map(async (message) => {
+            if (message.slideImages && message.slideImages.length > 0) {
+                // Upload images to Storage and get URLs
+                const storageUrls = await uploadChatSlideImages(
+                    userId,
+                    chatId,
+                    message.id,
+                    message.slideImages
+                );
+
+                return {
+                    ...message,
+                    slideImages: storageUrls // Replace with Storage URLs
+                };
+            }
+            return message;
+        })
+    );
+
+    // Save chat metadata
+    const chatRef = doc(db, 'users', userId, 'chats', chatId);
+    const chatData: SavedChat = {
+        id: chatId,
+        userId,
+        title: chatTitle,
+        createdAt: messages[0]?.timestamp || now,
+        updatedAt: now,
+        lastMessage,
+        messageCount: messages.length
+    };
+
+    // Only add generatedDeckId if it's defined (Firestore doesn't accept undefined)
+    if (generatedDeckId) {
+        chatData.generatedDeckId = generatedDeckId;
+    }
+
+    await setDoc(chatRef, chatData);
+
+    // Save messages as subcollection
+    const batch = writeBatch(db);
+    messagesWithStorageUrls.forEach(message => {
+        const messageRef = doc(db, 'users', userId, 'chats', chatId, 'messages', message.id);
+        batch.set(messageRef, message);
+    });
+    await batch.commit();
+
+    console.log(`✅ Chat saved: ${chatTitle} (${messages.length} messages)`);
+};
+
+/**
+ * Get all chats for a user (metadata only)
+ */
+export const getUserChats = async (userId: string): Promise<SavedChat[]> => {
+    const chatsRef = collection(db, 'users', userId, 'chats');
+    const q = query(chatsRef, orderBy('updatedAt', 'desc'));
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => doc.data() as SavedChat);
+};
+
+/**
+ * Get a specific chat with all messages
+ */
+export const getChat = async (
+    userId: string,
+    chatId: string
+): Promise<{ chat: SavedChat; messages: StoredChatMessage[] } | null> => {
+    // Get chat metadata
+    const chatRef = doc(db, 'users', userId, 'chats', chatId);
+    const chatSnap = await getDoc(chatRef);
+
+    if (!chatSnap.exists()) {
+        return null;
+    }
+
+    // Get messages
+    const messagesRef = collection(db, 'users', userId, 'chats', chatId, 'messages');
+    const q = query(messagesRef, orderBy('timestamp', 'asc'));
+    const messagesSnapshot = await getDocs(q);
+
+    const messages = messagesSnapshot.docs.map(doc => doc.data() as StoredChatMessage);
+
+    return {
+        chat: chatSnap.data() as SavedChat,
+        messages
+    };
+};
+
+/**
+ * Update existing chat metadata
+ */
+export const updateChat = async (
+    userId: string,
+    chatId: string,
+    updates: Partial<SavedChat>
+): Promise<void> => {
+    const chatRef = doc(db, 'users', userId, 'chats', chatId);
+    await updateDoc(chatRef, {
+        ...updates,
+        updatedAt: Date.now()
+    });
+};
+
+/**
+ * Delete a chat and all its messages
+ */
+export const deleteChat = async (userId: string, chatId: string): Promise<void> => {
+    // Delete all messages
+    const messagesRef = collection(db, 'users', userId, 'chats', chatId, 'messages');
+    const messagesSnapshot = await getDocs(messagesRef);
+
+    const batch = writeBatch(db);
+    messagesSnapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+    });
+    await batch.commit();
+
+    // Delete chat metadata
+    const chatRef = doc(db, 'users', userId, 'chats', chatId);
+    await deleteDoc(chatRef);
+
+    console.log(`✅ Chat deleted: ${chatId}`);
+};
+
+/**
+ * Auto-save with debouncing (500ms)
+ * Call this function on every message update
+ */
+let autoSaveTimeout: NodeJS.Timeout | null = null;
+
+export const autoSaveChat = (
+    userId: string,
+    chatId: string,
+    messages: StoredChatMessage[],
+    title?: string,
+    generatedDeckId?: string
+): void => {
+    // Clear previous timeout
+    if (autoSaveTimeout) {
+        clearTimeout(autoSaveTimeout);
+    }
+
+    // Set new timeout (500ms debounce - industry standard)
+    autoSaveTimeout = setTimeout(() => {
+        saveChat(userId, chatId, messages, title, generatedDeckId)
+            .catch(error => {
+                console.error('Auto-save failed:', error);
+            });
+    }, 500);
 };
 
 // ============================================================================

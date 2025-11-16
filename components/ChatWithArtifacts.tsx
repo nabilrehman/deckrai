@@ -13,12 +13,28 @@ interface ChatWithArtifactsProps {
 const ChatWithArtifacts: React.FC<ChatWithArtifactsProps> = ({ user, onSignOut, styleLibrary = [], onOpenInEditor }) => {
   const [showArtifacts, setShowArtifacts] = useState(false);
   const [artifactSlides, setArtifactSlides] = useState<Slide[]>([]);
+  const [slideHistory, setSlideHistory] = useState<Slide[][]>([]); // For undo functionality
   const [splitRatio, setSplitRatio] = useState(60); // 60% artifacts, 40% chat
   const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Save current state to history (for undo)
+  const saveToHistory = () => {
+    setSlideHistory(prev => [...prev, JSON.parse(JSON.stringify(artifactSlides))]);
+  };
+
+  // Undo last change
+  const undoLastChange = () => {
+    if (slideHistory.length > 0) {
+      const previousState = slideHistory[slideHistory.length - 1];
+      setArtifactSlides(previousState);
+      setSlideHistory(prev => prev.slice(0, -1));
+    }
+  };
+
   // Handle slides generated from chat
   const handleSlidesGenerated = (slides: Slide[]) => {
+    saveToHistory(); // Save before updating
     setArtifactSlides(slides);
     if (!showArtifacts && slides.length > 0) {
       setShowArtifacts(true);
@@ -27,6 +43,7 @@ const ChatWithArtifacts: React.FC<ChatWithArtifactsProps> = ({ user, onSignOut, 
 
   // Handle slide updates from chat (conversational editing)
   const handleSlideUpdate = (slideId: string, updates: Partial<Slide>) => {
+    saveToHistory(); // Save before updating
     setArtifactSlides(prev =>
       prev.map(slide =>
         slide.id === slideId ? { ...slide, ...updates } : slide
@@ -54,9 +71,112 @@ const ChatWithArtifacts: React.FC<ChatWithArtifactsProps> = ({ user, onSignOut, 
   };
 
   // Handle PDF download
-  const handleDownloadPDF = () => {
-    // TODO: Generate and download PDF
+  const handleDownloadPDF = async () => {
+    if (artifactSlides.length === 0) {
+      alert('No slides to download');
+      return;
+    }
+
     console.log('Downloading PDF...');
+
+    try {
+      const { jsPDF } = (window as any).jspdf;
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'px',
+        format: 'a4'
+      });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const pageAspectRatio = pageWidth / pageHeight;
+
+      for (let i = 0; i < artifactSlides.length; i++) {
+        const slide = artifactSlides[i];
+        const imgSrc = slide.history && slide.history.length > 0
+          ? slide.history[slide.history.length - 1]
+          : slide.originalSrc;
+
+        console.log(`[PDF] Processing slide ${i + 1}/${artifactSlides.length}...`);
+
+        // If it's already a data URL, use it directly
+        let cleanImgSrc: string;
+        if (imgSrc.startsWith('data:image/')) {
+          console.log(`[PDF] Slide ${i + 1} is already a data URL, using directly`);
+          cleanImgSrc = imgSrc;
+        } else {
+          // For external URLs, launder through canvas
+          console.log(`[PDF] Slide ${i + 1} is external URL, laundering through canvas...`);
+          cleanImgSrc = await new Promise<string>((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+              try {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth || img.width;
+                canvas.height = img.naturalHeight || img.height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                  reject(new Error('Failed to get canvas context'));
+                  return;
+                }
+                ctx.drawImage(img, 0, 0);
+                const dataUrl = canvas.toDataURL('image/png');
+                console.log(`[PDF] Slide ${i + 1} successfully laundered`);
+                resolve(dataUrl);
+              } catch (err: any) {
+                console.error(`[PDF] Canvas error for slide ${i + 1}:`, err);
+                reject(new Error(`Canvas processing failed: ${err.message}`));
+              }
+            };
+            img.onerror = (err) => {
+              console.error(`[PDF] Failed to load image for slide ${i + 1}:`, err);
+              reject(new Error(`Failed to load image from URL`));
+            };
+            img.src = imgSrc;
+          });
+        }
+
+        // Load the clean image to get dimensions
+        const img = new Image();
+        img.src = cleanImgSrc;
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = () => reject(new Error(`Failed to load processed image for slide ${i + 1}`));
+          setTimeout(() => reject(new Error(`Timeout loading slide ${i + 1}`)), 10000);
+        });
+
+        const imgWidth = img.naturalWidth;
+        const imgHeight = img.naturalHeight;
+        const imgAspectRatio = imgWidth / imgHeight;
+
+        let finalImgWidth, finalImgHeight, xOffset, yOffset;
+
+        if (imgAspectRatio > pageAspectRatio) {
+          finalImgWidth = pageWidth;
+          finalImgHeight = pageWidth / imgAspectRatio;
+          xOffset = 0;
+          yOffset = (pageHeight - finalImgHeight) / 2;
+        } else {
+          finalImgHeight = pageHeight;
+          finalImgWidth = pageHeight * imgAspectRatio;
+          yOffset = 0;
+          xOffset = (pageWidth - finalImgWidth) / 2;
+        }
+
+        if (i > 0) {
+          pdf.addPage();
+        }
+
+        pdf.addImage(cleanImgSrc, 'PNG', xOffset, yOffset, finalImgWidth, finalImgHeight);
+      }
+
+      pdf.save('deckr-ai-presentation.pdf');
+      console.log('[PDF] Download complete!');
+    } catch (error: any) {
+      console.error("Failed to generate PDF:", error);
+      alert(`Sorry, there was an error creating the PDF. ${error.message}`);
+    }
   };
 
   // Handle resizing
@@ -123,6 +243,8 @@ const ChatWithArtifacts: React.FC<ChatWithArtifactsProps> = ({ user, onSignOut, 
           onSlidesGenerated={handleSlidesGenerated}
           onSlideUpdate={handleSlideUpdate}
           onAddSlide={handleAddSlide}
+          artifactSlides={artifactSlides}
+          onUndoLastChange={undoLastChange}
         />
       </div>
 

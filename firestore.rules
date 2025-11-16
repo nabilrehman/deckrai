@@ -23,6 +23,18 @@ service cloud.firestore {
         allow read: if isOwner(userId);
         allow write: if isOwner(userId);
       }
+
+      // User's chats subcollection
+      match /chats/{chatId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId);
+
+        // Chat messages subcollection
+        match /messages/{messageId} {
+          allow read: if isOwner(userId);
+          allow write: if isOwner(userId);
+        }
+      }
     }
 
     // Decks collection - users can only access their own decks

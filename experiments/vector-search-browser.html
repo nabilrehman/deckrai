@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vector Search 2.0 Experiment</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 32px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 16px;
+    }
+    .upload-section {
+      border: 3px dashed #667eea;
+      border-radius: 12px;
+      padding: 40px;
+      text-align: center;
+      margin-bottom: 30px;
+      background: #f8f9ff;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .upload-section:hover {
+      border-color: #764ba2;
+      background: #f0f2ff;
+    }
+    .upload-section input {
+      display: none;
+    }
+    .upload-label {
+      font-size: 18px;
+      color: #667eea;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin: 10px 5px;
+      transition: transform 0.2s;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(102,126,234,0.3);
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .progress {
+      margin: 20px 0;
+      padding: 20px;
+      background: #f8f9ff;
+      border-radius: 8px;
+      display: none;
+    }
+    .progress.show {
+      display: block;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #e0e0e0;
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      width: 0%;
+      transition: width 0.3s;
+    }
+    .log {
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 13px;
+      color: #333;
+      line-height: 1.6;
+    }
+    .results {
+      margin-top: 30px;
+      display: none;
+    }
+    .results.show {
+      display: block;
+    }
+    .result-item {
+      background: #f8f9ff;
+      border-left: 4px solid #667eea;
+      padding: 20px;
+      margin: 15px 0;
+      border-radius: 8px;
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+    .result-rank {
+      font-size: 32px;
+      font-weight: 700;
+      color: #667eea;
+      min-width: 50px;
+    }
+    .result-info {
+      flex: 1;
+    }
+    .result-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 5px;
+    }
+    .result-similarity {
+      font-size: 14px;
+      color: #666;
+    }
+    .similarity-bar {
+      width: 100%;
+      height: 6px;
+      background: #e0e0e0;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .similarity-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      transition: width 0.5s;
+    }
+    .slide-preview {
+      width: 120px;
+      height: 67px;
+      border-radius: 6px;
+      object-fit: cover;
+      border: 2px solid #ddd;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin: 30px 0;
+      display: none;
+    }
+    .stats.show {
+      display: grid;
+    }
+    .stat-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 12px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧪 Vector Search 2.0 Experiment</h1>
+    <p class="subtitle">Upload your PDF to test multimodal vector similarity search for slide categorization</p>
+
+    <div class="upload-section" id="uploadSection">
+      <input type="file" id="pdfInput" accept="application/pdf">
+      <label for="pdfInput" class="upload-label">
+        📄 Click to select your PDF (DA Mentor Led Hackathon _ Q4 2025.pdf)
+      </label>
+      <p style="color: #999; margin-top: 10px; font-size: 14px;">The experiment will process all slides and find "title slides"</p>
+    </div>
+
+    <div style="text-align: center;">
+      <button id="runBtn" class="btn" disabled>▶️ Run Experiment</button>
+      <button id="downloadBtn" class="btn" style="display: none;">💾 Download Results (JSON)</button>
+    </div>
+
+    <div class="progress" id="progress">
+      <div class="log" id="log"></div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+    </div>
+
+    <div class="stats" id="stats">
+      <div class="stat-card">
+        <div class="stat-value" id="slideCount">0</div>
+        <div class="stat-label">Slides Processed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="topScore">0.00</div>
+        <div class="stat-label">Top Similarity</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="avgScore">0.00</div>
+        <div class="stat-label">Average Similarity</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="timeTaken">0s</div>
+        <div class="stat-label">Processing Time</div>
+      </div>
+    </div>
+
+    <div class="results" id="results">
+      <h2 style="margin-bottom: 20px;">🔍 Top Results for "Title Slide"</h2>
+      <div id="resultsList"></div>
+    </div>
+  </div>
+
+  <script>
+    // Configure pdf.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
+
+    // Configuration
+    const PROJECT_ID = 'deckr-477706';
+    const LOCATION = 'us-central1';
+
+    let pdfFile = null;
+    let slideData = [];
+    let startTime;
+
+    // UI Elements
+    const pdfInput = document.getElementById('pdfInput');
+    const runBtn = document.getElementById('runBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const progress = document.getElementById('progress');
+    const log = document.getElementById('log');
+    const progressFill = document.getElementById('progressFill');
+    const results = document.getElementById('results');
+    const resultsList = document.getElementById('resultsList');
+    const stats = document.getElementById('stats');
+
+    // Event Listeners
+    pdfInput.addEventListener('change', (e) => {
+      pdfFile = e.target.files[0];
+      if (pdfFile) {
+        runBtn.disabled = false;
+        addLog(`✅ Selected: ${pdfFile.name} (${(pdfFile.size / 1024 / 1024).toFixed(2)} MB)`);
+      }
+    });
+
+    runBtn.addEventListener('click', runExperiment);
+    downloadBtn.addEventListener('click', downloadResults);
+
+    // Upload section click handler
+    document.getElementById('uploadSection').addEventListener('click', () => {
+      pdfInput.click();
+    });
+
+    // Utility Functions
+    function addLog(message) {
+      const now = new Date().toLocaleTimeString();
+      log.innerHTML += `<div>[${now}] ${message}</div>`;
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function updateProgress(percent) {
+      progressFill.style.width = `${percent}%`;
+    }
+
+    async function getAccessToken() {
+      // In browser, we need user to authenticate via gcloud first
+      // For now, we'll use the API key from environment
+      // Note: In production, use proper OAuth2 flow
+      return null; // Will prompt user to set up auth
+    }
+
+    // Main Experiment Function
+    async function runExperiment() {
+      if (!pdfFile) return;
+
+      startTime = Date.now();
+      runBtn.disabled = true;
+      progress.classList.add('show');
+      results.classList.remove('show');
+      stats.classList.remove('show');
+      slideData = [];
+      log.innerHTML = '';
+
+      try {
+        addLog('🔧 Starting Vector Search 2.0 Experiment...');
+        addLog('');
+
+        // Step 1: Convert PDF to images
+        addLog('📄 Step 1: Converting PDF to images...');
+        const slides = await convertPdfToImages(pdfFile);
+        addLog(`✅ Extracted ${slides.length} slides from PDF`);
+        addLog('');
+        updateProgress(20);
+
+        // Step 2: Generate embeddings
+        addLog('📊 Step 2: Generating multimodal embeddings...');
+        const embeddings = await generateEmbeddings(slides);
+        addLog(`✅ Generated embeddings for ${embeddings.length} slides`);
+        addLog('');
+        updateProgress(60);
+
+        // Step 3: Query for "title slide"
+        addLog('🔍 Step 3: Querying for "title slide"...');
+        const queryResults = await queryForTitleSlide(embeddings);
+        addLog(`✅ Found ${queryResults.length} results`);
+        addLog('');
+        updateProgress(90);
+
+        // Step 4: Display results
+        displayResults(queryResults, slides);
+        updateProgress(100);
+
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        addLog('');
+        addLog(`✅ Experiment complete in ${elapsed}s!`);
+
+        downloadBtn.style.display = 'inline-block';
+
+      } catch (error) {
+        addLog(`❌ Error: ${error.message}`);
+        console.error(error);
+      } finally {
+        runBtn.disabled = false;
+      }
+    }
+
+    // Step 1: Convert PDF to Images (using pdf.js like StyleLibraryPanel.tsx)
+    async function convertPdfToImages(file) {
+      const slides = [];
+      const fileReader = new FileReader();
+
+      return new Promise((resolve, reject) => {
+        fileReader.onload = async (event) => {
+          try {
+            const typedarray = new Uint8Array(event.target.result);
+            const pdf = await pdfjsLib.getDocument(typedarray).promise;
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+              const page = await pdf.getPage(i);
+              const viewport = page.getViewport({ scale: 1.5 });
+              const canvas = document.createElement('canvas');
+              canvas.height = viewport.height;
+              canvas.width = viewport.width;
+              const context = canvas.getContext('2d');
+
+              if (context) {
+                await page.render({ canvasContext: context, viewport }).promise;
+                const imageDataUrl = canvas.toDataURL('image/png');
+                slides.push({
+                  id: `slide-${i}`,
+                  slideNumber: i,
+                  image: imageDataUrl,
+                  imageBase64: imageDataUrl.split(',')[1]
+                });
+              }
+
+              updateProgress(5 + (i / pdf.numPages * 15));
+            }
+
+            resolve(slides);
+          } catch (err) {
+            reject(err);
+          }
+        };
+        fileReader.readAsArrayBuffer(file);
+      });
+    }
+
+    // Step 2: Generate Embeddings
+    async function generateEmbeddings(slides) {
+      const results = [];
+
+      for (let i = 0; i < slides.length; i++) {
+        const slide = slides[i];
+        addLog(`   Processing ${slide.id}...`);
+
+        try {
+          // Call Vertex AI Multimodal Embedding API
+          const embedding = await callMultimodalEmbeddingAPI(slide.imageBase64);
+
+          results.push({
+            ...slide,
+            embedding
+          });
+
+          addLog(`   ✅ ${slide.id} embedded (512 dimensions)`);
+        } catch (error) {
+          addLog(`   ❌ ${slide.id} failed: ${error.message}`);
+        }
+
+        updateProgress(20 + (i / slides.length * 40));
+      }
+
+      slideData = results;
+      return results;
+    }
+
+    // Call Vertex AI Multimodal Embedding API
+    async function callMultimodalEmbeddingAPI(imageBase64) {
+      // Note: This requires CORS to be enabled on the API
+      // For the experiment, we'll use a simulated embedding or proxy
+
+      addLog('   ⚠️  Note: Direct API calls from browser require CORS setup');
+      addLog('   💡 Using simulated embeddings for demonstration');
+
+      // Simulate embedding generation (random 512-dim vector)
+      // In production, you would call the actual API via a backend proxy
+      return Array.from({ length: 512 }, () => Math.random());
+    }
+
+    // Step 3: Query for Title Slide
+    async function queryForTitleSlide(slideEmbeddings) {
+      const queryText = "title slide presentation cover page";
+      addLog(`   Query: "${queryText}"`);
+
+      // Generate query embedding (simulated)
+      const queryEmbedding = Array.from({ length: 512 }, () => Math.random());
+
+      // Calculate cosine similarity with all slides
+      const results = slideEmbeddings.map(slide => ({
+        ...slide,
+        similarity: cosineSimilarity(queryEmbedding, slide.embedding)
+      }));
+
+      // Sort by similarity
+      results.sort((a, b) => b.similarity - a.similarity);
+
+      return results;
+    }
+
+    // Cosine Similarity
+    function cosineSimilarity(a, b) {
+      const dotProduct = a.reduce((sum, val, i) => sum + val * b[i], 0);
+      const magnitudeA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
+      const magnitudeB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
+      return dotProduct / (magnitudeA * magnitudeB);
+    }
+
+    // Display Results
+    function displayResults(queryResults, slides) {
+      results.classList.add('show');
+      stats.classList.add('show');
+      resultsList.innerHTML = '';
+
+      const top10 = queryResults.slice(0, 10);
+
+      top10.forEach((result, index) => {
+        const item = document.createElement('div');
+        item.className = 'result-item';
+
+        const similarityPercent = (result.similarity * 100).toFixed(1);
+
+        item.innerHTML = `
+          <div class="result-rank">#${index + 1}</div>
+          <img src="${result.image}" class="slide-preview" alt="Slide ${result.slideNumber}">
+          <div class="result-info">
+            <div class="result-title">Slide ${result.slideNumber}</div>
+            <div class="result-similarity">Similarity: ${result.similarity.toFixed(4)} (${similarityPercent}%)</div>
+            <div class="similarity-bar">
+              <div class="similarity-fill" style="width: ${similarityPercent}%"></div>
+            </div>
+          </div>
+        `;
+
+        resultsList.appendChild(item);
+      });
+
+      // Update stats
+      const allSimilarities = queryResults.map(r => r.similarity);
+      const topSimilarity = Math.max(...allSimilarities);
+      const avgSimilarity = allSimilarities.reduce((a, b) => a + b, 0) / allSimilarities.length;
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+      document.getElementById('slideCount').textContent = slides.length;
+      document.getElementById('topScore').textContent = topSimilarity.toFixed(3);
+      document.getElementById('avgScore').textContent = avgSimilarity.toFixed(3);
+      document.getElementById('timeTaken').textContent = `${elapsed}s`;
+    }
+
+    // Download Results
+    function downloadResults() {
+      const data = {
+        experiment: 'Vector Search 2.0 - Title Slide Detection',
+        pdf: pdfFile?.name || 'unknown.pdf',
+        slideCount: slideData.length,
+        query: 'title slide presentation cover page',
+        timestamp: new Date().toISOString(),
+        results: slideData.map(slide => ({
+          id: slide.id,
+          slideNumber: slide.slideNumber,
+          similarity: slide.similarity,
+          embedding: slide.embedding
+        }))
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `vector-search-results-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      addLog('💾 Results downloaded as JSON');
+    }
+  </script>
+</body>
+</html>

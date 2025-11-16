@@ -5,6 +5,148 @@ import { DeckAiExecutionPlan, StyleLibraryItem, Slide, DebugLog, DebugSession, C
 
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
+/**
+ * Agentic Intent Detection - Parses user's natural language to determine editing intent
+ * Follows 2025 agentic AI patterns: AI determines action type, not regex
+ */
+export interface EditIntent {
+  isEditing: boolean;
+  slideNumbers: number[];  // 1-indexed slide numbers
+  action: string;  // The actual edit request
+  scope: 'single' | 'multiple' | 'all';
+}
+
+/**
+ * Parse plan modification intent - AI determines changes to generation plan
+ * Replaces regex patterns with AI understanding
+ */
+export interface PlanModification {
+  slideCount?: number;
+  style?: 'executive' | 'visual' | 'technical' | 'minimal';
+  audience?: string;
+  hasChanges: boolean;
+}
+
+export const parsePlanModification = async (
+  userPrompt: string,
+  currentPlan: { slideCount: number; style: string; audience: string }
+): Promise<PlanModification> => {
+  const prompt = `You are analyzing a user's request to modify a presentation generation plan.
+
+**Current Plan:**
+- Slide count: ${currentPlan.slideCount}
+- Style: ${currentPlan.style}
+- Audience: ${currentPlan.audience}
+
+**User Request:** "${userPrompt}"
+
+Determine what changes the user wants to make. Extract:
+1. New slide count (if mentioned)
+2. New style (executive/professional/formal, visual/creative/modern, technical/detailed, minimal/simple)
+3. New audience (if mentioned)
+
+**Examples:**
+User: "make it 10 slides"
+Response: {"slideCount": 10, "hasChanges": true}
+
+User: "make it more formal and professional"
+Response: {"style": "executive", "hasChanges": true}
+
+User: "change to 8 slides for executives"
+Response: {"slideCount": 8, "audience": "executives", "hasChanges": true}
+
+User: "looks good"
+Response: {"hasChanges": false}
+
+Respond with ONLY valid JSON. Omit fields that aren't being changed.`;
+
+  try {
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.0-flash-exp',
+      contents: prompt
+    });
+    const responseText = result.text.trim();
+
+    const jsonMatch = responseText.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) ||
+                     responseText.match(/(\{[\s\S]*\})/);
+
+    if (!jsonMatch) {
+      console.error('Failed to parse plan modification:', responseText);
+      return { hasChanges: false };
+    }
+
+    const modification: PlanModification = JSON.parse(jsonMatch[1]);
+    console.log('🤖 Parsed plan modification:', modification);
+    return modification;
+  } catch (error) {
+    console.error('Error parsing plan modification:', error);
+    return { hasChanges: false };
+  }
+};
+
+export const parseEditIntent = async (
+  userPrompt: string,
+  totalSlides: number
+): Promise<EditIntent> => {
+  const prompt = `You are an intent parser for a slide deck editing system. Analyze the user's request and determine:
+
+1. Is this an EDIT request (modifying existing slides) or a CREATE request (making a new deck)?
+2. If editing, which slide(s) should be edited?
+3. What is the actual edit action?
+
+**Rules:**
+- "slide 2", "slide2", "@slide2" all mean slide number 2
+- "whole deck", "all slides", "entire presentation" means ALL slides (${totalSlides} total)
+- "slides 2 and 3" or "slide 2, 3, 4" means multiple specific slides
+- If no slide number is mentioned AND it's an edit request, assume ALL slides
+
+**Examples:**
+User: "regenerate slide 2 with better design"
+Response: {"isEditing": true, "slideNumbers": [2], "action": "regenerate with better design", "scope": "single"}
+
+User: "fix spelling in my whole deck"
+Response: {"isEditing": true, "slideNumbers": [1,2,3,4,5,6,7,8], "action": "fix spelling", "scope": "all"}
+
+User: "@slide3 make it more colorful"
+Response: {"isEditing": true, "slideNumbers": [3], "action": "make it more colorful", "scope": "single"}
+
+User: "update slides 2, 4, and 7 with new branding"
+Response: {"isEditing": true, "slideNumbers": [2,4,7], "action": "update with new branding", "scope": "multiple"}
+
+User: "create a presentation about AI"
+Response: {"isEditing": false, "slideNumbers": [], "action": "", "scope": "single"}
+
+**User Request:** "${userPrompt}"
+
+**Current deck has ${totalSlides} slides.**
+
+Respond with ONLY valid JSON matching the EditIntent format. No explanation.`;
+
+  try {
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.0-flash-exp',
+      contents: prompt
+    });
+    const responseText = result.text.trim();
+
+    // Extract JSON from markdown code blocks if present
+    const jsonMatch = responseText.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) ||
+                     responseText.match(/(\{[\s\S]*\})/);
+
+    if (!jsonMatch) {
+      console.error('Failed to parse intent, no JSON found:', responseText);
+      return { isEditing: false, slideNumbers: [], action: '', scope: 'single' };
+    }
+
+    const intent: EditIntent = JSON.parse(jsonMatch[1]);
+    console.log('🤖 Parsed edit intent:', intent);
+    return intent;
+  } catch (error) {
+    console.error('Error parsing edit intent:', error);
+    return { isEditing: false, slideNumbers: [], action: '', scope: 'single' };
+  }
+};
+
 export interface BoundingBox {
   x: number;
   y: number;

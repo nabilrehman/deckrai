@@ -18,8 +18,31 @@ const AddSlideButton: React.FC<{ onClick: () => void, isTop?: boolean }> = ({ on
              <div className="p-3">
                 <button
                     onClick={onClick}
-                    className="btn btn-primary w-full shadow-btn hover:shadow-btn-hover"
+                    className="bg-gradient-brand w-full"
                     aria-label="Add new slide"
+                    style={{
+                      padding: '10px 16px',
+                      borderRadius: 'var(--radius-lg)',
+                      border: 'none',
+                      color: 'white',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      transition: 'all var(--transition-fast)',
+                      boxShadow: 'var(--shadow-md)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 8px 16px rgba(99, 102, 241, 0.3)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                    }}
                 >
                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />

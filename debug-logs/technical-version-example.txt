@@ -1,0 +1,71 @@
+## Input for Technical/Informational Version
+
+**Company:** solarwinds.com
+
+**Presentation Type:** Technical deep-dive
+
+**Audience:** Technical architects and data engineers
+
+**Goal:** Educate on GCP data platform architecture and implementation details
+
+**Content:**
+We implemented a data lakehouse on BigQuery with the following architecture:
+
+1. **Ingestion Layer (Bronze)**
+   - Using CData Sync for real-time data ingestion from Salesforce and Pendo
+   - Raw data stored in Bronze dataset with minimal transformation
+   - Schema evolution handled programmatically via metadata tables
+
+2. **Transformation Layer (Silver/Gold)**
+   - DBT/Dataform for transformations
+   - Domain-driven Silver layer organization
+   - Business-ready Gold layer for analytics
+
+3. **Governance & Security**
+   - DataPlex for data taxonomy and discovery
+   - Column-level security with policy tags
+   - RBAC using Google Groups synchronized with Microsoft AD
+   - Centralized custom roles at organization level
+
+4. **AI & Analytics Integration**
+   - BigQuery ML for in-database machine learning
+   - Gemini Enterprise for code generation and analysis
+   - Looker with LookML semantic layer for BI
+   - Vector search capabilities for AI applications
+
+5. **Cost Optimization**
+   - Moving from on-demand to flat-rate BigQuery slots
+   - Estimated commitment: 500 slots based on initial migration
+   - Storage optimization with table partitioning and clustering
+
+**Key Technical Decisions:**
+- ELT over ETL (transform in BigQuery for performance)
+- Separate non-prod and prod ingestion pipelines
+- Governance team owns taxonomy, engineering applies tags
+- Use of reservation assignments for workload isolation
+
+---
+
+## Expected Output Differences:
+
+**Current (Status Report):**
+- Timeline visuals
+- High-level accomplishments
+- Executive-friendly language
+- Business metrics (500 licenses, etc.)
+
+**Technical Version Would Have:**
+- Architecture diagrams with components
+- Code samples (SQL, DBT models)
+- Technical specifications (slot sizes, table schemas)
+- Implementation patterns and best practices
+- Performance benchmarks
+- Security implementation details
+- More "How" than "What"
+
+**Slide Examples for Technical Version:**
+- Slide 3: "BigQuery Lakehouse Architecture" (detailed diagram with datasets, views, materialized views)
+- Slide 4: "ELT Pipeline Implementation" (code walkthrough of CData → Bronze → Silver transformation)
+- Slide 5: "DataPlex Taxonomy Structure" (hierarchical diagram of tags and policies)
+- Slide 6: "RBAC Implementation Pattern" (Google Groups → Custom Roles → Dataset permissions flow)
+- Slide 7: "Gemini Integration Patterns" (code examples of using Gemini for SQL generation)

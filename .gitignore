@@ -30,3 +30,4 @@ dist-ssr
 
 # Session logs (for debugging)
 logs/
+.vite/

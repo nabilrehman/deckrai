@@ -4,10 +4,15 @@ import ThinkingSection, { ThinkingStep } from './ThinkingSection';
 import ActionSummary, { ActionItem } from './ActionSummary';
 import ModeSelectionCards from './ModeSelectionCards';
 import PlanDisplay from './PlanDisplay';
-import { Slide, StyleLibraryItem } from '../types';
+import SlidePreviewInline from './SlidePreviewInline';
+import UndoActionButton from './UndoActionButton';
+import ChatInputWithMentions from './ChatInputWithMentions';
+import { Slide, StyleLibraryItem, StoredChatMessage } from '../types';
 import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationContext } from '../services/intelligentGeneration';
 import { detectVibeFromNotes, getDesignerStylesForVibe, getDesignerStyleById, generateStylePromptModifier, PresentationVibe } from '../services/vibeDetection';
-import { createSlideFromPrompt, findBestStyleReferenceFromPrompt } from '../services/geminiService';
+import { createSlideFromPrompt, findBestStyleReferenceFromPrompt, executeSlideTask } from '../services/geminiService';
+import { saveChat, getUserChats, getChat } from '../services/firestoreService';
+import { SavedChat } from '../types';
 
 interface ChatMessage {
   id: string;
@@ -24,6 +29,14 @@ interface ChatMessage {
     items: ActionItem[];
   };
   component?: React.ReactNode;
+  // New fields for 10/10 chat features
+  slidePreview?: Slide[];           // Slides to show inline preview
+  beforeSlides?: Slide[];           // For before/after comparison
+  showComparison?: boolean;         // Toggle before/after view
+  undoAction?: () => void;          // Undo callback
+  undoDescription?: string;         // Description like "Updated 3 slides"
+  mentionedSlides?: string[];       // IDs of @mentioned slides
+  attachedImages?: string[];        // Uploaded image URLs
 }
 
 interface ChatLandingViewProps {
@@ -36,6 +49,10 @@ interface ChatLandingViewProps {
   onSlidesGenerated?: (slides: Slide[]) => void;
   onSlideUpdate?: (slideId: string, updates: Partial<Slide>) => void;
   onAddSlide?: (newSlide: Slide) => void;
+
+  // Props for 10/10 chat features
+  artifactSlides?: Slide[];         // Current slides for @mentions
+  onUndoLastChange?: () => void;    // Undo callback
 }
 
 /**
@@ -61,6 +78,41 @@ const launderImageSrc = (src: string): Promise<string> => {
   });
 };
 
+/**
+ * Helper: Convert ChatMessage to StoredChatMessage (serializable format)
+ */
+const chatMessageToStoredMessage = (message: ChatMessage): StoredChatMessage => {
+  const stored: StoredChatMessage = {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    timestamp: message.timestamp
+  };
+
+  // Convert slide previews to storage format
+  if (message.slidePreview && message.slidePreview.length > 0) {
+    stored.slideImages = message.slidePreview.map(slide =>
+      slide.history && slide.history.length > 0
+        ? slide.history[slide.history.length - 1]
+        : slide.originalSrc
+    );
+    stored.slideData = message.slidePreview.map(slide => ({
+      id: slide.id,
+      name: slide.name,
+      storageUrl: slide.history && slide.history.length > 0
+        ? slide.history[slide.history.length - 1]
+        : slide.originalSrc
+    }));
+  }
+
+  // Convert thinking steps
+  if (message.thinking) {
+    stored.thinkingSteps = message.thinking.steps;
+  }
+
+  return stored;
+};
+
 const ChatLandingView: React.FC<ChatLandingViewProps> = ({
   styleLibrary = [],
   onDeckGenerated,
@@ -68,7 +120,9 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
   onSignOut,
   onSlidesGenerated,
   onSlideUpdate,
-  onAddSlide
+  onAddSlide,
+  artifactSlides = [],
+  onUndoLastChange
 }) => {
   // UI State
   const [inputValue, setInputValue] = useState('');
@@ -95,7 +149,15 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
   const [generationMode, setGenerationMode] = useState<'template' | 'crazy' | null>(null);
   const [pendingUserPrompt, setPendingUserPrompt] = useState<string>('');
   const [awaitingPlanEdit, setAwaitingPlanEdit] = useState(false);
-  const [artifactSlides, setArtifactSlides] = useState<Slide[]>([]);
+
+  // @Mention and Image Upload State (for current message context)
+  const [currentMentionedSlides, setCurrentMentionedSlides] = useState<string[]>([]);
+  const [currentAttachedImages, setCurrentAttachedImages] = useState<string[]>([]);
+
+  // Chat Storage State
+  const [currentChatId, setCurrentChatId] = useState(`chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+  const [savedChats, setSavedChats] = useState<SavedChat[]>([]);
+  const [loadingChats, setLoadingChats] = useState(false);
 
   // Debug: Log styleLibrary on mount and when it changes
   useEffect(() => {
@@ -105,6 +167,47 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
       firstItem: styleLibrary?.[0]?.name || 'none'
     });
   }, [styleLibrary]);
+
+  // Load saved chats on mount
+  useEffect(() => {
+    if (!user) return;
+
+    const loadChats = async () => {
+      setLoadingChats(true);
+      try {
+        const chats = await getUserChats(user.uid);
+        setSavedChats(chats);
+      } catch (error) {
+        console.error('Failed to load chats:', error);
+      } finally {
+        setLoadingChats(false);
+      }
+    };
+
+    loadChats();
+  }, [user]);
+
+  // Auto-save chat on message changes (500ms debounce) and refresh chat list
+  useEffect(() => {
+    if (!user || messages.length === 0) return;
+
+    const storedMessages = messages.map(chatMessageToStoredMessage);
+
+    // Save and then refresh the chat list
+    const saveTimeout = setTimeout(async () => {
+      try {
+        await saveChat(user.uid, currentChatId, storedMessages);
+
+        // Refresh the chat list after saving
+        const chats = await getUserChats(user.uid);
+        setSavedChats(chats);
+      } catch (error) {
+        console.error('Auto-save or refresh failed:', error);
+      }
+    }, 500);
+
+    return () => clearTimeout(saveTimeout);
+  }, [messages, user, currentChatId]);
 
   const suggestedPrompts = [
     'Sales deck for enterprise clients',
@@ -142,6 +245,60 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
     setThinkingSteps(prev => [...prev, step]);
   }, []);
 
+  /**
+   * Helper: Load a saved chat
+   */
+  const handleLoadChat = useCallback(async (chatId: string) => {
+    if (!user) return;
+
+    try {
+      const chatData = await getChat(user.uid, chatId);
+      if (!chatData) {
+        console.error('Chat not found');
+        return;
+      }
+
+      // Convert StoredChatMessages back to ChatMessages
+      const loadedMessages: ChatMessage[] = chatData.messages.map(stored => ({
+        id: stored.id,
+        role: stored.role,
+        content: stored.content,
+        timestamp: stored.timestamp,
+        thinking: stored.thinkingSteps ? {
+          steps: stored.thinkingSteps,
+          duration: 'a few seconds'
+        } : undefined,
+        slidePreview: stored.slideData?.map(data => ({
+          id: data.id,
+          name: data.name,
+          originalSrc: data.storageUrl,
+          history: [data.storageUrl]
+        }))
+      }));
+
+      setMessages(loadedMessages);
+      setCurrentChatId(chatId);
+      setChatActive(true);
+
+      console.log(`✅ Loaded chat: ${chatData.chat.title}`);
+    } catch (error) {
+      console.error('Failed to load chat:', error);
+    }
+  }, [user]);
+
+  /**
+   * Helper: Start a new chat
+   */
+  const handleNewChat = useCallback(() => {
+    setMessages([]);
+    setInputValue('');
+    setCurrentChatId(`chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+    setChatActive(false);
+    setGenerationPlan(null);
+    setDetectedVibe(null);
+    setThinkingSteps([]);
+  }, []);
+
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (chatMessagesRef.current) {
@@ -170,7 +327,7 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
   /**
    * Main Handler: Process user's text prompt (Gemini pattern)
    */
-  const handleGenerate = useCallback(async () => {
+  const handleGenerate = useCallback(async (mentionedSlideIds?: string[]) => {
     if (!inputValue.trim()) return;
 
     const userPrompt = inputValue.trim();
@@ -185,25 +342,66 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
       content: userPrompt
     });
 
+    // Check if we're waiting for mode selection (templates vs scratch)
+    if (pendingUserPrompt) {
+      // Use AI to understand the user's mode choice
+      const lowerPrompt = userPrompt.toLowerCase();
+
+      // Detect if they chose templates or scratch/crazy mode
+      const wantsTemplates = lowerPrompt.includes('template') ||
+                            lowerPrompt.includes('company') ||
+                            lowerPrompt.includes('reference') ||
+                            lowerPrompt.includes('uploaded') ||
+                            lowerPrompt.includes('brand consistency');
+
+      const wantsScratch = lowerPrompt.includes('scratch') ||
+                          lowerPrompt.includes('crazy') ||
+                          lowerPrompt.includes('creative') ||
+                          lowerPrompt.includes('fresh') ||
+                          lowerPrompt.includes('new');
+
+      if (wantsTemplates || wantsScratch) {
+        const selectedMode = wantsTemplates ? 'template' : 'crazy';
+        const originalPrompt = pendingUserPrompt;
+
+        // Clear pending state
+        setPendingUserPrompt('');
+
+        // Continue with the selected mode
+        continueWithMode(selectedMode, originalPrompt);
+        return;
+      }
+
+      // If we can't detect their choice, ask again more clearly
+      addMessage({
+        role: 'assistant',
+        content: `I didn't quite catch that. Please choose one:\n\n**Use Templates** - Match your content to your uploaded references\n**Start from Scratch** - Create fresh designs based on your brand research\n\nJust click one of the buttons above, or type "templates" or "scratch".`
+      });
+      return;
+    }
+
     // Check if we're editing an existing plan
     if (awaitingPlanEdit && generationPlan) {
       setAwaitingPlanEdit(false);
 
-      // Use AI to understand what they want to change
+      // Use AI to understand what they want to change (agentic pattern)
+      const { parsePlanModification } = await import('../services/geminiService');
+      const modification = await parsePlanModification(userPrompt, {
+        slideCount: generationPlan.slideCount,
+        style: generationPlan.style,
+        audience: generationPlan.audience
+      });
+
+      // Apply AI-detected modifications
       const updatedPlan = { ...generationPlan };
-
-      // Simple pattern matching for common edits
-      const slideCountMatch = userPrompt.match(/(\d+)\s*slides?/i);
-      if (slideCountMatch) {
-        updatedPlan.slideCount = parseInt(slideCountMatch[1]);
+      if (modification.slideCount !== undefined) {
+        updatedPlan.slideCount = modification.slideCount;
       }
-
-      if (userPrompt.match(/executive|professional|formal/i)) {
-        updatedPlan.style = 'executive';
-      } else if (userPrompt.match(/visual|creative|modern/i)) {
-        updatedPlan.style = 'visual';
-      } else if (userPrompt.match(/technical|detailed/i)) {
-        updatedPlan.style = 'technical';
+      if (modification.style) {
+        updatedPlan.style = modification.style;
+      }
+      if (modification.audience) {
+        updatedPlan.audience = modification.audience;
       }
 
       setGenerationPlan(updatedPlan);
@@ -233,7 +431,98 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
       return;
     }
 
-    // Check if user has style library → ask for mode selection
+    // Use AI to detect editing intent (agentic pattern - AI determines action, not regex)
+    let isEditingRequest = false;
+    let slideIdsToEdit: string[] = [];
+
+    if (artifactSlides && artifactSlides.length > 0) {
+      // First check @mentions (instant detection, no AI call needed)
+      if (mentionedSlideIds && mentionedSlideIds.length > 0) {
+        isEditingRequest = true;
+        slideIdsToEdit = mentionedSlideIds;
+        console.log('🔧 Detected editing request via @mentions:', mentionedSlideIds);
+      } else {
+        // No @mentions - use AI to detect natural language editing intent
+        const { parseEditIntent } = await import('../services/geminiService');
+        const intent = await parseEditIntent(userPrompt, artifactSlides.length);
+
+        if (intent.isEditing) {
+          isEditingRequest = true;
+          // Convert 1-indexed slide numbers to slide IDs
+          slideIdsToEdit = intent.slideNumbers.map(num => {
+            const slide = artifactSlides[num - 1]; // Convert to 0-indexed
+            return slide?.id;
+          }).filter(Boolean) as string[];
+
+          console.log('🤖 AI detected editing intent:', {
+            scope: intent.scope,
+            slideNumbers: intent.slideNumbers,
+            slideIds: slideIdsToEdit,
+            action: intent.action
+          });
+        }
+      }
+    }
+
+    if (isEditingRequest && slideIdsToEdit.length > 0) {
+      // This is an editing request - handle inline editing
+      console.log('🔧 Processing edit request for slides:', slideIdsToEdit);
+
+      // Inline editing logic (avoid circular dependency)
+      setIsProcessing(true);
+
+      try {
+        // Process each slide to edit
+        const editPromises = slideIdsToEdit.map(async (slideId) => {
+          const slide = artifactSlides.find(s => s.id === slideId);
+          if (!slide) return null;
+
+          const currentSrc = slide.history && slide.history.length > 0
+            ? slide.history[slide.history.length - 1]
+            : slide.originalSrc;
+
+          // Call the same function Editor uses for AI edits
+          const { executeSlideTask } = await import('../services/geminiService');
+          const result = await executeSlideTask(currentSrc, userPrompt, false);
+          const newImageDataUrl = result.images[0];
+
+          return {
+            ...slide,
+            history: [...(slide.history || [slide.originalSrc]), newImageDataUrl]
+          };
+        });
+
+        const editedSlides = (await Promise.all(editPromises)).filter(Boolean) as Slide[];
+
+        // Update slides via callback
+        if (onSlideUpdate && editedSlides.length > 0) {
+          editedSlides.forEach(slide => {
+            onSlideUpdate(slide.id, { history: slide.history });
+          });
+        }
+
+        // Add success message
+        addMessage({
+          role: 'assistant',
+          content: `✅ Updated ${editedSlides.length} slide${editedSlides.length > 1 ? 's' : ''}!`,
+          slidePreview: editedSlides
+        });
+      } catch (error) {
+        console.error('Error editing slides:', error);
+        addMessage({
+          role: 'assistant',
+          content: `❌ Sorry, there was an error editing the slides. Please try again.`
+        });
+      } finally {
+        setIsProcessing(false);
+      }
+
+      // Clear the mentioned slides after handling
+      setCurrentMentionedSlides([]);
+      return;
+    }
+
+    // Check if user has style library → ask for mode selection (only for NEW deck creation)
     const hasStyleLibrary = styleLibrary && styleLibrary.length > 0;
 
     console.log('🔍 handleUserPrompt: Checking styleLibrary', {
@@ -312,7 +601,66 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
 
     // No style library → proceed directly with crazy mode
     continueWithMode('crazy', userPrompt);
-  }, [inputValue, addMessage, styleLibrary]);
+  }, [inputValue, addMessage, styleLibrary, artifactSlides, awaitingPlanEdit, generationPlan, onSlideUpdate]);
+
+  /**
+   * Handle editing slides via @mentions
+   */
+  const handleEditSlides = useCallback(async (userPrompt: string, mentionedSlideIds: string[]) => {
+    setIsProcessing(true);
+
+    try {
+      // Add user message
+      addMessage({
+        role: 'user',
+        content: userPrompt
+      });
+
+      // Process each mentioned slide
+      const editPromises = mentionedSlideIds.map(async (slideId) => {
+        const slide = artifactSlides.find(s => s.id === slideId);
+        if (!slide) return null;
+
+        const slideIndex = artifactSlides.findIndex(s => s.id === slideId);
+        const currentSrc = slide.history && slide.history.length > 0
+          ? slide.history[slide.history.length - 1]
+          : slide.originalSrc;
+
+        // Call the same function Editor uses for AI edits
+        const newImageDataUrl = await executeSlideTask(currentSrc, userPrompt);
+
+        return {
+          ...slide,
+          history: [...(slide.history || [slide.originalSrc]), newImageDataUrl]
+        };
+      });
+
+      const editedSlides = (await Promise.all(editPromises)).filter(Boolean) as Slide[];
+
+      // Update slides via callback
+      if (onSlideUpdate && editedSlides.length > 0) {
+        editedSlides.forEach(slide => {
+          onSlideUpdate(slide.id, { history: slide.history });
+        });
+      }
+
+      // Add success message
+      addMessage({
+        role: 'assistant',
+        content: `✅ Updated ${editedSlides.length} slide${editedSlides.length > 1 ? 's' : ''}!`,
+        slidePreview: editedSlides
+      });
+
+    } catch (error) {
+      console.error('Error editing slides:', error);
+      addMessage({
+        role: 'assistant',
+        content: `❌ Sorry, there was an error editing the slides. Please try again.`
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [artifactSlides, addMessage, onSlideUpdate]);
 
   /**
    * Continue generation after mode selection
@@ -422,6 +770,33 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
       setIsProcessing(false);
     }
   }, [inputValue, thinkingStartTime, thinkingSteps, addMessage, addThinkingStep, updateThinkingStep]);
+
+  /**
+   * Handle message submission from ChatInputWithMentions
+   */
+  const handleSendMessage = useCallback((value: string, mentionedSlideIds?: string[], attachedImages?: string[]) => {
+    // Simply set the input value and call handleGenerate
+    setInputValue(value);
+
+    // Store images and mentions for use in slide generation
+    if (mentionedSlideIds && mentionedSlideIds.length > 0) {
+      setCurrentMentionedSlides(mentionedSlideIds);
+      console.log('📌 Mentioned slides stored:', mentionedSlideIds);
+    } else {
+      setCurrentMentionedSlides([]);
+    }
+
+    if (attachedImages && attachedImages.length > 0) {
+      setCurrentAttachedImages(attachedImages);
+      console.log('🖼️ Attached images stored:', attachedImages.length);
+    } else {
+      setCurrentAttachedImages([]);
+    }
+
+    // Trigger the existing generation flow
+    // Pass mentionedSlideIds directly to avoid React state timing issues
+    handleGenerate(mentionedSlideIds);
+  }, [handleGenerate]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -533,8 +908,9 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
             false,
             [],
             undefined,
-            null,
-            null
+            null,  // theme
+            null,  // logoImage
+            currentAttachedImages.length > 0 ? currentAttachedImages[0] : null  // customImage - use first uploaded image
           );
 
           const finalImage = await launderImageSrc(images[0]);
@@ -551,9 +927,6 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
 
         const batchResults = await Promise.all(batchPromises);
         generatedSlides.push(...batchResults);
-
-        // Update artifact slides panel
-        setArtifactSlides(prev => [...prev, ...batchResults]);
       }
 
       const duration = ((Date.now() - thinkingStartTime) / 1000).toFixed(1);
@@ -561,7 +934,7 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
       // Add completion message
       addMessage({
         role: 'assistant',
-        content: `✅ Successfully generated ${plan.slideCount} slides! Opening the editor...`,
+        content: `✅ Successfully generated ${generatedSlides.length} slides! Opening the editor...`,
         thinking: {
           steps: thinkingSteps.map(s => ({ ...s, status: 'completed' as const })),
           duration: `${duration}s`
@@ -571,10 +944,12 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
           icon: 'sparkles',
           items: generatedSlides.map((slide, i) => ({
             name: `Slide ${i + 1}`,
-            status: 'completed' as const,
-            changes: '+142'
+            status: 'completed' as const
           }))
-        }
+        },
+        slidePreview: generatedSlides,  // Show all generated slides
+        undoAction: onUndoLastChange,
+        undoDescription: `Created ${generatedSlides.length} slides`
       });
 
       // Pass slides to parent
@@ -587,6 +962,10 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
         if (onDeckGenerated) {
           onDeckGenerated(generatedSlides);
         }
+
+        // Clear stored context after generation
+        setCurrentAttachedImages([]);
+        setCurrentMentionedSlides([]);
       }, 1500);
 
     } catch (error: any) {
@@ -596,10 +975,14 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
         role: 'assistant',
         content: `I encountered an error while generating slides: ${error.message}\n\nPlease try again.`
       });
+
+      // Clear context on error too
+      setCurrentAttachedImages([]);
+      setCurrentMentionedSlides([]);
     } finally {
       setIsProcessing(false);
     }
-  }, [detectedVibe, thinkingStartTime, thinkingSteps, addMessage, addThinkingStep, updateThinkingStep, onDeckGenerated]);
+  }, [detectedVibe, thinkingStartTime, thinkingSteps, addMessage, addThinkingStep, updateThinkingStep, onDeckGenerated, onSlidesGenerated, onUndoLastChange, currentAttachedImages]);
 
   /**
    * Handler: Process file uploads (Gemini pattern)
@@ -876,11 +1259,7 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
                 e.currentTarget.style.background = '#FFFFFF';
                 e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)';
               }}
-              onClick={() => {
-                setChatActive(false);
-                setMessages([]);
-                setInputValue('');
-              }}
+              onClick={handleNewChat}
             >
               <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -902,30 +1281,152 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
               Recent
             </div>
 
-            {/* Sample Chat History Item */}
-            <div
-              style={{
-                padding: '10px 12px',
-                background: '#FFFFFF',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                transition: 'all 150ms ease',
-                fontSize: '14px',
-                color: '#4B5563',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#F0F1FF';
-                e.currentTarget.style.color = '#4F46E5';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#FFFFFF';
-                e.currentTarget.style.color = '#4B5563';
-              }}
-            >
-              {messages.length > 0 && messages[0].content.substring(0, 30) + '...'}
+            {/* Chat History Items */}
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}>
+              {!user ? (
+                /* Not logged in - Show sign-in prompt */
+                <div style={{
+                  padding: '20px 16px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    margin: '0 auto 12px',
+                    background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <svg width="24" height="24" fill="white" viewBox="0 0 24 24">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                  </div>
+                  <div style={{
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: '#1F2937',
+                    marginBottom: '6px'
+                  }}>
+                    Sign in to save chats
+                  </div>
+                  <div style={{
+                    fontSize: '12px',
+                    color: '#6B7280',
+                    marginBottom: '16px',
+                    lineHeight: '1.5'
+                  }}>
+                    Your conversations will be saved and accessible across devices
+                  </div>
+                  <button
+                    onClick={() => {
+                      // Scroll to top where sign-in button is in header
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                      // Could also trigger a sign-in modal here if available
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 150ms ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'scale(1.02)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(99, 102, 241, 0.3)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    Sign In
+                  </button>
+                </div>
+              ) : loadingChats ? (
+                <div style={{
+                  padding: '20px',
+                  textAlign: 'center',
+                  fontSize: '13px',
+                  color: '#9CA3AF'
+                }}>
+                  Loading chats...
+                </div>
+              ) : savedChats.length === 0 ? (
+                <div style={{
+                  padding: '20px',
+                  textAlign: 'center',
+                  fontSize: '13px',
+                  color: '#9CA3AF'
+                }}>
+                  No saved chats yet
+                </div>
+              ) : (
+                savedChats.map((chat) => (
+                  <div
+                    key={chat.id}
+                    style={{
+                      padding: '10px 12px',
+                      background: currentChatId === chat.id ? '#F0F1FF' : '#FFFFFF',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      transition: 'all 150ms ease',
+                      fontSize: '14px',
+                      color: currentChatId === chat.id ? '#4F46E5' : '#4B5563',
+                      borderLeft: currentChatId === chat.id ? '3px solid #6366F1' : '3px solid transparent'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (currentChatId !== chat.id) {
+                        e.currentTarget.style.background = '#F9FAFB';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (currentChatId !== chat.id) {
+                        e.currentTarget.style.background = '#FFFFFF';
+                      }
+                    }}
+                    onClick={() => handleLoadChat(chat.id)}
+                  >
+                    <div style={{
+                      fontWeight: '500',
+                      marginBottom: '4px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {chat.title}
+                    </div>
+                    <div style={{
+                      fontSize: '12px',
+                      color: currentChatId === chat.id ? '#818CF8' : '#9CA3AF',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {chat.lastMessage}
+                    </div>
+                    <div style={{
+                      fontSize: '11px',
+                      color: '#D1D5DB',
+                      marginTop: '4px'
+                    }}>
+                      {new Date(chat.updatedAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
@@ -1561,6 +2062,24 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
                             {message.component}
                           </div>
                         )}
+
+                        {/* Slide Preview - Show inline thumbnails */}
+                        {message.slidePreview && message.slidePreview.length > 0 && (
+                          <SlidePreviewInline
+                            slides={message.slidePreview}
+                            beforeSlides={message.beforeSlides}
+                            showComparison={message.showComparison}
+                            title={message.showComparison ? 'Before & After' : 'Updated Slides'}
+                          />
+                        )}
+
+                        {/* Undo Button - Show for reversible actions */}
+                        {message.undoAction && message.undoDescription && (
+                          <UndoActionButton
+                            onUndo={message.undoAction}
+                            actionDescription={message.undoDescription}
+                          />
+                        )}
                       </div>
                     </div>
                   )}
@@ -1582,530 +2101,25 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
               margin: '0 auto',
               width: '100%'
             }}>
-              <div
-                style={{
-                  background: '#FFFFFF',
-                  borderRadius: '32px',
-                  border: '1px solid rgba(0, 0, 0, 0.06)',
-                  padding: '18px 24px',
-                  minHeight: '72px',
-                  transition: 'all 180ms cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02), 0 2px 4px rgba(0, 0, 0, 0.015)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '16px'
+              <ChatInputWithMentions
+                slides={artifactSlides || []}
+                value={inputValue}
+                onChange={setInputValue}
+                onSubmit={(value, mentionedSlideIds, attachedImages) => {
+                  handleSendMessage(value, mentionedSlideIds, attachedImages);
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.border = '1px solid rgba(99, 102, 241, 0.2)';
-                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.03), 0 4px 12px rgba(99, 102, 241, 0.08)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.border = '1px solid rgba(0, 0, 0, 0.06)';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02), 0 2px 4px rgba(0, 0, 0, 0.015)';
-                }}
-              >
-                {/* Plus Button */}
-                <button
-                  onClick={() => setShowUploadMenu(!showUploadMenu)}
-                  style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '20px',
-                    background: 'transparent',
-                    color: '#9CA3AF',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 100ms ease',
-                    border: 'none',
-                    cursor: 'pointer',
-                    flexShrink: 0
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#F9FAFB';
-                    e.currentTarget.style.color = '#4F46E5';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.color = '#9CA3AF';
-                  }}
-                  title="Add files"
-                >
-                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                </button>
-
-                {/* Textarea */}
-                <textarea
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Ask Deckr"
-                  rows={1}
-                  style={{
-                    flex: 1,
-                    fontSize: '16px',
-                    fontWeight: '400',
-                    color: '#2D3748',
-                    background: 'transparent',
-                    border: 'none',
-                    outline: 'none',
-                    lineHeight: '1.5',
-                    padding: '0',
-                    letterSpacing: '-0.011em',
-                    resize: 'none',
-                    overflow: 'auto',
-                    maxHeight: '240px',
-                    fontFamily: 'inherit'
-                  }}
-                  className="placeholder:text-gray-400"
-                  onInput={(e) => {
-                    const target = e.target as HTMLTextAreaElement;
-                    target.style.height = 'auto';
-                    const newHeight = Math.min(target.scrollHeight, 240);
-                    target.style.height = newHeight + 'px';
-                  }}
-                />
-
-                {/* Tools Button */}
-                <button
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '8px 10px',
-                    background: 'transparent',
-                    border: 'none',
-                    borderRadius: '16px',
-                    color: '#6B7280',
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    transition: 'all 100ms ease',
-                    flexShrink: 0
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#F9FAFB';
-                    e.currentTarget.style.color = '#4F46E5';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.color = '#6B7280';
-                  }}
-                  title="Tools"
-                >
-                  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
-                  <span>Tools</span>
-                </button>
-
-                {/* Model Selector */}
-                <div className="relative" ref={modelMenuRef}>
-                  <button
-                    onClick={() => setShowModelMenu(!showModelMenu)}
-                    style={{
-                      padding: '8px 12px',
-                      background: '#F3F4F6',
-                      border: 'none',
-                      borderRadius: '16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      color: '#4B5563',
-                      transition: 'all 150ms ease',
-                      height: '40px',
-                      flexShrink: 0
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#E5E7EB'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = '#F3F4F6'}
-                  >
-                    <span>{selectedModel.replace('Gemini ', '').replace('Claude ', '')}</span>
-                    <svg
-                      width="12"
-                      height="12"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2.5}
-                      style={{
-                        transform: showModelMenu ? 'rotate(180deg)' : 'rotate(0deg)',
-                        transition: 'transform 150ms ease'
-                      }}
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-
-                  {/* Model Dropdown */}
-                  {showModelMenu && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        bottom: '52px',
-                        right: '0',
-                        background: '#FFFFFF',
-                        borderRadius: '16px',
-                        border: '1px solid rgba(0, 0, 0, 0.08)',
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04)',
-                        minWidth: '280px',
-                        padding: '8px',
-                        zIndex: 50
-                      }}
-                    >
-                      {models.map((model, index) => (
-                        <button
-                          key={index}
-                          onClick={() => handleModelSelect(model.name)}
-                          style={{
-                            width: '100%',
-                            padding: '12px 14px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'flex-start',
-                            gap: '2px',
-                            background: selectedModel === model.name ? '#F0F1FF' : 'transparent',
-                            border: 'none',
-                            borderRadius: '10px',
-                            cursor: 'pointer',
-                            transition: 'all 100ms ease',
-                            textAlign: 'left'
-                          }}
-                          onMouseEnter={(e) => {
-                            if (selectedModel !== model.name) {
-                              e.currentTarget.style.background = '#F9FAFB';
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (selectedModel !== model.name) {
-                              e.currentTarget.style.background = 'transparent';
-                            }
-                          }}
-                        >
-                          <div style={{
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            color: selectedModel === model.name ? '#4F46E5' : '#1F2937'
-                          }}>
-                            {model.name}
-                          </div>
-                          <div style={{
-                            fontSize: '12px',
-                            color: '#6B7280',
-                            fontWeight: '400'
-                          }}>
-                            {model.description}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Submit Button - Always visible */}
-                <button
-                  onClick={handleGenerate}
-                  disabled={!inputValue.trim()}
-                  style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '50%',
-                    border: 'none',
-                    cursor: inputValue.trim() ? 'pointer' : 'not-allowed',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 180ms cubic-bezier(0.4, 0, 0.2, 1)',
-                    background: inputValue.trim()
-                      ? 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)'
-                      : '#E5E7EB',
-                    boxShadow: inputValue.trim()
-                      ? '0 2px 8px rgba(99, 102, 241, 0.28)'
-                      : 'none',
-                    flexShrink: 0,
-                    opacity: inputValue.trim() ? 1 : 0.5
-                  }}
-                  onMouseEnter={(e) => {
-                    if (inputValue.trim()) {
-                      e.currentTarget.style.transform = 'scale(1.08)';
-                      e.currentTarget.style.background = 'linear-gradient(135deg, #686BF2 0%, #5349E6 100%)';
-                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(99, 102, 241, 0.42)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (inputValue.trim()) {
-                      e.currentTarget.style.transform = 'scale(1)';
-                      e.currentTarget.style.background = 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)';
-                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(99, 102, 241, 0.28)';
-                    }
-                  }}
-                  title="Submit"
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke={inputValue.trim() ? 'white' : '#9CA3AF'}
-                    strokeWidth={2.5}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M12 19V5M5 12l7-7 7 7" />
-                  </svg>
-                </button>
-              </div>
+                placeholder="Ask Deckr..."
+                disabled={isProcessing}
+                showUploadButton={true}
+                showToolsButton={false}
+              />
             </div>
           </>
         )}
-        </div>
         {/* End MAIN CONTENT AREA */}
 
       </div>
-
-      {/* Edit Plan Modal */}
-      {editingPlan && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}
-        onClick={() => setEditingPlan(null)}
-        >
-          <div style={{
-            background: 'white',
-            borderRadius: '16px',
-            padding: '32px',
-            maxWidth: '600px',
-            width: '90%',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)'
-          }}
-          onClick={(e) => e.stopPropagation()}
-          >
-            <h2 style={{
-              fontSize: '24px',
-              fontWeight: '600',
-              color: '#1F2937',
-              marginBottom: '24px'
-            }}>
-              Edit Presentation Plan
-            </h2>
-
-            {/* Slide Count */}
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '8px'
-              }}>
-                Number of Slides
-              </label>
-              <input
-                type="number"
-                value={editingPlan.slideCount}
-                onChange={(e) => setEditingPlan({ ...editingPlan, slideCount: parseInt(e.target.value) || 1 })}
-                min="1"
-                max="50"
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  fontSize: '16px',
-                  border: '1px solid #D1D5DB',
-                  borderRadius: '8px',
-                  outline: 'none'
-                }}
-                onFocus={(e) => e.currentTarget.style.borderColor = '#6366F1'}
-                onBlur={(e) => e.currentTarget.style.borderColor = '#D1D5DB'}
-              />
-            </div>
-
-            {/* Style */}
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '8px'
-              }}>
-                Presentation Style
-              </label>
-              <input
-                type="text"
-                value={editingPlan.style}
-                onChange={(e) => setEditingPlan({ ...editingPlan, style: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  fontSize: '16px',
-                  border: '1px solid #D1D5DB',
-                  borderRadius: '8px',
-                  outline: 'none'
-                }}
-                onFocus={(e) => e.currentTarget.style.borderColor = '#6366F1'}
-                onBlur={(e) => e.currentTarget.style.borderColor = '#D1D5DB'}
-                placeholder="e.g., Professional, Modern, Creative"
-              />
-            </div>
-
-            {/* Audience */}
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '8px'
-              }}>
-                Audience
-              </label>
-              <input
-                type="text"
-                value={editingPlan.audience}
-                onChange={(e) => setEditingPlan({ ...editingPlan, audience: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  fontSize: '16px',
-                  border: '1px solid #D1D5DB',
-                  borderRadius: '8px',
-                  outline: 'none'
-                }}
-                onFocus={(e) => e.currentTarget.style.borderColor = '#6366F1'}
-                onBlur={(e) => e.currentTarget.style.borderColor = '#D1D5DB'}
-                placeholder="e.g., Technical architects, Executives"
-              />
-            </div>
-
-            {/* Buttons */}
-            <div style={{
-              display: 'flex',
-              gap: '12px',
-              justifyContent: 'flex-end'
-            }}>
-              <button
-                onClick={() => setEditingPlan(null)}
-                style={{
-                  padding: '10px 20px',
-                  background: 'white',
-                  color: '#6B7280',
-                  border: '1px solid #D1D5DB',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#F9FAFB';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'white';
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  handleGenerateSlides(editingPlan);
-                  setEditingPlan(null);
-                }}
-                style={{
-                  padding: '10px 20px',
-                  background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(99, 102, 241, 0.3)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              >
-                Generate with Changes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        @keyframes mesh-flow-1 {
-          0%, 100% {
-            transform: translate(0, 0) scale(1);
-          }
-          33% {
-            transform: translate(5%, -8%) scale(1.1);
-          }
-          66% {
-            transform: translate(-3%, 5%) scale(0.95);
-          }
-        }
-
-        @keyframes mesh-flow-2 {
-          0%, 100% {
-            transform: translate(0, 0) scale(1) rotate(0deg);
-          }
-          33% {
-            transform: translate(-6%, 4%) scale(1.05) rotate(2deg);
-          }
-          66% {
-            transform: translate(4%, -6%) scale(0.98) rotate(-2deg);
-          }
-        }
-
-        @keyframes mesh-flow-3 {
-          0%, 100% {
-            transform: translate(0, 0) scale(1);
-            opacity: 0.7;
-          }
-          50% {
-            transform: translate(-8%, 8%) scale(1.15);
-            opacity: 0.4;
-          }
-        }
-
-        @keyframes mesh-flow-4 {
-          0%, 100% {
-            transform: translate(0, 0) scale(1);
-          }
-          50% {
-            transform: translate(10%, -10%) scale(1.08);
-          }
-        }
-
-        @keyframes slideUp {
-          0% {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          100% {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
+      </div>
     </div>
   );
 };
