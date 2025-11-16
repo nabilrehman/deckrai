@@ -29,6 +29,7 @@ interface ChatMessage {
 interface ChatLandingViewProps {
   styleLibrary: StyleLibraryItem[];
   onDeckGenerated: (slides: Slide[]) => void;
+  onNavigateToPricing?: () => void;
 }
 
 /**

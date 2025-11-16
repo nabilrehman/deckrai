@@ -1,5 +1,4 @@
 
-
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Slide, StyleLibraryItem, DebugSession, Template, DeckAiExecutionPlan } from './types';
 import Header from './components/Header';
@@ -13,6 +12,7 @@ import StyleLibraryPanel from './components/StyleLibraryPanel';
 import DeckLibrary from './components/DeckLibrary';
 import SaveDeckModal from './components/SaveDeckModal';
 import ExportSuccessModal from './components/ExportSuccessModal';
+import PricingPage from './src/components/PricingPage';
 import { TEMPLATES } from './data/templates';
 import { useAuth } from './contexts/AuthContext';
 import {
@@ -25,11 +25,13 @@ import {
 } from './services/firestoreService';
 import { exportToGoogleSlides, handleOAuthCallback } from './services/googleSlidesService';
 
+type AppView = 'main' | 'pricing';
 
 declare const jspdf: any;
 
 const App: React.FC = () => {
   const { user } = useAuth();
+  const [currentView, setCurrentView] = useState<AppView>('main');
   const [slides, setSlides] = useState<Slide[]>([]);
   const [activeSlideId, setActiveSlideId] = useState<string | null>(null);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
@@ -566,8 +568,8 @@ const App: React.FC = () => {
         <div className="absolute top-10 right-1/4 w-[500px] h-[500px] bg-indigo-200/40 rounded-full mix-blend-multiply filter blur-3xl animate-float" style={{animationDelay: '2s'}}></div>
         <div className="absolute top-40 left-1/2 w-[400px] h-[400px] bg-purple-200/30 rounded-full mix-blend-multiply filter blur-3xl animate-float" style={{animationDelay: '4s'}}></div>
       </div>
-      {/* Only show Header when we have slides */}
-      {slides.length > 0 && (
+      {/* Show Header when we have slides OR when viewing pricing */}
+      {(slides.length > 0 || currentView === 'pricing') && (
         <Header
           onReset={handleResetProject}
           hasActiveProject={slides.length > 0}
@@ -581,10 +583,25 @@ const App: React.FC = () => {
           onSaveDeck={handleSaveDeck}
           onOpenDeckLibrary={handleOpenDeckLibrary}
           onDeleteAllStyleLibrary={handleDeleteAllStyleLibrary}
+          onNavigateToPricing={() => setCurrentView('pricing')}
         />
       )}
       <main className="flex-grow flex flex-row overflow-hidden w-full">
-        {slides.length > 0 && activeSlide ? (
+        {currentView === 'pricing' ? (
+          <PricingPage
+            onBack={() => setCurrentView('main')}
+            onSelectPlan={(planId) => {
+              console.log('Selected plan:', planId);
+              // TODO: Implement Stripe checkout
+              alert(`Plan selected: ${planId}\n\nStripe integration coming soon!`);
+            }}
+            onPurchasePack={(packId) => {
+              console.log('Purchase pack:', packId);
+              // TODO: Implement Stripe checkout
+              alert(`Credit pack selected: ${packId}\n\nStripe integration coming soon!`);
+            }}
+          />
+        ) : slides.length > 0 && activeSlide ? (
           <>
             <Editor
                 slides={slides}
@@ -623,7 +640,9 @@ const App: React.FC = () => {
               console.log('✅ Deck generated with slides:', generatedSlides);
               setSlides(generatedSlides);
               setActiveSlideId(generatedSlides[0]?.id || null);
+              setCurrentView('main'); // Ensure we're on main view when deck is generated
             }}
+            onNavigateToPricing={() => setCurrentView('pricing')}
           />
         )}
       </main>
