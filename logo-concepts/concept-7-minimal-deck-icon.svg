@@ -1,0 +1,25 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Concept 7: Ultra Minimal App Icon Style -->
+  <defs>
+    <linearGradient id="grad7" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7145FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#818CF8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background (app icon style) -->
+  <rect x="30" y="30" width="140" height="140" rx="35" fill="url(#grad7)"/>
+
+  <!-- Simple geometric deck icon inside -->
+  <g transform="translate(100, 100)">
+    <!-- Three minimalist rectangles representing slides -->
+    <rect x="-40" y="-25" width="80" height="50" rx="4" fill="white" opacity="0.3"/>
+    <rect x="-38" y="-22" width="80" height="50" rx="4" fill="white" opacity="0.6"/>
+    <rect x="-36" y="-19" width="80" height="50" rx="4" fill="white"/>
+
+    <!-- Tiny AI dot accent -->
+    <circle cx="35" cy="-10" r="6" fill="#FFD700">
+      <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+</svg>

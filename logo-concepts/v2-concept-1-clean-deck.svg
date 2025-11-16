@@ -1,0 +1,31 @@
+<svg width="400" height="200" viewBox="0 0 400 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- V2 Concept 1: Ultra Clean Deck with Wordmark (Claude-inspired minimalism) -->
+  <defs>
+    <linearGradient id="v2grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7145FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#818CF8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Icon (left side) -->
+  <g transform="translate(80, 100)">
+    <!-- Simple rounded rectangle stack - ultra minimal -->
+    <rect x="-35" y="-25" width="70" height="50" rx="12" fill="url(#v2grad1)" opacity="0.3"/>
+    <rect x="-33" y="-22" width="70" height="50" rx="12" fill="url(#v2grad1)" opacity="0.6"/>
+    <rect x="-31" y="-19" width="70" height="50" rx="12" fill="url(#v2grad1)"/>
+
+    <!-- Single AI dot accent - simple and clean -->
+    <circle cx="28" cy="-10" r="5" fill="#FFD700"/>
+    <circle cx="28" cy="-10" r="9" fill="#FFD700" opacity="0.3"/>
+  </g>
+
+  <!-- Wordmark (right side) -->
+  <g transform="translate(170, 100)">
+    <!-- "deckr.ai" text -->
+    <text x="0" y="8" font-family="'Inter', 'Sora', sans-serif" font-size="48" font-weight="700" fill="#1a1a2e" letter-spacing="-0.02em">deckr</text>
+    <text x="145" y="8" font-family="'Inter', sans-serif" font-size="48" font-weight="300" fill="#7145FF">.ai</text>
+
+    <!-- Tagline -->
+    <text x="0" y="30" font-family="'Inter', sans-serif" font-size="14" font-weight="500" fill="#94A3B8" letter-spacing="0.1em">AI DECK STUDIO</text>
+  </g>
+</svg>

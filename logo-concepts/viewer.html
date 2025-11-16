@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>deckr.ai Logo Concepts</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 40px 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      color: white;
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+
+    .subtitle {
+      text-align: center;
+      color: rgba(255,255,255,0.9);
+      font-size: 1.2rem;
+      margin-bottom: 3rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 30px;
+      margin-bottom: 40px;
+    }
+
+    .concept-card {
+      background: white;
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      cursor: pointer;
+    }
+
+    .concept-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 30px 80px rgba(0,0,0,0.4);
+    }
+
+    .concept-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .concept-number {
+      display: inline-block;
+      background: linear-gradient(135deg, #7145FF, #818CF8);
+      color: white;
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .concept-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 8px;
+    }
+
+    .concept-description {
+      color: #666;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .logo-display {
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      border-radius: 15px;
+      padding: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 20px 0;
+      min-height: 250px;
+    }
+
+    .logo-display img {
+      max-width: 100%;
+      height: auto;
+      filter: drop-shadow(0 10px 30px rgba(0,0,0,0.1));
+    }
+
+    .features {
+      background: #f8f9fa;
+      border-radius: 10px;
+      padding: 15px;
+      margin-top: 15px;
+    }
+
+    .features ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .features li {
+      padding: 5px 0;
+      color: #444;
+      font-size: 0.9rem;
+    }
+
+    .features li:before {
+      content: "✓ ";
+      color: #7145FF;
+      font-weight: bold;
+      margin-right: 8px;
+    }
+
+    .cta-section {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .cta-section h2 {
+      color: #1a1a2e;
+      margin-bottom: 20px;
+      font-size: 2rem;
+    }
+
+    .cta-section p {
+      color: #666;
+      font-size: 1.1rem;
+      margin-bottom: 30px;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 15px 30px;
+      border-radius: 10px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #7145FF, #818CF8);
+      color: white;
+      box-shadow: 0 10px 30px rgba(113, 69, 255, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 40px rgba(113, 69, 255, 0.4);
+    }
+
+    .btn-secondary {
+      background: white;
+      color: #7145FF;
+      border: 2px solid #7145FF;
+    }
+
+    .btn-secondary:hover {
+      background: #7145FF;
+      color: white;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 2rem;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>deckr.ai Logo Concepts</h1>
+    <p class="subtitle">6 Modern Logo Designs for Your AI-Powered Presentation Studio</p>
+
+    <div class="grid">
+      <!-- Concept 1 -->
+      <div class="concept-card">
+        <div class="concept-header">
+          <span class="concept-number">Concept 1</span>
+          <h3 class="concept-title">Stacked Decks + AI Spark</h3>
+          <p class="concept-description">Professional, minimalist stack with golden AI sparkle</p>
+        </div>
+        <div class="logo-display">
+          <img src="concept-1-stacked-decks.svg" alt="Concept 1">
+        </div>
+        <div class="features">
+          <ul>
+            <li>Clean, professional aesthetic</li>
+            <li>Clear "deck/slides" metaphor</li>
+            <li>Eye-catching AI spark element</li>
+            <li>Scales well at small sizes</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Concept 2 -->
+      <div class="concept-card">
+        <div class="concept-header">
+          <span class="concept-number">Concept 2</span>
+          <h3 class="concept-title">Neural Network</h3>
+          <p class="concept-description">AI intelligence visualized as interconnected nodes</p>
+        </div>
+        <div class="logo-display">
+          <img src="concept-2-neural-network.svg" alt="Concept 2">
+        </div>
+        <div class="features">
+          <ul>
+            <li>Strong AI/tech symbolism</li>
+            <li>Modern, innovative look</li>
+            <li>Unique among competitors</li>
+            <li>Golden center shows processing</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Concept 3 -->
+      <div class="concept-card">
+        <div class="concept-header">
+          <span class="concept-number">Concept 3</span>
+          <h3 class="concept-title">Lightning Deck</h3>
+          <p class="concept-description">Speed and power combined with presentation concept</p>
+        </div>
+        <div class="logo-display">
+          <img src="concept-3-lightning-deck.svg" alt="Concept 3">
+        </div>
+        <div class="features">
+          <ul>
+            <li>Energetic, dynamic feel</li>
+            <li>Conveys speed/efficiency</li>
+            <li>Bold, memorable design</li>
+            <li>Great for marketing</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Concept 4 -->
+      <div class="concept-card">
+        <div class="concept-header">
+          <span class="concept-number">Concept 4</span>
+          <h3 class="concept-title">D Monogram</h3>
+          <p class="concept-description">Minimalist lettermark with circuit board elements</p>
+        </div>
+        <div class="logo-display">
+          <img src="concept-4-d-monogram.svg" alt="Concept 4">
+        </div>
+        <div class="features">
+          <ul>
+            <li>Sleek, minimalist design</li>
+            <li>Tech-forward circuit motif</li>
+            <li>Highly versatile</li>
+            <li>Works great as app icon</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Concept 5 -->
+      <div class="concept-card">
+        <div class="concept-header">
+          <span class="concept-number">Concept 5</span>
+          <h3 class="concept-title">Transformation</h3>
+          <p class="concept-description">Before/after showing AI-powered improvement</p>
+        </div>
+        <div class="logo-display">
+          <img src="concept-5-transformation.svg" alt="Concept 5">
+        </div>
+        <div class="features">
+          <ul>
+            <li>Clear value proposition</li>
+            <li>Shows transformation process</li>
+            <li>Magical sparkle effect</li>
+            <li>Storytelling element</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Concept 6 -->
+      <div class="concept-card">
+        <div class="concept-header">
+          <span class="concept-number">Concept 6</span>
+          <h3 class="concept-title">Orbital Deck</h3>
+          <p class="concept-description">3D isometric stack with AI orbital processing</p>
+        </div>
+        <div class="logo-display">
+          <img src="concept-6-orbital-deck.svg" alt="Concept 6">
+        </div>
+        <div class="features">
+          <ul>
+            <li>Sophisticated 3D look</li>
+            <li>Dynamic orbital motion</li>
+            <li>Premium, high-tech feel</li>
+            <li>Animated potential</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="cta-section">
+      <h2>What's Next?</h2>
+      <p>Choose your favorite concept(s) and I'll refine them, create variations, and provide all formats needed!</p>
+      <div class="button-group">
+        <button class="btn btn-primary" onclick="alert('Tell me which concept number(s) you like best, and I\'ll create refined versions!')">Select Favorites</button>
+        <button class="btn btn-secondary" onclick="alert('I can create custom variations combining elements from multiple concepts!')">Request Custom Variation</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

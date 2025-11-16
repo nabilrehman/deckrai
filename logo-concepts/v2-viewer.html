@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>deckr.ai Logo Concepts V2 - Refined</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 40px 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+
+    h1 {
+      color: white;
+      font-size: 3.5rem;
+      margin-bottom: 1rem;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      font-weight: 800;
+    }
+
+    .version-badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.2);
+      color: white;
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      backdrop-filter: blur(10px);
+    }
+
+    .subtitle {
+      color: rgba(255,255,255,0.95);
+      font-size: 1.3rem;
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+
+    .research-insights {
+      background: rgba(255,255,255,0.95);
+      border-radius: 20px;
+      padding: 30px;
+      margin-bottom: 40px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .research-insights h2 {
+      color: #7145FF;
+      margin-bottom: 20px;
+      font-size: 1.8rem;
+    }
+
+    .insights-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
+
+    .insight-card {
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      padding: 20px;
+      border-radius: 15px;
+      border-left: 4px solid #7145FF;
+    }
+
+    .insight-card h3 {
+      color: #7145FF;
+      font-size: 1rem;
+      margin-bottom: 10px;
+    }
+
+    .insight-card p {
+      color: #444;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+      gap: 35px;
+      margin-bottom: 40px;
+    }
+
+    .concept-card {
+      background: white;
+      border-radius: 24px;
+      padding: 35px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .concept-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 5px;
+      background: linear-gradient(90deg, #7145FF, #818CF8);
+      transform: scaleX(0);
+      transition: transform 0.4s ease;
+    }
+
+    .concept-card:hover::before {
+      transform: scaleX(1);
+    }
+
+    .concept-card:hover {
+      transform: translateY(-10px);
+      box-shadow: 0 30px 80px rgba(113, 69, 255, 0.4);
+    }
+
+    .v2-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #FFD700, #FFA500);
+      color: #1a1a2e;
+      padding: 5px 12px;
+      border-radius: 15px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .concept-header {
+      margin-bottom: 25px;
+    }
+
+    .concept-number {
+      display: inline-block;
+      background: linear-gradient(135deg, #7145FF, #818CF8);
+      color: white;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .concept-title {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #1a1a2e;
+      margin-bottom: 10px;
+      line-height: 1.3;
+    }
+
+    .concept-description {
+      color: #666;
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+
+    .logo-display {
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      border-radius: 20px;
+      padding: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 25px 0;
+      min-height: 280px;
+      position: relative;
+    }
+
+    .logo-display.wordmark {
+      padding: 30px;
+      min-height: 200px;
+    }
+
+    .logo-display img {
+      max-width: 100%;
+      height: auto;
+      filter: drop-shadow(0 15px 35px rgba(0,0,0,0.15));
+    }
+
+    .features {
+      background: #f8f9fa;
+      border-radius: 15px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+
+    .features h4 {
+      color: #7145FF;
+      font-size: 0.9rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .features ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .features li {
+      padding: 7px 0;
+      color: #444;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .features li:before {
+      content: "✓ ";
+      color: #7145FF;
+      font-weight: bold;
+      margin-right: 10px;
+      font-size: 1.1rem;
+    }
+
+    .comparison {
+      background: white;
+      border-radius: 24px;
+      padding: 40px;
+      margin-bottom: 40px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .comparison h2 {
+      color: #1a1a2e;
+      font-size: 2rem;
+      margin-bottom: 20px;
+    }
+
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-top: 30px;
+    }
+
+    .comparison-item {
+      padding: 25px;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      border-radius: 15px;
+    }
+
+    .comparison-item h3 {
+      color: #7145FF;
+      margin-bottom: 15px;
+      font-size: 1.2rem;
+    }
+
+    .comparison-item ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .comparison-item li {
+      padding: 5px 0;
+      color: #444;
+      font-size: 0.9rem;
+    }
+
+    .comparison-item li:before {
+      content: "→ ";
+      color: #7145FF;
+      font-weight: bold;
+      margin-right: 8px;
+    }
+
+    .cta-section {
+      background: white;
+      border-radius: 24px;
+      padding: 50px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .cta-section h2 {
+      color: #1a1a2e;
+      margin-bottom: 20px;
+      font-size: 2.5rem;
+      font-weight: 800;
+    }
+
+    .cta-section p {
+      color: #666;
+      font-size: 1.2rem;
+      margin-bottom: 35px;
+      line-height: 1.7;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 18px 35px;
+      border-radius: 12px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      border: none;
+      cursor: pointer;
+      font-size: 1.05rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #7145FF, #818CF8);
+      color: white;
+      box-shadow: 0 10px 30px rgba(113, 69, 255, 0.4);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 20px 50px rgba(113, 69, 255, 0.5);
+    }
+
+    .btn-secondary {
+      background: white;
+      color: #7145FF;
+      border: 3px solid #7145FF;
+    }
+
+    .btn-secondary:hover {
+      background: #7145FF;
+      color: white;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 2.5rem;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .comparison-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <span class="version-badge">✨ Version 2.0 - Research-Driven Redesign</span>
+      <h1>deckr.ai Logo Concepts</h1>
+      <p class="subtitle">Refined designs based on analysis of Claude AI, ChatGPT, and 2025 minimalist trends<br>
+      Incorporating rounded edges, negative space, and distinctive memorability</p>
+    </div>
+
+    <!-- Research Insights -->
+    <div class="research-insights">
+      <h2>🔍 What We Learned from the Best AI Logos</h2>
+      <div class="insights-grid">
+        <div class="insight-card">
+          <h3>Claude AI</h3>
+          <p>Terra cotta warmth, chat bubble icon, humanistic typeface, approachable minimalism</p>
+        </div>
+        <div class="insight-card">
+          <h3>2025 Trends</h3>
+          <p>Geometric minimalism, clean lines, generous negative space, professional yet friendly</p>
+        </div>
+        <div class="insight-card">
+          <h3>Rounded Edges</h3>
+          <p>Convey empathy and approachability without sacrificing professionalism</p>
+        </div>
+        <div class="insight-card">
+          <h3>Distinctive</h3>
+          <p>Simple but memorable, works perfectly as app icon and brand mark</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comparison Section -->
+    <div class="comparison">
+      <h2>V1 → V2 Improvements</h2>
+      <div class="comparison-grid">
+        <div class="comparison-item">
+          <h3>Design Refinements</h3>
+          <ul>
+            <li>Increased corner radius for approachability</li>
+            <li>Better negative space usage</li>
+            <li>Cleaner, more minimal compositions</li>
+            <li>Stronger hierarchy and focus</li>
+          </ul>
+        </div>
+        <div class="comparison-item">
+          <h3>Strategic Changes</h3>
+          <ul>
+            <li>Added wordmark integration</li>
+            <li>Optimized for app icon format</li>
+            <li>Enhanced memorability and uniqueness</li>
+            <li>Improved scalability at all sizes</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- V2 Concept 1 -->
+      <div class="concept-card">
+        <span class="v2-badge">V2 Refined</span>
+        <div class="concept-header">
+          <span class="concept-number">V2-1</span>
+          <h3 class="concept-title">Clean Deck + Wordmark</h3>
+          <p class="concept-description">Claude-inspired minimalism with professional full logo lockup</p>
+        </div>
+        <div class="logo-display wordmark">
+          <img src="v2-concept-1-clean-deck.svg" alt="V2 Concept 1">
+        </div>
+        <div class="features">
+          <h4>Why This Works</h4>
+          <ul>
+            <li>Complete brand system (icon + wordmark)</li>
+            <li>Generous negative space like Claude AI</li>
+            <li>Rounded corners for approachability</li>
+            <li>Single AI dot - minimal yet distinctive</li>
+            <li>Perfect for headers, business cards, website</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- V2 Concept 2 -->
+      <div class="concept-card">
+        <span class="v2-badge">V2 Refined</span>
+        <div class="concept-header">
+          <span class="concept-number">V2-2</span>
+          <h3 class="concept-title">Geometric 'D' Intelligence</h3>
+          <p class="concept-description">Modern lettermark with neural network symbol</p>
+        </div>
+        <div class="logo-display">
+          <img src="v2-concept-2-geometric-d.svg" alt="V2 Concept 2">
+        </div>
+        <div class="features">
+          <h4>Why This Works</h4>
+          <ul>
+            <li>Strong lettermark (instant recognition)</li>
+            <li>AI intelligence visualized (3 connected dots)</li>
+            <li>Excellent negative space usage</li>
+            <li>Scalable and versatile</li>
+            <li>Works great as app icon</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- V2 Concept 3 -->
+      <div class="concept-card">
+        <span class="v2-badge">V2 Refined</span>
+        <div class="concept-header">
+          <span class="concept-number">V2-3</span>
+          <h3 class="concept-title">Perfect App Icon</h3>
+          <p class="concept-description">iOS/Android ready with rounded square format</p>
+        </div>
+        <div class="logo-display">
+          <img src="v2-concept-3-app-icon.svg" alt="V2 Concept 3">
+        </div>
+        <div class="features">
+          <h4>Why This Works</h4>
+          <ul>
+            <li>iOS/Android app icon standards</li>
+            <li>Gradient background = premium feel</li>
+            <li>Simple white slides = clarity</li>
+            <li>Golden AI spark = intelligence</li>
+            <li>Immediately recognizable on home screen</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- V2 Concept 4 -->
+      <div class="concept-card">
+        <span class="v2-badge">V2 Refined</span>
+        <div class="concept-header">
+          <span class="concept-number">V2-4</span>
+          <h3 class="concept-title">Flowing Slides</h3>
+          <p class="concept-description">Organic minimalism with dynamic arrangement</p>
+        </div>
+        <div class="logo-display">
+          <img src="v2-concept-4-flowing-slides.svg" alt="V2 Concept 4">
+        </div>
+        <div class="features">
+          <h4>Why This Works</h4>
+          <ul>
+            <li>Dynamic, flowing composition</li>
+            <li>Suggests movement and creation</li>
+            <li>Generous rounded corners (14px radius)</li>
+            <li>Content lines show real slides</li>
+            <li>Unique, memorable, friendly</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- V2 Concept 5 -->
+      <div class="concept-card">
+        <span class="v2-badge">V2 Refined</span>
+        <div class="concept-header">
+          <span class="concept-number">V2-5</span>
+          <h3 class="concept-title">Card Fan</h3>
+          <p class="concept-description">Distinctive "deck of cards" metaphor with AI intelligence symbol</p>
+        </div>
+        <div class="logo-display">
+          <img src="v2-concept-5-card-fan.svg" alt="V2 Concept 5">
+        </div>
+        <div class="features">
+          <h4>Why This Works</h4>
+          <ul>
+            <li>Highly distinctive and memorable</li>
+            <li>Clear "deck" metaphor (playing cards)</li>
+            <li>AI symbol in center card</li>
+            <li>Premium, sophisticated look</li>
+            <li>Perfect for presentations about deckr.ai</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="cta-section">
+      <h2>Ready to Choose?</h2>
+      <p>These V2 concepts incorporate best practices from Claude AI, ChatGPT, and 2025 design trends.<br>
+      Select your favorite(s) and I'll create production-ready files in all formats!</p>
+      <div class="button-group">
+        <button class="btn btn-primary" onclick="alert('Tell me which V2 concept number you love! I\'ll create:\n\n• SVG (scalable vector)\n• PNG (multiple sizes)\n• App icons (iOS/Android)\n• Favicon\n• Social media versions')">
+          Select Winner
+        </button>
+        <button class="btn btn-secondary" onclick="alert('I can combine elements from multiple concepts or create custom variations based on your feedback!')">
+          Custom Variation
+        </button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
