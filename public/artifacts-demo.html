@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Artifacts Panel Demo - Deckr.ai</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #F8F9FA;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .demo-container {
+      display: flex;
+      height: 100vh;
+    }
+
+    .chat-mock {
+      width: 40%;
+      background: white;
+      padding: 24px;
+      border-right: 1px solid rgba(0, 0, 0, 0.06);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .chat-header {
+      font-size: 18px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .chat-message {
+      padding: 12px 16px;
+      background: #F8F9FA;
+      border-radius: 12px;
+      font-size: 14px;
+      color: #374151;
+    }
+
+    .artifacts-mock {
+      width: 60%;
+      background: #F8F9FA;
+    }
+
+    .instructions {
+      padding: 24px;
+      background: rgba(99, 102, 241, 0.05);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      border-radius: 12px;
+      margin-bottom: 16px;
+    }
+
+    .instructions h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #6366F1;
+      margin-bottom: 12px;
+    }
+
+    .instructions ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .instructions li {
+      font-size: 14px;
+      color: #374151;
+      padding-left: 20px;
+      position: relative;
+    }
+
+    .instructions li:before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: #10B981;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-container">
+    <!-- Mock Chat Panel -->
+    <div class="chat-mock">
+      <div class="chat-header">Chat Panel</div>
+
+      <div class="instructions">
+        <h3>Testing Instructions</h3>
+        <ul>
+          <li>The Artifacts panel is shown on the right →</li>
+          <li>This is a static demo of the component</li>
+          <li>Switch view modes using the icons in header</li>
+          <li>Hover over slides to see actions</li>
+          <li>Click slides to select them</li>
+          <li>Resize divider is not shown in this demo</li>
+        </ul>
+      </div>
+
+      <div class="chat-message">
+        <strong>User:</strong> Create a 5-slide pitch deck for a SaaS startup
+      </div>
+
+      <div class="chat-message">
+        <strong>AI:</strong> I'll create a 5-slide pitch deck with modern design. Generating now...
+      </div>
+
+      <div class="chat-message">
+        <strong>AI:</strong> ✓ Generated 5 slides! Check the artifacts panel →
+      </div>
+    </div>
+
+    <!-- Artifacts Panel Mock -->
+    <div class="artifacts-mock">
+      <div id="root"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    // This would normally import the React component
+    // For now, just show instructions to view in the app
+    document.getElementById('root').innerHTML = `
+      <div style="padding: 24px; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; text-align: center;">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" style="opacity: 0.3;">
+          <rect x="2" y="2" width="8" height="8" rx="1" stroke="#6366F1" stroke-width="2"/>
+          <rect x="14" y="2" width="8" height="8" rx="1" stroke="#6366F1" stroke-width="2"/>
+          <rect x="2" y="14" width="8" height="8" rx="1" stroke="#6366F1" stroke-width="2"/>
+          <rect x="14" y="14" width="8" height="8" rx="1" stroke="#6366F1" stroke-width="2"/>
+        </svg>
+        <div style="font-size: 18px; font-weight: 600; color: #111827;">
+          Artifacts Panel Component
+        </div>
+        <div style="font-size: 14px; color: #6B7280; max-width: 400px; line-height: 1.5;">
+          To test the full Artifacts panel with React, open the main app at
+          <a href="http://localhost:3003" style="color: #6366F1; text-decoration: none; font-weight: 500;">localhost:3003</a>
+        </div>
+        <div style="margin-top: 24px; padding: 16px; background: rgba(99, 102, 241, 0.05); border-radius: 8px; font-size: 13px; color: #374151; max-width: 500px;">
+          <strong style="color: #6366F1;">Note:</strong> The ArtifactsPanel component needs to be integrated with ChatLandingView first. Currently working on branch: <code style="background: rgba(0,0,0,0.05); padding: 2px 6px; border-radius: 4px;">feature/artifacts-panel</code>
+        </div>
+      </div>
+    `;
+  </script>
+</body>
+</html>

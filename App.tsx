@@ -5,6 +5,7 @@ import { Slide, StyleLibraryItem, DebugSession, Template, DeckAiExecutionPlan } 
 import Header from './components/Header';
 import Editor from './components/Editor';
 import ChatLandingView from './components/ChatLandingView';
+import ChatWithArtifacts from './components/ChatWithArtifacts';
 import ChatController from './components/ChatController';
 import GenerationModeSelector from './components/GenerationModeSelector';
 import PresentationView from './components/PresentationView';
@@ -617,12 +618,20 @@ const App: React.FC = () => {
             />
           </>
         ) : (
-          <ChatLandingView
+          <ChatWithArtifacts
+            user={user}
             styleLibrary={styleLibrary}
-            onDeckGenerated={(generatedSlides) => {
-              console.log('✅ Deck generated with slides:', generatedSlides);
-              setSlides(generatedSlides);
-              setActiveSlideId(generatedSlides[0]?.id || null);
+            onSignOut={() => {
+              // Sign out is handled in Header component
+              console.log('Sign out requested from artifacts panel');
+            }}
+            onOpenInEditor={(artifactSlides) => {
+              // Transition to classic editor with slides from artifacts
+              console.log('Opening in classic editor with', artifactSlides.length, 'slides');
+              setSlides(artifactSlides);
+              if (artifactSlides.length > 0) {
+                setActiveSlideId(artifactSlides[0].id);
+              }
             }}
           />
         )}

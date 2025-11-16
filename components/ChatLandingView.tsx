@@ -27,8 +27,15 @@ interface ChatMessage {
 }
 
 interface ChatLandingViewProps {
-  styleLibrary: StyleLibraryItem[];
-  onDeckGenerated: (slides: Slide[]) => void;
+  styleLibrary?: StyleLibraryItem[];
+  onDeckGenerated?: (slides: Slide[]) => void;
+
+  // New props for artifacts mode
+  user?: any;
+  onSignOut?: () => void;
+  onSlidesGenerated?: (slides: Slide[]) => void;
+  onSlideUpdate?: (slideId: string, updates: Partial<Slide>) => void;
+  onAddSlide?: (newSlide: Slide) => void;
 }
 
 /**
@@ -54,7 +61,15 @@ const launderImageSrc = (src: string): Promise<string> => {
   });
 };
 
-const ChatLandingView: React.FC<ChatLandingViewProps> = ({ styleLibrary, onDeckGenerated }) => {
+const ChatLandingView: React.FC<ChatLandingViewProps> = ({
+  styleLibrary = [],
+  onDeckGenerated,
+  user,
+  onSignOut,
+  onSlidesGenerated,
+  onSlideUpdate,
+  onAddSlide
+}) => {
   // UI State
   const [inputValue, setInputValue] = useState('');
   const [showUploadMenu, setShowUploadMenu] = useState(false);
@@ -81,6 +96,15 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({ styleLibrary, onDeckG
   const [pendingUserPrompt, setPendingUserPrompt] = useState<string>('');
   const [awaitingPlanEdit, setAwaitingPlanEdit] = useState(false);
   const [artifactSlides, setArtifactSlides] = useState<Slide[]>([]);
+
+  // Debug: Log styleLibrary on mount and when it changes
+  useEffect(() => {
+    console.log('🔍 ChatLandingView: styleLibrary prop received:', {
+      length: styleLibrary?.length || 0,
+      hasItems: styleLibrary && styleLibrary.length > 0,
+      firstItem: styleLibrary?.[0]?.name || 'none'
+    });
+  }, [styleLibrary]);
 
   const suggestedPrompts = [
     'Sales deck for enterprise clients',
@@ -211,6 +235,13 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({ styleLibrary, onDeckG
 
     // Check if user has style library → ask for mode selection
     const hasStyleLibrary = styleLibrary && styleLibrary.length > 0;
+
+    console.log('🔍 handleUserPrompt: Checking styleLibrary', {
+      styleLibraryExists: !!styleLibrary,
+      styleLibraryLength: styleLibrary?.length || 0,
+      hasStyleLibrary,
+      willShowModal: hasStyleLibrary
+    });
 
     if (hasStyleLibrary) {
       // Ask user to select mode before proceeding
@@ -546,9 +577,16 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({ styleLibrary, onDeckG
         }
       });
 
-      // Pass slides to parent → switches to Editor view
+      // Pass slides to parent
       setTimeout(() => {
-        onDeckGenerated(generatedSlides);
+        // Call artifacts callback if in artifacts mode
+        if (onSlidesGenerated) {
+          onSlidesGenerated(generatedSlides);
+        }
+        // Call legacy callback if in editor mode
+        if (onDeckGenerated) {
+          onDeckGenerated(generatedSlides);
+        }
       }, 1500);
 
     } catch (error: any) {

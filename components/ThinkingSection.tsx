@@ -24,9 +24,21 @@ const ThinkingSection: React.FC<ThinkingSectionProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
+  // Check if any step is still active (thinking in progress)
+  const isThinking = steps.some(step => step.status === 'active');
+
   // Calculate total thinking time if not provided
-  // Use provided duration, or default to "a few seconds" if not available
-  const thinkingTime = duration || 'a few seconds';
+  // Safeguard: If duration looks like a timestamp (>1000s), default to "a few seconds"
+  let thinkingTime = duration || 'a few seconds';
+
+  // Extract numeric value from duration string (e.g., "3.5s" -> 3.5)
+  const numericDuration = parseFloat(thinkingTime);
+
+  // If duration is suspiciously large (>1000 seconds = ~16 mins), it's likely a timestamp bug
+  if (!isNaN(numericDuration) && numericDuration > 1000) {
+    console.warn('⚠️ Detected timestamp instead of duration:', thinkingTime);
+    thinkingTime = 'a few seconds';
+  }
 
   return (
     <div style={{
@@ -63,8 +75,19 @@ const ThinkingSection: React.FC<ThinkingSectionProps> = ({
         {/* AI Icon - Using BrandedLoader */}
         <BrandedLoader size={20} variant="inline" />
 
-        {/* Thought duration */}
-        <span>Thought for {thinkingTime}</span>
+        {/* Thought duration or Thinking... */}
+        {isThinking ? (
+          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>Thinking</span>
+            <span style={{
+              animation: 'blink 1.4s infinite',
+              fontSize: '16px',
+              lineHeight: '1'
+            }}>...</span>
+          </span>
+        ) : (
+          <span>Thought for {thinkingTime}</span>
+        )}
 
         {/* Expand/Collapse Arrow */}
         <svg
@@ -87,6 +110,14 @@ const ThinkingSection: React.FC<ThinkingSectionProps> = ({
           />
         </svg>
       </button>
+
+      {/* Blinking animation CSS */}
+      <style>{`
+        @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+      `}</style>
 
       {/* Thinking Steps - Expandable */}
       {isExpanded && (
@@ -111,8 +142,8 @@ const ThinkingSection: React.FC<ThinkingSectionProps> = ({
             >
               {/* Status Icon */}
               <div style={{
-                width: '24px',
-                height: '24px',
+                width: '28px',
+                height: '28px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -120,12 +151,31 @@ const ThinkingSection: React.FC<ThinkingSectionProps> = ({
                 marginTop: '2px'
               }}>
                 {step.status === 'completed' && (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" fill="#10B981" opacity="0.1"/>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{
+                    filter: 'drop-shadow(0 2px 4px rgba(34, 197, 94, 0.2))'
+                  }}>
+                    <defs>
+                      <linearGradient id="checkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style={{ stopColor: '#10B981', stopOpacity: 1 }} />
+                        <stop offset="50%" style={{ stopColor: '#22C55E', stopOpacity: 1 }} />
+                        <stop offset="100%" style={{ stopColor: '#34D399', stopOpacity: 1 }} />
+                      </linearGradient>
+                      <radialGradient id="checkGlow" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" style={{ stopColor: '#22C55E', stopOpacity: 0.3 }} />
+                        <stop offset="100%" style={{ stopColor: '#10B981', stopOpacity: 0 }} />
+                      </radialGradient>
+                    </defs>
+                    {/* Ambient glow background */}
+                    <circle cx="12" cy="12" r="11" fill="url(#checkGlow)" />
+                    {/* Soft background fill */}
+                    <circle cx="12" cy="12" r="10" fill="url(#checkGradient)" opacity="0.12"/>
+                    {/* Subtle outer ring */}
+                    <circle cx="12" cy="12" r="10" stroke="url(#checkGradient)" strokeWidth="1.5" opacity="0.4"/>
+                    {/* Bold checkmark */}
                     <path
-                      d="M9 12l2 2 4-4"
-                      stroke="#10B981"
-                      strokeWidth="2"
+                      d="M8 12l3 3 5-5"
+                      stroke="url(#checkGradient)"
+                      strokeWidth="2.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
