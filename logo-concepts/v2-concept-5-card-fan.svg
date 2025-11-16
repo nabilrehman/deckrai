@@ -1,0 +1,47 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- V2 Concept 5: Card Fan (Distinctive & Memorable) -->
+  <defs>
+    <linearGradient id="v2grad5" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7145FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#818CF8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(100, 110)">
+    <!-- Three cards fanned out like a deck of cards -->
+
+    <!-- Left card -->
+    <g transform="rotate(-15)">
+      <rect x="-35" y="-50" width="70" height="90" rx="12" fill="url(#v2grad5)" opacity="0.7"/>
+      <rect x="-35" y="-50" width="70" height="90" rx="12" fill="none" stroke="white" stroke-width="2" opacity="0.3"/>
+    </g>
+
+    <!-- Center card (prominent) -->
+    <g transform="rotate(0)">
+      <rect x="-35" y="-50" width="70" height="90" rx="12" fill="url(#v2grad5)"/>
+      <rect x="-35" y="-50" width="70" height="90" rx="12" fill="none" stroke="white" stroke-width="2.5" opacity="0.5"/>
+
+      <!-- AI symbol in center card -->
+      <g transform="translate(0, -10)">
+        <!-- Minimalist "AI" representation -->
+        <circle cx="-10" cy="0" r="5" fill="white" opacity="0.9"/>
+        <circle cx="10" cy="0" r="5" fill="white" opacity="0.9"/>
+        <line x1="-10" y1="0" x2="10" y2="0" stroke="white" stroke-width="3" opacity="0.9"/>
+
+        <!-- Connecting arc (like neural connection) -->
+        <path d="M -10,-5 Q 0,-15 10,-5" stroke="#FFD700" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      </g>
+    </g>
+
+    <!-- Right card -->
+    <g transform="rotate(15)">
+      <rect x="-35" y="-50" width="70" height="90" rx="12" fill="url(#v2grad5)" opacity="0.7"/>
+      <rect x="-35" y="-50" width="70" height="90" rx="12" fill="none" stroke="white" stroke-width="2" opacity="0.3"/>
+    </g>
+
+    <!-- Golden AI accent above -->
+    <circle cx="0" cy="-65" r="6" fill="#FFD700"/>
+    <circle cx="0" cy="-65" r="10" fill="#FFD700" opacity="0.4"/>
+    <circle cx="0" cy="-65" r="14" fill="#FFD700" opacity="0.2"/>
+  </g>
+</svg>

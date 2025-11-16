@@ -1,0 +1,43 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- V2 Concept 2: Geometric 'D' with Rounded Corners (Modern Minimalist) -->
+  <defs>
+    <linearGradient id="v2grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7145FF;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#5D5FEF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#818CF8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(100, 100)">
+    <!-- Outer rounded 'D' shape -->
+    <path d="M -45,-65
+             L -45,65
+             L 15,65
+             C 50,65 65,50 65,15
+             L 65,-15
+             C 65,-50 50,-65 15,-65 Z"
+          fill="url(#v2grad2)"
+          stroke="none"/>
+
+    <!-- Inner cutout with generous negative space -->
+    <path d="M -20,-45
+             L -20,45
+             L 15,45
+             C 35,45 45,35 45,15
+             L 45,-15
+             C 45,-35 35,-45 15,-45 Z"
+          fill="white"/>
+
+    <!-- Minimalist AI accent - three dots forming intelligence symbol -->
+    <g fill="#FFD700">
+      <circle cx="0" cy="-20" r="4"/>
+      <circle cx="-8" cy="0" r="4"/>
+      <circle cx="8" cy="0" r="4"/>
+
+      <!-- Connecting lines (subtle) -->
+      <line x1="0" y1="-20" x2="-8" y2="0" stroke="#FFD700" stroke-width="2" opacity="0.4"/>
+      <line x1="0" y1="-20" x2="8" y2="0" stroke="#FFD700" stroke-width="2" opacity="0.4"/>
+      <line x1="-8" y1="0" x2="8" y2="0" stroke="#FFD700" stroke-width="2" opacity="0.4"/>
+    </g>
+  </g>
+</svg>
