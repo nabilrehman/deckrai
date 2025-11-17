@@ -8,7 +8,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:content": "tsx tests/content-quality-test.ts",
-    "test:master-agent": "tsx services/adk/__tests__/masterAgent.test.ts"
+    "test:master-agent": "tsx services/adk/__tests__/masterAgent.test.ts",
+    "test:tools": "tsx services/adk/tools/__tests__/tools.test.ts",
+    "test:reflection": "tsx services/adk/workflows/__tests__/reflectionDemo.test.ts",
+    "test:adk": "npm run test:master-agent && npm run test:tools && npm run test:reflection"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.17.3",
