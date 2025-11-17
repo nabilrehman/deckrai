@@ -11,7 +11,8 @@
     "test:master-agent": "tsx services/adk/__tests__/masterAgent.test.ts",
     "test:tools": "tsx services/adk/tools/__tests__/tools.test.ts",
     "test:reflection": "tsx services/adk/workflows/__tests__/reflectionDemo.test.ts",
-    "test:adk": "npm run test:master-agent && npm run test:tools && npm run test:reflection"
+    "test:iterative": "tsx services/adk/workflows/__tests__/iterativeReflectionDemo.test.ts",
+    "test:adk": "npm run test:master-agent && npm run test:tools && npm run test:reflection && npm run test:iterative"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.17.3",
