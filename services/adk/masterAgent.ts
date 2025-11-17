@@ -12,7 +12,23 @@
  * - QUICK_QUESTION: Simple Q&A
  */
 
-import { LlmAgent } from '@google/adk';
+import { LlmAgent, Gemini } from '@google/adk';
+
+/**
+ * Get API key from environment variables
+ * Supports both Vite (VITE_GEMINI_API_KEY) and standard (GEMINI_API_KEY, GOOGLE_GENAI_API_KEY)
+ */
+function getApiKey(): string | undefined {
+    // Check Vite environment first (for browser/dev)
+    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) {
+        return import.meta.env.VITE_GEMINI_API_KEY;
+    }
+    // Check Node.js environment (for tests/backend)
+    if (typeof process !== 'undefined' && process.env) {
+        return process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
+    }
+    return undefined;
+}
 
 export interface IntentClassification {
     intent: 'CREATE_DECK' | 'EDIT_SLIDES' | 'ANALYZE_CONTENT' | 'PLAN_STRATEGY' | 'QUICK_QUESTION';
@@ -32,15 +48,37 @@ export interface IntentClassification {
 }
 
 /**
- * Master Agent - The Orchestrator
- *
- * Analyzes user input and classifies intent with extracted data.
+ * Create Gemini model with API key from environment (lazy initialization)
  */
-export const masterAgent = new LlmAgent({
-    name: "DeckRAIMasterAgent",
-    model: "gemini-2.5-flash", // Fast classification
-    description: "Master orchestrator that classifies all user intents",
-    instruction: `You are the Master Agent for DeckRAI, an AI presentation builder.
+function createGeminiModel(): Gemini {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        throw new Error(
+            'API key must be provided. Set VITE_GEMINI_API_KEY (for Vite), ' +
+            'GEMINI_API_KEY, or GOOGLE_GENAI_API_KEY environment variable.'
+        );
+    }
+    return new Gemini({
+        model: "gemini-2.5-flash",
+        apiKey
+    });
+}
+
+// Global instance (lazy initialized)
+let _masterAgentInstance: LlmAgent | null = null;
+
+/**
+ * Get or create the Master Agent instance
+ *
+ * This is lazy-initialized to avoid requiring API key at module load time.
+ */
+export function getMasterAgent(): LlmAgent {
+    if (!_masterAgentInstance) {
+        _masterAgentInstance = new LlmAgent({
+            name: "DeckRAIMasterAgent",
+            model: createGeminiModel(), // Fast classification with configured API key
+            description: "Master orchestrator that classifies all user intents",
+            instruction: `You are the Master Agent for DeckRAI, an AI presentation builder.
 
 ## Your Role
 
@@ -274,7 +312,20 @@ Output:
 - Below 0.60: Ambiguous - respond with clarifying question
 
 Begin classification!`,
-});
+        });
+    }
+    return _masterAgentInstance;
+}
+
+/**
+ * Legacy export for backwards compatibility
+ * @deprecated Use getMasterAgent() instead
+ */
+export const masterAgent = {
+    get instance() {
+        return getMasterAgent();
+    }
+};
 
 /**
  * Parse user input and context into Master Agent format
