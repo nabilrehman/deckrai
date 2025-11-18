@@ -3,16 +3,8 @@ import ChatInterface from './ChatInterface';
 import ThinkingSection, { ThinkingStep } from './ThinkingSection';
 import ActionSummary, { ActionItem } from './ActionSummary';
 import { Slide, StyleLibraryItem } from '../types';
-import { analyzeNotesAndAskQuestions as analyzeOriginal, generateSlidesWithContext as generateOriginal, GenerationContext } from '../services/intelligentGeneration';
-import { analyzeNotesAndAskQuestions as analyzeWithADK, generateSlidesWithContext as generateWithADK } from '../services/deckraiService';
+import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationContext } from '../services/deckraiService';
 import { detectVibeFromNotes, getDesignerStylesForVibe, PresentationVibe } from '../services/vibeDetection';
-
-// Allow toggling ADK from browser console: window.__USE_ADK = true/false
-declare global {
-  interface Window {
-    __USE_ADK?: boolean;
-  }
-}
 
 interface ChatMessage {
   id: string;
@@ -49,21 +41,6 @@ const ChatController: React.FC<ChatControllerProps> = ({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [thinkingSteps, setThinkingSteps] = useState<ThinkingStep[]>([]);
-
-  // ADK toggle state (can be controlled via browser console)
-  const [useADK, setUseADK] = useState(false);
-
-  // Check for browser console toggle
-  React.useEffect(() => {
-    const checkADKToggle = () => {
-      if (typeof window !== 'undefined' && window.__USE_ADK !== undefined) {
-        setUseADK(window.__USE_ADK);
-      }
-    };
-    checkADKToggle();
-    const interval = setInterval(checkADKToggle, 1000); // Check every second
-    return () => clearInterval(interval);
-  }, []);
 
   // State from generation flow
   const [detectedVibe, setDetectedVibe] = useState<PresentationVibe | null>(null);
@@ -105,7 +82,7 @@ const ChatController: React.FC<ChatControllerProps> = ({
    */
   const handleUserPrompt = useCallback(async (userPrompt: string) => {
     console.log('🎯 ChatController: Processing user prompt:', userPrompt);
-    console.log(`🔧 System Mode: ${useADK ? '🤖 ADK Coordinator (NEW)' : '🔵 Original System'}`);
+    console.log('🤖 [ADK] Using ADK Coordinator');
 
     // Add user message
     addMessage({
@@ -140,20 +117,14 @@ const ChatController: React.FC<ChatControllerProps> = ({
       // Step 2: AI analyzes and asks questions
       const step2: ThinkingStep = {
         id: 'step-analyze',
-        title: useADK ? 'ADK Coordinator analyzing request' : 'Planning slide structure',
-        content: useADK
-          ? '🤖 Using Google ADK Coordinator to analyze your request...'
-          : 'AI is analyzing your request and creating a deck plan...',
+        title: 'ADK Coordinator analyzing request',
+        content: '🤖 Using Google ADK Coordinator to analyze your request...',
         status: 'active',
         type: 'thinking'
       };
       addThinkingStep(step2);
 
-      // Use ADK or original system based on toggle
-      const analyzeFunction = useADK ? analyzeWithADK : analyzeOriginal;
-      console.log(`🎯 Using ${useADK ? 'ADK Coordinator' : 'Original System'} for analysis`);
-
-      const analysis = await analyzeFunction(userPrompt);
+      const analysis = await analyzeNotesAndAskQuestions(userPrompt);
       console.log('✅ AI analysis complete:', analysis);
 
       updateThinkingStep('step-analyze', {
@@ -185,10 +156,9 @@ const ChatController: React.FC<ChatControllerProps> = ({
       const duration = ((Date.now() - thinkingStartTime) / 1000).toFixed(1);
 
       // Add AI response with plan
-      const systemBadge = useADK ? '🤖 ADK Coordinator' : '🔵 Original System';
       addMessage({
         role: 'assistant',
-        content: `${systemBadge}\n\nI'll create a **${plan.slideCount}-slide deck** with a ${plan.style} style for ${plan.audience}.\n\n**Plan:**\n${plan.reasoning}\n\n**Estimated viewing time:** ${plan.estimatedTime}\n\nWould you like me to proceed with generating these slides?`,
+        content: `I'll create a **${plan.slideCount}-slide deck** with a ${plan.style} style for ${plan.audience}.\n\n**Plan:**\n${plan.reasoning}\n\n**Estimated viewing time:** ${plan.estimatedTime}\n\nWould you like me to proceed with generating these slides?`,
         thinking: {
           steps: [...thinkingSteps, { ...step3, status: 'completed' }],
           duration: `${duration}s`
@@ -211,7 +181,7 @@ const ChatController: React.FC<ChatControllerProps> = ({
     } finally {
       setIsProcessing(false);
     }
-  }, [useADK, thinkingStartTime, thinkingSteps, addMessage, addThinkingStep, updateThinkingStep]);
+  }, [thinkingStartTime, thinkingSteps, addMessage, addThinkingStep, updateThinkingStep]);
 
   /**
    * Generate slides based on approved plan
