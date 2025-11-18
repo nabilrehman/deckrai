@@ -1,11 +1,15 @@
 /**
- * DeckRAI ADK Service - Wrapper for Google Agent Development Kit Coordinator
- * Maintains compatibility with existing UI while using new ADK architecture
+ * DeckRAI ADK Service - HTTP Client for ADK Backend
+ *
+ * This service makes HTTP calls to the Node.js backend server running ADK.
+ * The backend server exposes REST API endpoints that run the ADK coordinator.
+ *
+ * Architecture:
+ * Frontend (Browser) → HTTP → Backend (Node.js + ADK) → Gemini API
  */
 
-import { Session, InvocationContext } from '@google/genai/agents';
-import { getDeckRAIAgent } from './adk/deckraiAgent';
-import type { GenerationContext } from './intelligentGeneration';
+// API base URL - defaults to localhost for development
+const API_URL = import.meta.env.VITE_ADK_API_URL || 'http://localhost:8000';
 
 export interface ADKAnalysisResult {
   questions: Array<{
@@ -20,9 +24,16 @@ export interface ADKAnalysisResult {
   };
 }
 
+export interface GenerationContext {
+  notes: string;
+  audience: string;
+  slideCount: number;
+  style: string;
+  tone: string;
+}
+
 /**
- * Analyze notes and ask questions using ADK coordinator
- * Drop-in replacement for intelligentGeneration.analyzeNotesAndAskQuestions
+ * Analyze notes and ask questions using ADK coordinator (via backend API)
  *
  * @param userPrompt - User's input text
  * @param mentionedSlideIds - Optional array of slide IDs mentioned with @ (e.g., @slide2)
@@ -33,68 +44,41 @@ export async function analyzeNotesAndAskQuestions(
   mentionedSlideIds?: string[],
   slides?: any[]
 ): Promise<ADKAnalysisResult> {
-  console.log('🤖 [ADK] analyzeNotesAndAskQuestions called');
-  console.log('📝 [ADK] User prompt:', userPrompt.substring(0, 100) + '...');
+  console.log('🌐 [ADK Client] Calling backend API');
+  console.log('📝 [ADK Client] User prompt:', userPrompt.substring(0, 100) + '...');
   if (mentionedSlideIds && mentionedSlideIds.length > 0) {
-    console.log('📌 [ADK] Mentioned slides:', mentionedSlideIds);
+    console.log('📌 [ADK Client] Mentioned slides:', mentionedSlideIds);
   }
 
   try {
-    // Create ADK session for this request
-    const session = new Session({ sessionId: `analyze-${Date.now()}` });
-
-    // Detect mode: EDIT if slides mentioned, CREATE otherwise
-    const isEditMode = mentionedSlideIds && mentionedSlideIds.length > 0;
-
-    if (isEditMode && slides) {
-      // EDIT MODE - Set session state for editing specific slides
-      session.state.set('mode', 'edit');
-      session.state.set('target_slide_ids', mentionedSlideIds);
-      session.state.set('user_input', userPrompt);
-
-      // Calculate slide numbers (1-indexed) from IDs
-      const slideNumbers = mentionedSlideIds.map(id => {
-        const index = slides.findIndex(s => s.id === id);
-        return index + 1;
-      });
-      session.state.set('target_slide_numbers', slideNumbers);
-
-      // Determine scope
-      const scope = mentionedSlideIds.length === slides.length ? 'all' :
-                   mentionedSlideIds.length > 1 ? 'multiple' : 'single';
-      session.state.set('scope', scope);
-
-      console.log(`⚡ [ADK] Edit mode: ${scope} - slides ${slideNumbers.join(', ')}`);
-    } else {
-      // CREATE MODE - Set session state for new deck creation
-      session.state.set('mode', 'create');
-      session.state.set('user_input', userPrompt);
-      console.log('⚡ [ADK] Create mode');
-    }
-
-    console.log('⚡ [ADK] Session created, calling coordinator...');
-
-    // Create invocation context
-    const ctx = new InvocationContext({
-      session,
-      userMessage: userPrompt,
-      timestamp: new Date()
+    const response = await fetch(`${API_URL}/api/adk/analyze`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userPrompt,
+        mentionedSlideIds,
+        slides
+      })
     });
 
-    // Get coordinator agent and run
-    const agent = getDeckRAIAgent();
-    const result = await agent.runAsync(ctx);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `API error: ${response.status} ${response.statusText}`);
+    }
 
-    console.log('✅ [ADK] Coordinator complete:', result);
+    const data = await response.json();
+    console.log('✅ [ADK Client] Backend response received:', data);
 
-    // Parse result from coordinator
-    const analysis = parseCoordinatorResult(result, userPrompt, isEditMode);
+    // Parse the coordinator result
+    const analysis = parseCoordinatorResult(data.result, userPrompt, data.isEditMode);
 
-    console.log('✅ [ADK] Analysis result:', analysis);
+    console.log('✅ [ADK Client] Analysis result:', analysis);
     return analysis;
 
   } catch (error: any) {
-    console.error('❌ [ADK] Error in analyzeNotesAndAskQuestions:', error);
+    console.error('❌ [ADK Client] API call failed:', error);
 
     // Fallback to sensible defaults
     return {
@@ -113,58 +97,91 @@ export async function analyzeNotesAndAskQuestions(
       suggestions: {
         recommendedSlideCount: 7,
         recommendedStyle: "executive",
-        reasoning: "Standard deck with professional style (ADK coordinator fallback)"
+        reasoning: "Standard deck with professional style (backend unavailable - using fallback)"
       }
     };
   }
 }
 
 /**
- * Generate slides with full context using ADK coordinator
- * Drop-in replacement for intelligentGeneration.generateSlidesWithContext
+ * Generate slides with full context using ADK coordinator (via backend API)
  */
 export async function generateSlidesWithContext(
   context: GenerationContext
 ): Promise<string[]> {
-  console.log('🤖 [ADK] generateSlidesWithContext called');
-  console.log('📝 [ADK] Context:', context);
+  console.log('🌐 [ADK Client] Calling backend API for slide generation');
+  console.log('📝 [ADK Client] Context:', context);
 
   try {
-    // Create ADK session for slide generation
-    const session = new Session({ sessionId: `generate-${Date.now()}` });
-
-    // Set session state with full context
-    session.state.set('mode', 'create');
-    session.state.set('user_input', context.notes);
-    session.state.set('audience', context.audience);
-    session.state.set('slide_count', context.slideCount);
-    session.state.set('style', context.style);
-    session.state.set('tone', context.tone);
-
-    console.log('⚡ [ADK] Session created, calling coordinator...');
-
-    // Create invocation context
-    const ctx = new InvocationContext({
-      session,
-      userMessage: `Generate ${context.slideCount} slides for ${context.audience} in ${context.style} style: ${context.notes}`,
-      timestamp: new Date()
+    const response = await fetch(`${API_URL}/api/adk/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ context })
     });
 
-    // Get coordinator agent and run
-    const agent = getDeckRAIAgent();
-    const result = await agent.runAsync(ctx);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `API error: ${response.status}`);
+    }
 
-    console.log('✅ [ADK] Coordinator complete');
+    const data = await response.json();
+    console.log('✅ [ADK Client] Backend response received');
 
     // Parse slide prompts from result
-    const slidePrompts = parseSlidePromptsFromResult(result, context);
+    const slidePrompts = parseSlidePromptsFromResult(data.result, context);
 
-    console.log(`✅ [ADK] Generated ${slidePrompts.length} slide prompts`);
+    console.log(`✅ [ADK Client] Generated ${slidePrompts.length} slide prompts`);
     return slidePrompts;
 
   } catch (error: any) {
-    console.error('❌ [ADK] Error in generateSlidesWithContext:', error);
+    console.error('❌ [ADK Client] API call failed:', error);
     throw new Error(`ADK slide generation failed: ${error.message}`);
+  }
+}
+
+/**
+ * Execute slide editing task using ADK coordinator (via backend API)
+ */
+export async function executeSlideTask(
+  slideId: string,
+  task: string,
+  currentSlideSrc: string,
+  slides?: any[]
+): Promise<string> {
+  console.log('🌐 [ADK Client] Calling backend API for slide edit');
+  console.log('🆔 [ADK Client] Slide ID:', slideId);
+  console.log('📝 [ADK Client] Task:', task);
+
+  try {
+    const response = await fetch(`${API_URL}/api/adk/edit-slide`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        slideId,
+        task,
+        currentSlideSrc,
+        slides
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ [ADK Client] Backend response received');
+
+    // Return the new slide src
+    return data.newSlideSrc;
+
+  } catch (error: any) {
+    console.error('❌ [ADK Client] API call failed:', error);
+    throw new Error(`ADK slide edit failed: ${error.message}`);
   }
 }
 
@@ -255,69 +272,6 @@ function parseCoordinatorResult(result: any, userPrompt: string, isEditMode: boo
       reasoning: `ADK Coordinator analyzed your request and recommends a ${slideCount}-slide ${style} presentation. This format will effectively communicate your key messages while maintaining audience engagement.`
     }
   };
-}
-
-/**
- * Execute slide editing task using ADK coordinator
- * Drop-in replacement for geminiService.executeSlideTask
- *
- * @param slideId - ID of the slide to edit
- * @param task - Edit task description
- * @param currentSlideSrc - Current slide image data URL
- * @param slides - Array of all slides (for context)
- * @returns Promise<string> - New slide image data URL
- */
-export async function executeSlideTask(
-  slideId: string,
-  task: string,
-  currentSlideSrc: string,
-  slides?: any[]
-): Promise<string> {
-  console.log('🤖 [ADK] executeSlideTask called');
-  console.log('📝 [ADK] Task:', task);
-  console.log('🆔 [ADK] Slide ID:', slideId);
-
-  try {
-    // Create ADK session for slide editing
-    const session = new Session({ sessionId: `edit-slide-${Date.now()}` });
-
-    // Set session state for EDIT mode
-    session.state.set('mode', 'edit');
-    session.state.set('target_slide_ids', [slideId]);
-    session.state.set('user_input', task);
-    session.state.set('scope', 'single');
-
-    // Add slide number if slides array provided
-    if (slides) {
-      const slideIndex = slides.findIndex(s => s.id === slideId);
-      if (slideIndex !== -1) {
-        session.state.set('target_slide_numbers', [slideIndex + 1]);
-      }
-    }
-
-    console.log('⚡ [ADK] Session created for slide edit, calling coordinator...');
-
-    // Create invocation context
-    const ctx = new InvocationContext({
-      session,
-      userMessage: task,
-      timestamp: new Date()
-    });
-
-    // Get coordinator agent and run
-    const agent = getDeckRAIAgent();
-    const result = await agent.runAsync(ctx);
-
-    console.log('✅ [ADK] Coordinator edit complete');
-
-    // For now, return the current slide (full implementation pending)
-    // In full implementation, this would return the edited slide from the specialized agent
-    return currentSlideSrc;
-
-  } catch (error: any) {
-    console.error('❌ [ADK] Error in executeSlideTask:', error);
-    throw new Error(`ADK slide edit failed: ${error.message}`);
-  }
 }
 
 /**
