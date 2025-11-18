@@ -4,6 +4,7 @@
  */
 
 import { GoogleGenAI } from "@google/genai";
+import { CompanyTheme } from '../types';
 
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
@@ -69,7 +70,7 @@ IMPORTANT: Return ONLY the JSON object. Do not include any conversational text, 
 }`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-pro",
+    model: "gemini-3-pro-preview",
     config: {
       thinkingConfig: {
         thinkingBudget: 32768 // Max thinking budget for best strategic analysis quality
@@ -129,6 +130,8 @@ IMPORTANT: Return ONLY the JSON object. Do not include any conversational text, 
 export const generateSlidesWithContext = async (
   context: GenerationContext
 ): Promise<string[]> => {
+  console.log('📝 generateSlidesWithContext called with:', context);
+
   const systemPrompt = `You are an expert "Presentation Content Strategist" for a leading tech company. Your specialty is transforming raw information into clear, concise, and compelling slide deck outlines.
 
 **Context:**
@@ -174,27 +177,40 @@ ${getStyleGuidelines(context.style || 'auto')}
 **Output Format:**
 Your final output MUST be a JSON array of strings, where each string is the complete, detailed prompt for one slide. Do not add any other explanation or text outside of the JSON array.`;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-pro",
-    config: {
-      thinkingConfig: {
-        thinkingBudget: 32768 // Max thinking budget for highest quality deck planning
-      }
-    },
-    contents: [{ text: systemPrompt }],
-  });
-
-  const jsonText = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
+  console.log('🤖 Calling Gemini API...');
 
   try {
-    const parsed = JSON.parse(jsonText);
-    if (Array.isArray(parsed)) {
-      return parsed;
+    const response = await ai.models.generateContent({
+      model: "gemini-3-pro-preview",
+      config: {
+        thinkingConfig: {
+          thinkingBudget: 32768 // Max thinking budget for highest quality deck planning
+        }
+      },
+      contents: [{ text: systemPrompt }],
+    });
+
+    console.log('✅ Gemini API response received');
+    const jsonText = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
+    console.log('📄 Extracted JSON text (first 200 chars):', jsonText.substring(0, 200));
+
+    try {
+      const parsed = JSON.parse(jsonText);
+      if (Array.isArray(parsed)) {
+        console.log(`✅ Successfully parsed ${parsed.length} slide descriptions`);
+        return parsed;
+      }
+      console.error('❌ Parsed result is not an array:', typeof parsed);
+      throw new Error("Invalid format - expected array");
+    } catch (e) {
+      console.error("❌ Failed to parse slide descriptions:", e);
+      console.error("Raw response:", jsonText);
+      throw new Error("Failed to generate slides. Please try again.");
     }
-    throw new Error("Invalid format");
-  } catch (e) {
-    console.error("Failed to parse slide descriptions:", e);
-    throw new Error("Failed to generate slides. Please try again.");
+  } catch (apiError: any) {
+    console.error('❌ Gemini API call failed:', apiError);
+    console.error('Error details:', apiError.message, apiError.stack);
+    throw new Error(`API Error: ${apiError.message || 'Failed to generate slides'}`);
   }
 };
 
@@ -295,3 +311,4 @@ function getStyleGuidelines(style: string): string {
 - Clear structure with whitespace
 - Professional design, avoid clutter`;
 }
+
