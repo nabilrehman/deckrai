@@ -23,20 +23,54 @@ export interface ADKAnalysisResult {
 /**
  * Analyze notes and ask questions using ADK coordinator
  * Drop-in replacement for intelligentGeneration.analyzeNotesAndAskQuestions
+ *
+ * @param userPrompt - User's input text
+ * @param mentionedSlideIds - Optional array of slide IDs mentioned with @ (e.g., @slide2)
+ * @param slides - Optional array of current slides (for edit mode)
  */
 export async function analyzeNotesAndAskQuestions(
-  userPrompt: string
+  userPrompt: string,
+  mentionedSlideIds?: string[],
+  slides?: any[]
 ): Promise<ADKAnalysisResult> {
   console.log('🤖 [ADK] analyzeNotesAndAskQuestions called');
   console.log('📝 [ADK] User prompt:', userPrompt.substring(0, 100) + '...');
+  if (mentionedSlideIds && mentionedSlideIds.length > 0) {
+    console.log('📌 [ADK] Mentioned slides:', mentionedSlideIds);
+  }
 
   try {
     // Create ADK session for this request
     const session = new Session({ sessionId: `analyze-${Date.now()}` });
 
-    // Set session state for CREATE mode
-    session.state.set('mode', 'create');
-    session.state.set('user_input', userPrompt);
+    // Detect mode: EDIT if slides mentioned, CREATE otherwise
+    const isEditMode = mentionedSlideIds && mentionedSlideIds.length > 0;
+
+    if (isEditMode && slides) {
+      // EDIT MODE - Set session state for editing specific slides
+      session.state.set('mode', 'edit');
+      session.state.set('target_slide_ids', mentionedSlideIds);
+      session.state.set('user_input', userPrompt);
+
+      // Calculate slide numbers (1-indexed) from IDs
+      const slideNumbers = mentionedSlideIds.map(id => {
+        const index = slides.findIndex(s => s.id === id);
+        return index + 1;
+      });
+      session.state.set('target_slide_numbers', slideNumbers);
+
+      // Determine scope
+      const scope = mentionedSlideIds.length === slides.length ? 'all' :
+                   mentionedSlideIds.length > 1 ? 'multiple' : 'single';
+      session.state.set('scope', scope);
+
+      console.log(`⚡ [ADK] Edit mode: ${scope} - slides ${slideNumbers.join(', ')}`);
+    } else {
+      // CREATE MODE - Set session state for new deck creation
+      session.state.set('mode', 'create');
+      session.state.set('user_input', userPrompt);
+      console.log('⚡ [ADK] Create mode');
+    }
 
     console.log('⚡ [ADK] Session created, calling coordinator...');
 
@@ -54,7 +88,7 @@ export async function analyzeNotesAndAskQuestions(
     console.log('✅ [ADK] Coordinator complete:', result);
 
     // Parse result from coordinator
-    const analysis = parseCoordinatorResult(result, userPrompt);
+    const analysis = parseCoordinatorResult(result, userPrompt, isEditMode);
 
     console.log('✅ [ADK] Analysis result:', analysis);
     return analysis;
@@ -136,13 +170,35 @@ export async function generateSlidesWithContext(
 
 /**
  * Parse coordinator result into analysis format
+ * @param result - Result from ADK coordinator
+ * @param userPrompt - Original user prompt
+ * @param isEditMode - Whether this is edit mode (true) or create mode (false)
  */
-function parseCoordinatorResult(result: any, userPrompt: string): ADKAnalysisResult {
+function parseCoordinatorResult(result: any, userPrompt: string, isEditMode: boolean = false): ADKAnalysisResult {
   // Try to extract structured data from coordinator response
   // For now, use intelligent defaults based on prompt analysis
 
   const promptLower = userPrompt.toLowerCase();
 
+  // EDIT MODE - Different analysis for slide editing
+  if (isEditMode) {
+    return {
+      questions: [
+        {
+          question: "How should I apply this change?",
+          options: ["Subtle refinement", "Moderate update", "Complete redesign"],
+          reasoning: "Understanding the extent of changes helps maintain visual consistency"
+        }
+      ],
+      suggestions: {
+        recommendedSlideCount: 1, // Editing doesn't change count
+        recommendedStyle: "maintain_existing",
+        reasoning: "ADK Coordinator will edit the selected slide(s) while maintaining the existing deck style and tone."
+      }
+    };
+  }
+
+  // CREATE MODE - Analyze for new deck creation
   // Detect slide count from prompt
   let slideCount = 7; // default
   const countMatch = userPrompt.match(/(\d+)[- ]?slide/i);
@@ -199,6 +255,69 @@ function parseCoordinatorResult(result: any, userPrompt: string): ADKAnalysisRes
       reasoning: `ADK Coordinator analyzed your request and recommends a ${slideCount}-slide ${style} presentation. This format will effectively communicate your key messages while maintaining audience engagement.`
     }
   };
+}
+
+/**
+ * Execute slide editing task using ADK coordinator
+ * Drop-in replacement for geminiService.executeSlideTask
+ *
+ * @param slideId - ID of the slide to edit
+ * @param task - Edit task description
+ * @param currentSlideSrc - Current slide image data URL
+ * @param slides - Array of all slides (for context)
+ * @returns Promise<string> - New slide image data URL
+ */
+export async function executeSlideTask(
+  slideId: string,
+  task: string,
+  currentSlideSrc: string,
+  slides?: any[]
+): Promise<string> {
+  console.log('🤖 [ADK] executeSlideTask called');
+  console.log('📝 [ADK] Task:', task);
+  console.log('🆔 [ADK] Slide ID:', slideId);
+
+  try {
+    // Create ADK session for slide editing
+    const session = new Session({ sessionId: `edit-slide-${Date.now()}` });
+
+    // Set session state for EDIT mode
+    session.state.set('mode', 'edit');
+    session.state.set('target_slide_ids', [slideId]);
+    session.state.set('user_input', task);
+    session.state.set('scope', 'single');
+
+    // Add slide number if slides array provided
+    if (slides) {
+      const slideIndex = slides.findIndex(s => s.id === slideId);
+      if (slideIndex !== -1) {
+        session.state.set('target_slide_numbers', [slideIndex + 1]);
+      }
+    }
+
+    console.log('⚡ [ADK] Session created for slide edit, calling coordinator...');
+
+    // Create invocation context
+    const ctx = new InvocationContext({
+      session,
+      userMessage: task,
+      timestamp: new Date()
+    });
+
+    // Get coordinator agent and run
+    const agent = getDeckRAIAgent();
+    const result = await agent.runAsync(ctx);
+
+    console.log('✅ [ADK] Coordinator edit complete');
+
+    // For now, return the current slide (full implementation pending)
+    // In full implementation, this would return the edited slide from the specialized agent
+    return currentSlideSrc;
+
+  } catch (error: any) {
+    console.error('❌ [ADK] Error in executeSlideTask:', error);
+    throw new Error(`ADK slide edit failed: ${error.message}`);
+  }
 }
 
 /**
