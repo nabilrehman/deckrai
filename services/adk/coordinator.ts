@@ -17,7 +17,7 @@
  */
 
 import { LlmAgent, Gemini } from '@google/adk';
-import { GOOGLE_SEARCH } from '../tools';
+import { GOOGLE_SEARCH } from './tools';
 
 /**
  * Get API key from environment
@@ -129,7 +129,6 @@ If session state provides mention context, USE IT! Don't re-parse the message.
 
 ## Decision Tree
 
-```
 IF request mentions template or reference style:
     IF also mentions architecture:
         → transfer_to_agent(agent_name='TemplateArchitectureAgent')
@@ -149,7 +148,6 @@ ELSE IF multiple reference decks (3+):
 
 ELSE:
     → transfer_to_agent(agent_name='StandardAgent')
-```
 
 ## Examples
 
