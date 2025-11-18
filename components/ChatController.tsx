@@ -3,7 +3,7 @@ import ChatInterface from './ChatInterface';
 import ThinkingSection, { ThinkingStep } from './ThinkingSection';
 import ActionSummary, { ActionItem } from './ActionSummary';
 import { Slide, StyleLibraryItem } from '../types';
-import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationContext } from '../services/deckraiService';
+import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationContext } from '../services/intelligentGeneration';
 import { detectVibeFromNotes, getDesignerStylesForVibe, PresentationVibe } from '../services/vibeDetection';
 
 interface ChatMessage {
