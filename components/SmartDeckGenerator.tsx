@@ -3,7 +3,7 @@ import { Slide, StyleLibraryItem } from '../types';
 import GenerationPlanProposal, { GenerationPlan } from './GenerationPlanProposal';
 import FloatingActionBubble from './FloatingActionBubble';
 import EnhancedThemePreviewSelector from './EnhancedThemePreviewSelector';
-import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationContext } from '../services/intelligentGeneration';
+import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationContext } from '../services/deckraiService';
 import { createSlideFromPrompt, findBestStyleReferenceFromPrompt } from '../services/geminiService';
 import { detectVibeFromNotes, getDesignerStylesForVibe, getDesignerStyleById, generateStylePromptModifier, PresentationVibe } from '../services/vibeDetection';
 

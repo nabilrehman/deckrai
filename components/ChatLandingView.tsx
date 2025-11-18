@@ -8,9 +8,9 @@ import SlidePreviewInline from './SlidePreviewInline';
 import UndoActionButton from './UndoActionButton';
 import ChatInputWithMentions from './ChatInputWithMentions';
 import { Slide, StyleLibraryItem, StoredChatMessage } from '../types';
-import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationContext } from '../services/intelligentGeneration';
+import { analyzeNotesAndAskQuestions, generateSlidesWithContext, executeSlideTask, GenerationContext } from '../services/deckraiService';
 import { detectVibeFromNotes, getDesignerStylesForVibe, getDesignerStyleById, generateStylePromptModifier, PresentationVibe } from '../services/vibeDetection';
-import { createSlideFromPrompt, findBestStyleReferenceFromPrompt, executeSlideTask } from '../services/geminiService';
+import { createSlideFromPrompt, findBestStyleReferenceFromPrompt } from '../services/geminiService';
 import { saveChat, getUserChats, getChat } from '../services/firestoreService';
 import { SavedChat } from '../types';
 
