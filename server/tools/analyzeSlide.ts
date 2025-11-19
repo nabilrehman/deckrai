@@ -98,7 +98,25 @@ export async function analyzeSlide(params: {
  * Build analysis prompt based on goal
  */
 function buildAnalysisPrompt(goal: string): string {
-  const basePrompt = `Analyze this presentation slide and return a JSON object with the following structure:
+  const basePrompt = `You are a MASTER SLIDE ANALYZER AND DESIGNER with expertise in both content strategy and visual design.
+
+**Your Job:**
+1. Analyze slides from CONTENT and DESIGN perspectives
+2. Provide QUALITY FEEDBACK on what's working and what isn't
+3. Identify specific IMPROVEMENTS NEEDED
+4. Highlight what's GOOD about the slide
+5. Suggest what CAN BE IMPROVED
+
+**Your Expertise:**
+- Presentation design (10+ years)
+- Visual hierarchy, typography, color theory
+- Content strategy and storytelling
+- Accessibility (WCAG compliance)
+- Brand design
+
+---
+
+Analyze this presentation slide and return a JSON object with the following structure:
 
 {
   "category": "<one of: title|problem|solution|features|benefits|usecases|pricing|cta|other>",
@@ -106,22 +124,53 @@ function buildAnalysisPrompt(goal: string): string {
   "visualElements": ["<list of visual elements: images, charts, icons, diagrams, etc>"],
   "colorScheme": ["<dominant colors as hex codes>"],
   "layout": "<centered|left-aligned|grid|two-column|image-heavy>",
-  "suggestions": ["<list of improvement suggestions>"]
-}`;
+
+  "qualityScore": <1-10 rating>,
+  "status": "<excellent|good|needs-improvement|poor>",
+  "issues": [
+    {
+      "type": "<too-much-text|too-little-text|poor-contrast|cluttered|bland|off-brand|unclear-message>",
+      "severity": "<critical|important|minor>",
+      "description": "<what the issue is>",
+      "recommendation": "<how to fix it>"
+    }
+  ],
+
+  "strengths": ["<what's working well>"],
+  "improvements": ["<specific actionable improvements>"],
+  "suggestions": ["<general suggestions>"]
+}
+
+**Quality Assessment Guidelines:**
+- qualityScore: 8-10 = excellent, 6-7 = good, 4-5 = needs-improvement, 1-3 = poor
+- status: Overall slide quality assessment
+- issues: Identify specific problems (too much text, poor contrast, etc.) with severity and fix recommendations
+- strengths: What's working well (good visuals, clear message, nice layout, etc.)
+- improvements: Specific, actionable changes (reduce text by 50%, add icon, change color X to Y)
+- suggestions: General ideas for enhancement
+
+**Common Issues to Check:**
+- Too much text (more than 50 words or 5 bullet points)
+- Too little text (unclear message)
+- Poor color contrast (accessibility)
+- Cluttered layout (too many elements)
+- Bland design (solid color background, no visuals)
+- Off-brand colors or fonts
+- Unclear message or purpose`;
 
   switch (goal) {
     case 'quick':
-      return `${basePrompt}\n\nProvide a QUICK analysis focusing on category and layout only.`;
+      return `${basePrompt}\n\nProvide a QUICK analysis focusing on category, status, and top 2 issues only.`;
 
     case 'content-only':
-      return `${basePrompt}\n\nFocus ONLY on text content: textDensity and suggestions for content improvements.`;
+      return `${basePrompt}\n\nFocus on TEXT QUALITY: Check for too-much-text, unclear-message, readability issues.`;
 
     case 'visual-only':
-      return `${basePrompt}\n\nFocus ONLY on visual elements: visualElements, colorScheme, and layout.`;
+      return `${basePrompt}\n\nFocus on VISUAL QUALITY: Check for poor-contrast, cluttered, bland design issues.`;
 
     case 'full':
     default:
-      return `${basePrompt}\n\nProvide a COMPREHENSIVE analysis with detailed suggestions for improvements.`;
+      return `${basePrompt}\n\nProvide COMPREHENSIVE quality assessment with all issues, strengths, and improvements identified.`;
   }
 }
 

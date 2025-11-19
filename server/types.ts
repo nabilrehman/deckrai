@@ -20,7 +20,21 @@ export interface SlideAnalysis {
   visualElements: string[];
   colorScheme: string[];
   layout: 'centered' | 'left-aligned' | 'grid' | 'two-column' | 'image-heavy';
-  suggestions: string[];
+
+  // Quality Assessment
+  qualityScore: number; // 1-10 scale
+  status: 'excellent' | 'good' | 'needs-improvement' | 'poor';
+  issues: Array<{
+    type: 'too-much-text' | 'too-little-text' | 'poor-contrast' | 'cluttered' | 'bland' | 'off-brand' | 'unclear-message';
+    severity: 'critical' | 'important' | 'minor';
+    description: string;
+    recommendation: string;
+  }>;
+
+  // Actionable Feedback
+  strengths: string[]; // What's working well
+  improvements: string[]; // Specific improvements to make
+  suggestions: string[]; // General suggestions
 }
 
 export interface DeckAnalysis {
