@@ -2,48 +2,57 @@
  * Deckr ADK Tools
  * 10 atomic tools for slide generation and editing
  *
- * Each tool wraps existing functionality from services/
- * Tools are single-purpose, well-documented, and ADK-compliant
+ * Architecture:
+ * - Each tool wraps existing services (lift & shift)
+ * - Single-purpose, well-documented, type-safe
+ * - ADK-compliant schemas for LLM understanding
+ *
+ * Tool Organization:
+ * 1. Vision & Analysis (Phase 2) ✅
+ * 2. Slide Generation & Editing (Phase 3)
+ * 3. Research & Brand (Phase 4)
+ * 4. Infrastructure (Phase 5)
  */
 
-// TODO Phase 2-5: Implement all tools
+// ============================================================================
+// Phase 2: Vision & Analysis Tools ✅ COMPLETE
+// ============================================================================
 
-/**
- * Phase 2: Vision & Analysis Tools
- * - analyzeSlideTool (single slide vision)
- * - analyzeDeckTool (batch deck vision)
- */
+export { analyzeSlideTool } from './analyzeSlide';
+export { analyzeDeckTool } from './analyzeDeck';
 
-/**
- * Phase 3: Slide Generation & Editing Tools
- * - createSlideTool (wraps createSlideFromPrompt)
- * - minorEditSlideTool (wraps inpainting/targeted edits)
- * - redesignSlideTool (wraps executeSlideTask with 3 variations)
- */
+// ============================================================================
+// Phase 3: Slide Generation & Editing Tools (TODO)
+// ============================================================================
 
-/**
- * Phase 4: Research Tools
- * - researchCompanyTool (Google Search + Gemini synthesis)
- * - analyzeBrandTool (wraps generateThemeFromWebsite)
- * - fetchCompanyLogoTool (Cloud Run API - fallback after Gemini search)
- * - extractPainPointsTool (NLP extraction from notes)
- */
+// TODO: createSlideTool - wraps createSlideFromPrompt + specialized generators
+// TODO: minorEditSlideTool - wraps inpainting/targeted edits
+// TODO: redesignSlideTool - wraps executeSlideTask (3 variations)
 
-/**
- * Phase 5: Infrastructure Tools
- * - uploadFileTool (PDF extraction, Firebase Storage)
- */
-
-// Placeholder exports
-export const analyzeSlideTool = null;
-export const analyzeDeckTool = null;
 export const createSlideTool = null;
 export const minorEditSlideTool = null;
 export const redesignSlideTool = null;
+
+// ============================================================================
+// Phase 4: Research & Brand Tools (TODO)
+// ============================================================================
+
+// TODO: researchCompanyTool - Google Search + Gemini synthesis
+// TODO: analyzeBrandTool - wraps generateThemeFromWebsite
+// TODO: fetchCompanyLogoTool - Cloud Run API (fallback after Gemini search)
+// TODO: extractPainPointsTool - NLP extraction from notes
+
 export const researchCompanyTool = null;
 export const analyzeBrandTool = null;
 export const fetchCompanyLogoTool = null;
 export const extractPainPointsTool = null;
+
+// ============================================================================
+// Phase 5: Infrastructure Tools (TODO)
+// ============================================================================
+
+// TODO: uploadFileTool - PDF extraction, Firebase Storage upload
+
 export const uploadFileTool = null;
 
 /**
