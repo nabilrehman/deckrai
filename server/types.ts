@@ -123,7 +123,7 @@ export interface CreateSlideParams {
 export interface MinorEditSlideParams {
   prompt: string; // Edit instruction
   base64Image: string; // Original slide image (base64 data URL)
-  base64Mask: string; // Mask highlighting area to edit (base64 data URL)
+  base64Mask?: string; // Optional: Mask highlighting area to edit (base64 data URL). If provided, only masked region is edited (inpainting). If not provided, entire slide can be edited based on instruction.
   deepMode: boolean;
 }
 

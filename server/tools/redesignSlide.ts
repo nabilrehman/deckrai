@@ -101,9 +101,11 @@ export async function redesignSlide(params: RedesignSlideParams): Promise<ToolRe
 
 **User's Redesign Request:** "${params.detailedPrompt}"
 
-**Instructions:**
+**CRITICAL Instructions:**
 - Interpret the request and apply the changes to the slide's design, layout, or content.
-- If the request is vague, make reasonable professional design choices.
+- **PRESERVE THE ORIGINAL COLOR SCHEME** unless the user specifically requests a color change (e.g., "make it dark theme", "change to blue colors").
+- **PRESERVE THE ORIGINAL THEME** (light/dark) unless explicitly asked to change it.
+- If the request is vague, make reasonable professional design choices while maintaining the original visual theme and colors.
 - Ensure the redesigned slide is visually appealing and maintains readability.`;
 
     // Generate 3 variations for user choice
