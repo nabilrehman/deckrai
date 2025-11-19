@@ -112,23 +112,24 @@ export interface AnalyzeDeckParams {
 }
 
 export interface CreateSlideParams {
-  prompt: string;
-  referenceSrc?: string; // Optional reference slide
-  theme?: BrandTheme;
-  logoSrc?: string;
-  customImages?: string[];
+  detailedPrompt: string;
+  referenceSlideImage?: string | null; // Optional reference slide (base64 data URL)
+  deepMode: boolean;
+  theme?: BrandTheme | null;
+  logoImage?: string | null; // Company logo (base64 data URL)
+  customImage?: string | null; // Custom image to include (base64 data URL)
 }
 
 export interface MinorEditSlideParams {
-  slideSrc: string;
-  editPrompt: string;
-  maskSrc?: string; // For inpainting
+  prompt: string; // Edit instruction
+  base64Image: string; // Original slide image (base64 data URL)
+  base64Mask: string; // Mask highlighting area to edit (base64 data URL)
+  deepMode: boolean;
 }
 
 export interface RedesignSlideParams {
-  slideSrc: string;
-  redesignPrompt: string;
-  referenceSrc?: string;
+  base64Image: string; // Slide to redesign (base64 data URL)
+  detailedPrompt: string; // Redesign instruction
   deepMode: boolean;
 }
 
@@ -153,6 +154,25 @@ export interface ExtractPainPointsParams {
 export interface UploadFileParams {
   file: string; // base64 or blob
   fileType: 'pdf' | 'image' | 'logo';
+}
+
+// ============================================================================
+// TOOL RESULT DATA TYPES
+// ============================================================================
+
+export interface CreateSlideResult {
+  images: string[]; // Generated slide variations (base64 data URLs)
+  prompts: string[]; // Final prompts used for each variation
+}
+
+export interface MinorEditSlideResult {
+  images: string[]; // Edited slide variations (base64 data URLs)
+  variationPrompts: string[]; // Final prompts used for each variation
+}
+
+export interface RedesignSlideResult {
+  images: string[]; // Redesigned slide variations (base64 data URLs)
+  prompts: string[]; // Final prompts used for each variation
 }
 
 // ============================================================================

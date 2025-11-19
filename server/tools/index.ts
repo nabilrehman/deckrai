@@ -22,16 +22,12 @@ export { analyzeSlideTool } from './analyzeSlide';
 export { analyzeDeckTool } from './analyzeDeck';
 
 // ============================================================================
-// Phase 3: Slide Generation & Editing Tools (TODO)
+// Phase 3: Slide Generation & Editing Tools ✅ COMPLETE
 // ============================================================================
 
-// TODO: createSlideTool - wraps createSlideFromPrompt + specialized generators
-// TODO: minorEditSlideTool - wraps inpainting/targeted edits
-// TODO: redesignSlideTool - wraps executeSlideTask (3 variations)
-
-export const createSlideTool = null;
-export const minorEditSlideTool = null;
-export const redesignSlideTool = null;
+export { createSlideTool } from './createSlide';
+export { minorEditSlideTool } from './minorEditSlide';
+export { redesignSlideTool } from './redesignSlide';
 
 // ============================================================================
 // Phase 4: Research & Brand Tools (TODO)
