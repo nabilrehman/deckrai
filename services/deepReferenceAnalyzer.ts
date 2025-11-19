@@ -193,7 +193,7 @@ export async function analyzeReferenceSlide(
     }
 
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-pro',
+      model: 'gemini-3-pro-preview',
       contents: [
         {
           inlineData: {

@@ -127,7 +127,12 @@ const Editor: React.FC<EditorProps> = ({
     setIsCreatingPlan(true);
     setError(null);
     try {
-        const slidesInfo = slides.map(s => ({ id: s.id, name: s.name }));
+        // Pass slide images for vision-based analysis
+        const slidesInfo = slides.map(s => ({
+          id: s.id,
+          name: s.name,
+          src: s.history && s.history.length > 0 ? s.history[s.history.length - 1] : s.originalSrc
+        }));
         const plan = await generateDeckExecutionPlan(deckAiPrompt, slidesInfo);
 
         let isPlanValid = true;
@@ -181,7 +186,11 @@ const Editor: React.FC<EditorProps> = ({
 
     try {
       // Step 1: Analyze request
-      const slidesInfo = slides.map(s => ({ id: s.id, name: s.name }));
+      const slidesInfo = slides.map(s => ({
+        id: s.id,
+        name: s.name,
+        src: s.history && s.history.length > 0 ? s.history[s.history.length - 1] : s.originalSrc
+      }));
 
       // Step 2: Generate plan
       thinkingSteps[0].status = 'completed';

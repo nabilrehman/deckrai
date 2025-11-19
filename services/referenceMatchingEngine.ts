@@ -166,7 +166,7 @@ ${spec.brandContext ? `- Brand Context: ${spec.brandContext}` : ''}
       .replace('{{SLIDE_SPECS}}', slideSpecsText);
 
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-pro',
+      model: 'gemini-3-pro-preview',
       contents: prompt,
     });
     const responseText = result.text;

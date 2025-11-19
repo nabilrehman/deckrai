@@ -199,7 +199,7 @@ ${slideSpec.dataVisualization ? `Data: ${slideSpec.dataVisualization}` : ''}
     const base64Data = match[2];
 
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-pro',
+      model: 'gemini-3-pro-preview',
       contents: [
         {
           inlineData: {

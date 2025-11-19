@@ -256,7 +256,7 @@ Return ONLY valid JSON with all 5 fields:
 }`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-pro-preview',
         config: {
           thinkingConfig: {
             thinkingBudget: 8192 // Use thinking mode for better context understanding
@@ -657,7 +657,7 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
         initialPrompt: `Designer Mode: ${slideCount} slides for ${context.myCompany}`,
         finalImages: slides.map(s => s.originalSrc),
         logs: debugLogs,
-        model: 'gemini-2.5-pro + gemini-2.5-flash-image',
+        model: 'gemini-3-pro-preview + gemini-2.5-flash-image',
         deepMode: false
       };
 
@@ -810,10 +810,11 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
     setUploadError(null);
 
     try {
-      // Create slide info for AI planner
+      // Create slide info for AI planner (with images for vision-based analysis)
       const slidesInfo = uploadedSlides.map((slide) => ({
         id: slide.id,
         name: slide.name,
+        src: slide.history && slide.history.length > 0 ? slide.history[slide.history.length - 1] : slide.originalSrc
       }));
 
       // Generate AI execution plan

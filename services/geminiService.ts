@@ -62,7 +62,7 @@ Respond with ONLY valid JSON. Omit fields that aren't being changed.`;
 
   try {
     const result = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.5-flash',
       contents: prompt
     });
     const responseText = result.text.trim();
@@ -124,7 +124,7 @@ Respond with ONLY valid JSON matching the EditIntent format. No explanation.`;
 
   try {
     const result = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.5-flash',
       contents: prompt
     });
     const responseText = result.text.trim();
@@ -144,6 +144,231 @@ Respond with ONLY valid JSON matching the EditIntent format. No explanation.`;
   } catch (error) {
     console.error('Error parsing edit intent:', error);
     return { isEditing: false, slideNumbers: [], action: '', scope: 'single' };
+  }
+};
+
+/**
+ * Deck Customization Intent - Analyzes uploaded deck + user request
+ * Creates a customization plan with specific actions (modify, add, remove slides)
+ */
+export interface DeckCustomizationPlan {
+  isCustomization: boolean;
+  companyName?: string;
+  customizations: Array<{
+    action: 'modify' | 'add' | 'remove' | 'recreate';
+    slideIndex?: number;  // For modify/remove (0-indexed)
+    description: string;
+    position?: 'before' | 'after' | 'end';  // For add
+    positionIndex?: number;  // Which slide to add before/after
+    useAssetAsSlide?: boolean;  // If true, treat uploaded image as the slide itself
+    assetName?: string;  // Name of asset to use
+  }>;
+  assetUsage?: {
+    [assetName: string]: 'logo' | 'image_asset' | 'slide_to_recreate' | 'reference_style';
+  };
+  reasoning: string;
+}
+
+export const analyzeDeckCustomization = async (
+  userPrompt: string,
+  uploadedSlideCount: number,
+  uploadedAssets?: Array<{ id: string; name: string; type: 'image' | 'logo'; src: string }>
+): Promise<DeckCustomizationPlan> => {
+  // Build asset context for AI
+  const assetContext = uploadedAssets && uploadedAssets.length > 0
+    ? `\n\n**Uploaded Images:**\nThe user has uploaded ${uploadedAssets.length} image(s):\n${uploadedAssets.map(a => `- ${a.name}`).join('\n')}\n\n**IMPORTANT:** Images can be used in different ways based on user intent:\n- **Logo/Asset**: "use this logo in the title" → use as brand asset in slides\n- **Slide to Recreate**: "recreate this slide" → treat image as existing slide to redesign\n- **Style Reference**: "make slides like this" → use as visual style inspiration\n\nDetermine from the user's prompt how each image should be used.`
+    : '';
+
+  const deckContext = uploadedSlideCount > 0
+    ? `A user has uploaded an existing deck (${uploadedSlideCount} slides) and wants to customize it.`
+    : `A user has uploaded files and wants to work with them.`;
+
+  const prompt = `You are an expert presentation customization agent. ${deckContext}${assetContext}
+
+**User Request:** "${userPrompt}"
+
+**Your Task:**
+Analyze the request and create a detailed customization plan that specifies:
+1. Which slides to MODIFY (with specific changes)
+2. Which slides to ADD (with descriptions and positions)
+3. Which slides to REMOVE (if any)
+4. Which slides to RECREATE (if user says "recreate this slide")
+5. Extract the company/customer name if mentioned
+6. Determine how uploaded images should be used (logo, asset, slide to recreate, or style reference)
+
+**Example Requests and Responses:**
+
+Request: "customize this deck for Atlassian.com and add their pain point slide and architecture diagram of solution, add customer references from similar industry"
+Response:
+{
+  "isCustomization": true,
+  "companyName": "Atlassian",
+  "customizations": [
+    {
+      "action": "modify",
+      "slideIndex": 0,
+      "description": "Update title slide with Atlassian branding and logo"
+    },
+    {
+      "action": "add",
+      "description": "Pain Points Slide - Research and showcase Atlassian's key challenges in their domain (project management, team collaboration)",
+      "position": "after",
+      "positionIndex": 2
+    },
+    {
+      "action": "add",
+      "description": "Solution Architecture Diagram - Technical architecture showing how our solution integrates with Atlassian's infrastructure",
+      "position": "after",
+      "positionIndex": 3
+    },
+    {
+      "action": "add",
+      "description": "Customer References - Similar companies in software/SaaS industry (e.g., GitHub, GitLab, Jira competitors) who use our solution",
+      "position": "end"
+    }
+  ],
+  "reasoning": "The user wants to personalize an existing deck for Atlassian. This requires: (1) updating branding on title, (2) adding a pain points slide that addresses Atlassian-specific challenges, (3) adding technical architecture, and (4) adding relevant customer proof points."
+}
+
+Request: "update this deck for Microsoft, add competitive analysis"
+Response:
+{
+  "isCustomization": true,
+  "companyName": "Microsoft",
+  "customizations": [
+    {
+      "action": "modify",
+      "slideIndex": 0,
+      "description": "Update title slide with Microsoft branding"
+    },
+    {
+      "action": "add",
+      "description": "Competitive Analysis - Compare our solution vs Microsoft's current tools, highlighting unique advantages",
+      "position": "end"
+    }
+  ],
+  "reasoning": "User wants to tailor the deck for Microsoft and include competitive positioning."
+}
+
+Request: "recreate this slide" (with image "old-title.png" uploaded)
+Response:
+{
+  "isCustomization": true,
+  "customizations": [
+    {
+      "action": "recreate",
+      "description": "Recreate the slide with modern design and improved visual hierarchy",
+      "useAssetAsSlide": true,
+      "assetName": "old-title.png",
+      "position": "end"
+    }
+  ],
+  "assetUsage": {
+    "old-title.png": "slide_to_recreate"
+  },
+  "reasoning": "User wants to recreate an uploaded slide image with better design."
+}
+
+Request: "use this logo in the first slide" (with "company-logo.png" uploaded)
+Response:
+{
+  "isCustomization": true,
+  "customizations": [
+    {
+      "action": "modify",
+      "slideIndex": 0,
+      "description": "Add company-logo.png to the title slide",
+      "assetName": "company-logo.png"
+    }
+  ],
+  "assetUsage": {
+    "company-logo.png": "logo"
+  },
+  "reasoning": "User wants to use the uploaded logo as a brand asset in the first slide."
+}
+
+Request: "update [company].com's logo in first slide" (with "1.png" and "deck.pdf" uploaded)
+Response:
+{
+  "isCustomization": true,
+  "companyName": "[extracted company name from prompt]",
+  "customizations": [
+    {
+      "action": "modify",
+      "slideIndex": 0,
+      "description": "Update first slide with [company] branding using 1.png logo",
+      "assetName": "1.png"
+    }
+  ],
+  "assetUsage": {
+    "1.png": "logo"
+  },
+  "reasoning": "User wants to customize the deck for [company] and replace the logo on the first slide with the uploaded 1.png file. Extract company name dynamically from user's prompt."
+}
+
+Request: "make 5 slides like this" (with "reference.png" uploaded)
+Response:
+{
+  "isCustomization": true,
+  "customizations": [
+    {
+      "action": "add",
+      "description": "New slide following the visual style of reference.png",
+      "position": "end"
+    }
+  ],
+  "assetUsage": {
+    "reference.png": "reference_style"
+  },
+  "reasoning": "User wants to create new slides using the uploaded image as a style reference."
+}
+
+Request: "just fixing some typos"
+Response:
+{
+  "isCustomization": false,
+  "customizations": [],
+  "reasoning": "This is a simple edit request, not a strategic customization with company targeting."
+}
+
+**Important:**
+- If the request involves targeting a specific company/customer AND adding/modifying strategic content, set isCustomization: true
+- Extract company names DYNAMICALLY from ANY mention in the prompt (e.g., "acme.com" → "Acme", "update for XYZ Corp" → "XYZ Corp", "klick.com's logo" → "Klick")
+- Company can be ANYTHING - don't assume specific names, extract from user's actual prompt
+- For "add" actions, suggest smart positions (after intro, before conclusion, etc.)
+- Be specific in descriptions so designers know exactly what to create
+- For "recreate" actions, set useAssetAsSlide: true and specify assetName
+- Always include assetUsage map to clarify how each uploaded image should be used
+- Match generic filenames (1.png, image.jpg) to their purpose based on context from the prompt
+
+Respond with ONLY valid JSON. No explanation.`;
+
+  try {
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.5-pro',
+      config: {
+        thinkingConfig: {
+          thinkingBudget: 16384  // Good thinking for strategic planning
+        }
+      },
+      contents: prompt
+    });
+    const responseText = result.text.trim();
+
+    const jsonMatch = responseText.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) ||
+                     responseText.match(/(\{[\s\S]*\})/);
+
+    if (!jsonMatch) {
+      console.error('Failed to parse customization plan:', responseText);
+      return { isCustomization: false, customizations: [], reasoning: 'Failed to parse' };
+    }
+
+    const plan: DeckCustomizationPlan = JSON.parse(jsonMatch[1]);
+    console.log('🎯 Deck Customization Plan:', plan);
+    return plan;
+  } catch (error) {
+    console.error('Error analyzing deck customization:', error);
+    return { isCustomization: false, customizations: [], reasoning: 'Error occurred' };
   }
 };
 
@@ -363,7 +588,7 @@ export const getPersonalizationPlan = async (companyWebsite: string, base64Image
 **CRITICAL:** If no personalization is possible, return an empty JSON object like \`{"text_replacements": [], "image_replacements": []}\`.`;
     
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-pro",
+        model: "gemini-3-pro-preview",
         contents: { parts: [originalImagePart, {text: systemPrompt}] },
         config: { 
           tools: [{ googleSearch: {} }],
@@ -628,7 +853,7 @@ Analyze the target slide to understand its fundamental layout and content struct
     ];
 
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-pro",
+        model: "gemini-3-pro-preview",
         contents,
     });
 
@@ -685,7 +910,7 @@ Analyze the user's prompt to understand the INTENDED layout and content structur
     ];
 
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-pro",
+        model: "gemini-3-pro-preview",
         contents,
     });
     
@@ -791,8 +1016,64 @@ Render the content from the JSON BLUEPRINT according to the user's GOAL, ensurin
 // ==================================================================
 // "PLAN AND EXECUTE" DECK PERSONALIZATION WORKFLOW
 // ==================================================================
-export const generateDeckExecutionPlan = async (userPrompt: string, slidesInfo: { id: string, name: string }[]): Promise<DeckAiExecutionPlan> => {
-    const systemPrompt = `You are a "Master Presentation Strategist" AI. Your goal is to create a JSON execution plan to modify a slide deck based on a user's high-level request.
+export const generateDeckExecutionPlan = async (
+  userPrompt: string,
+  slidesInfo: { id: string, name: string, src?: string }[]
+): Promise<DeckAiExecutionPlan> => {
+    // Check if we have slide images for vision-based analysis
+    const hasSlideImages = slidesInfo.length > 0 && slidesInfo[0].src;
+
+    const systemPrompt = hasSlideImages
+      ? `You are a "Master Presentation Strategist" AI with vision capabilities. Your goal is to create a JSON execution plan to modify a slide deck based on a user's high-level request.
+
+**Your Inputs:**
+1.  A user's request (e.g., "Customize this deck for dhl.com, make it more visual...").
+2.  The ACTUAL SLIDE IMAGES - you can see exactly what's on each slide.
+3.  Each slide's ID and name for reference.
+
+**Your Task:**
+1.  **Analyze the Request:** Understand what the user wants to achieve.
+2.  **LOOK AT EACH SLIDE:** Visually analyze the content, layout, text density, visuals, data, etc.
+3.  **Create Slide-Specific Prompts:** For each slide that needs changes, create a detailed \`detailed_prompt\` that:
+    - Describes what you SEE on the slide currently
+    - Specifies exactly what to change based on the user's request
+    - Provides specific visual recommendations (e.g., "Convert the 5 bullet points into an icon grid", "Transform the data table into a bar chart")
+    - References the target customer/company where relevant
+
+**CRITICAL RULES:**
+1.  **Be Specific:** Don't say "make it more visual" - say "Convert the 5 text bullet points about features into a 5-icon grid with minimal text"
+2.  **Reference What You See:** "The slide currently has 3 paragraphs of text and a small logo. Transform this into..."
+3.  **Tailor to Content:** A slide with data tables needs different treatment than a slide with bullet points
+4.  **Skip Unchanged Slides:** If a slide doesn't need changes based on the user's request, don't include it
+
+**Output Format:** Valid JSON object with two keys: \`thought_process\` and \`tasks\`.
+    *   \`thought_process\`: Your analysis of the deck and strategy.
+    *   \`tasks\`: Array of task objects. Each task must have a \`type\`.
+
+**Task Object Schemas:**
+*   **If \`type\` is \`'EDIT_SLIDE'\`:** The object MUST contain:
+    *   \`slideId\`: string (The ID of the slide to edit, from the provided list)
+    *   \`detailed_prompt\`: string (Your instructions for the worker AI)
+*   **If \`type\` is \`'ADD_SLIDE'\`:** The object MUST contain:
+    *   \`newSlideName\`: string (A concise name for the new slide)
+    *   \`insertAfterSlideId\`: string (The ID of the slide that should come *before* the new one. Use "START" to add to the beginning.)
+    *   \`detailed_prompt\`: string (Your instructions for creating the new slide)
+
+**CRITICAL RULES:**
+1. If a slide does not need to be changed, DO NOT include it in the plan.
+2. **VERSIONS/VARIATIONS HANDLING:** If the user requests "N versions", "N variations", or "N different designs" of a slide:
+   - Create ONLY ONE 'EDIT_SLIDE' task for that slide
+   - In the detailed_prompt, explicitly state: "Generate N variations with different themes: [list the N distinct design directions]"
+   - The system will automatically generate multiple variations from a single EDIT_SLIDE task
+   - Example: "Give me 3 versions of slide 2" → ONE EDIT_SLIDE task with prompt: "Generate 3 variations: 1) Professional theme with corporate colors, 2) Creative theme with bold graphics, 3) Minimalist theme with elegant spacing"
+3. DO NOT create multiple EDIT_SLIDE tasks for the same slideId - this will cause overwrites.
+4. Only use 'ADD_SLIDE' when the user wants to INSERT a completely new slide into the deck.
+5. **UPLOADED IMAGE FILES:** If the user mentions uploaded image files:
+   - These are separate assets (not part of the slide deck)
+   - Interpret the user's intent - they could say anything: "add logo", "add these 5 logos in customer slides", "use this icon", "recreate this sketch", "add these to reference slides"
+   - In your detailed_prompt, describe how to use the uploaded files based on what the user asked for
+   - Be flexible and context-aware - let the user's request guide how you use the uploaded images`
+      : `You are a "Master Presentation Strategist" AI. Your goal is to create a JSON execution plan to modify a slide deck based on a user's high-level request.
 
 **Your Inputs:**
 1.  A user's request (e.g., "Customize this deck for dhl.com, add a POC slide...").
@@ -823,23 +1104,60 @@ export const generateDeckExecutionPlan = async (userPrompt: string, slidesInfo: 
    - The system will automatically generate multiple variations from a single EDIT_SLIDE task
    - Example: "Give me 3 versions of slide 2" → ONE EDIT_SLIDE task with prompt: "Generate 3 variations: 1) Professional theme with corporate colors, 2) Creative theme with bold graphics, 3) Minimalist theme with elegant spacing"
 3. DO NOT create multiple EDIT_SLIDE tasks for the same slideId - this will cause overwrites.
-4. Only use 'ADD_SLIDE' when the user wants to INSERT a completely new slide into the deck.`;
-    
-    const slideListForPrompt = slidesInfo.map(s => `- ID: "${s.id}", Name: "${s.name}"`).join('\n');
-    const fullPrompt = `User Request: "${userPrompt}"\n\nSlide Deck Structure:\n${slideListForPrompt}`;
-    
+4. Only use 'ADD_SLIDE' when the user wants to INSERT a completely new slide into the deck.
+5. **UPLOADED IMAGE FILES:** If the user mentions uploaded image files:
+   - These are separate assets (not part of the slide deck)
+   - Interpret the user's intent - they could say anything: "add logo", "add these 5 logos in customer slides", "use this icon", "recreate this sketch", "add these to reference slides"
+   - In your detailed_prompt, describe how to use the uploaded files based on what the user asked for
+   - Be flexible and context-aware - let the user's request guide how you use the uploaded images`;
+
+    // Build the prompt with slide references
+    const slideListForPrompt = slidesInfo.map((s, idx) =>
+      `- Slide ${idx + 1}: ID="${s.id}", Name="${s.name}"`
+    ).join('\n');
+
+    const fullPrompt = hasSlideImages
+      ? `User Request: "${userPrompt}"\n\nSlide Deck Structure:\n${slideListForPrompt}\n\nI'm now showing you each slide image in order. Analyze them visually and create specific prompts for the changes needed.`
+      : `User Request: "${userPrompt}"\n\nSlide Deck Structure:\n${slideListForPrompt}`;
+
+    // Build content parts: system prompt + user prompt + slide images (if available)
+    const contentParts: any[] = [
+      { text: systemPrompt },
+      { text: fullPrompt }
+    ];
+
+    // Add slide images for vision-based analysis (if available)
+    if (hasSlideImages) {
+      console.log(`[Master Agent] 👁️ Using VISION mode: Analyzing ${slidesInfo.length} slides visually...`);
+      slidesInfo.forEach((slide, idx) => {
+        if (slide.src) {
+          contentParts.push({ text: `\n--- SLIDE ${idx + 1} (ID: ${slide.id}) ---` });
+          contentParts.push(fileToGenerativePart(slide.src));
+        }
+      });
+      console.log(`[Master Agent] Sending ${contentParts.length} content parts (system + prompt + ${slidesInfo.length * 2} slide parts) to Gemini 3 Pro...`);
+    } else {
+      console.log(`[Master Agent] 📝 Using TEXT mode: Planning based on slide names only (no images provided)...`);
+    }
+
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-pro",
-        contents: [{ role: 'user', parts: [{ text: systemPrompt }, { text: fullPrompt }] }],
-        config: { 
+        model: "gemini-3-pro-preview",
+        contents: [{ role: 'user', parts: contentParts }],
+        config: {
+          thinkingConfig: {
+            thinkingBudget: 32768 // Max thinking budget for strategic planning
+          },
           tools: [{ googleSearch: {} }],
         }
     });
 
     const jsonText = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
+    console.log(`[Master Agent] Received response. Parsing execution plan...`);
+
     try {
         const parsedPlan = JSON.parse(jsonText);
-        
+        console.log(`[Master Agent] ✅ Successfully created ${parsedPlan.tasks?.length || 0} tasks based on visual analysis`);
+
         // Create a map for quick slide name lookups
         const slideInfoMap = new Map(slidesInfo.map(s => [s.id, s.name]));
 
@@ -938,12 +1256,27 @@ export const createSlideFromPrompt = async (
         imageParts.push(fileToGenerativePart(referenceSlideImage));
     }
      if (logoImage) {
-        logoInstructions = `\n\n**CRITICAL LOGO INSTRUCTION:** A logo image has been provided ONLY for reference to understand the brand. You MUST NOT attempt to draw, recreate, or include any logo in the generated image. AI image generators cannot reliably reproduce logos or text. Instead, you have two options:
-1. PREFERRED: Completely ignore the logo and do not reserve any space for it. Generate the slide without any logo placeholder.
-2. ALTERNATIVE: If you must acknowledge it, add a small subtle gray rectangle placeholder in the bottom corner (max 150px wide) with the text "LOGO" in tiny letters.
+        logoInstructions = `\n\n**LOGO PLACEMENT INSTRUCTION:** A company logo has been provided as a reference image.
 
-DO NOT attempt to recreate the logo design, colors, or text. This is a reference only.`;
-        imageParts.push({ text: "--- BRAND LOGO REFERENCE (DO NOT DRAW OR RECREATE THIS IN THE OUTPUT) ---" });
+**CRITICAL: PRESERVE EXISTING LOGOS**
+- If the original slide already contains logos (e.g., Google Cloud, AWS, Microsoft, etc.), you MUST keep them exactly as they are
+- The new logo should be ADDED to the slide, not replace existing logos
+- If there's already a logo in the top-right corner, place the new logo in a different position (top-left, bottom-right, or bottom-left)
+- If the top-right is empty, place the new logo there
+
+**Logo Specifications:**
+- Position: Top-right corner preferred (if available), otherwise top-left or bottom corner
+- Size: Approximately 120-180px width (scale proportionally to match existing logos)
+- Padding: 40-60px from edges
+- Style: Recreate the logo's colors, shapes, and design elements as faithfully as possible
+- Background: Ensure the logo has proper contrast against the slide background
+- Quality: Make the logo clear, sharp, and professional
+
+**Layout Guidance:**
+- If multiple logos exist, arrange them in a clean, balanced way
+- Maintain visual hierarchy - don't let logos compete for attention
+- The new logo should establish brand identity without overwhelming the slide content or removing existing branding`;
+        imageParts.push({ text: "--- COMPANY LOGO (ADD this while preserving existing logos) ---" });
         imageParts.push(fileToGenerativePart(logoImage));
     }
     if (customImage) {
@@ -964,6 +1297,8 @@ DO NOT attempt to recreate the logo design, colors, or text. This is a reference
     ];
 
     console.log(`[createSlideFromPrompt] 🎨 Generating ${basePrompts.length} variation...`);
+    console.log(`[createSlideFromPrompt] 📋 FULL PROMPT SENT TO GEMINI 2.5 FLASH IMAGE:`);
+    console.log(basePrompts[0]); // Log the actual prompt being sent
     onProgress?.('Generating new slide...');
     const promises = basePrompts.map((p, idx) => {
         console.log(`[createSlideFromPrompt] Variation ${idx + 1}/${basePrompts.length} prompt length: ${p.length} chars`);
@@ -1020,7 +1355,7 @@ export const analyzeDebugSession = async (session: DebugSession): Promise<string
 **Your Output:** A clear, well-structured analysis in Markdown format.`;
 
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-pro",
+        model: "gemini-3-pro-preview",
         contents: [{ text: systemPrompt }, { text: `\n\n--- SESSION LOG TO ANALYZE ---\n\`\`\`json\n${JSON.stringify(session, null, 2)}\n\`\`\``}],
     });
     
@@ -1047,7 +1382,7 @@ export const generateOutlineFromNotes = async (rawNotes: string): Promise<string
 Your final output MUST be a JSON array of strings, where each string is the complete, detailed prompt for one slide. Do not add any other explanation or text outside of the JSON array.`;
 
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-pro",
+        model: "gemini-3-pro-preview",
         contents: [{ text: systemPrompt }, { text: `\n\n--- RAW NOTES TO ANALYZE ---\n${rawNotes}` }],
     });
 
@@ -1089,7 +1424,7 @@ Your final output MUST be a JSON array of strings, with each string being the ne
 
     const fullPrompt = `--- USER'S OUTLINE ---\n${originalPrompts.join('\n')}`;
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-pro",
+        model: "gemini-3-pro-preview",
         contents: [{ text: systemPrompt }, { text: fullPrompt }],
     });
     
@@ -1127,7 +1462,7 @@ export const generateThemeFromWebsite = async (companyWebsite: string): Promise<
 3.  **Return a Structured JSON Object:** Your final output MUST be a valid JSON object. Do not add any other explanation or text outside of the JSON object. The object must have the following keys: \`primaryColor\`, \`secondaryColor\`, \`accentColor\`, \`fontStyle\`, \`visualStyle\`.`;
 
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-pro",
+        model: "gemini-3-pro-preview",
         contents: [{ text: systemPrompt }],
         config: {
             tools: [{ googleSearch: {} }],

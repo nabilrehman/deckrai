@@ -432,7 +432,7 @@ export async function generateDesignerOutline(
 
     const masterStart = Date.now();
     const masterResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-pro',
+      model: 'gemini-3-pro-preview',
       contents: masterPrompt,
       config: {
         thinkingConfig: {
@@ -483,7 +483,7 @@ export async function generateDesignerOutline(
 
       const slideStart = Date.now();
       const slideResponse = await ai.models.generateContent({
-        model: 'gemini-2.5-pro',
+        model: 'gemini-3-pro-preview',
         contents: slidePrompt,
         config: {
           thinkingConfig: {
