@@ -14,8 +14,13 @@ import type {
 import { analyzeReferenceSlide } from './deepReferenceAnalyzer';
 import { browserLogger } from './browserLogger';
 
+// Handle both Node.js (backend) and browser (frontend) environments
+const apiKey = (typeof import.meta !== 'undefined' && import.meta.env)
+  ? import.meta.env.VITE_GEMINI_API_KEY
+  : process.env.VITE_GEMINI_API_KEY;
+
 // Initialize Gemini API
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey });
 
 /**
  * Slide specification from Master Agent
@@ -199,8 +204,14 @@ ${spec.brandContext ? `- Brand Context: ${spec.brandContext}` : ''}
         .replace(/\s*\([^)]+\)\s*$/, '')  // Then remove (content), (image-content), etc.
         .trim();
 
-      // Find the reference by name
-      const reference = references.find(ref => ref.name === cleanReferenceName);
+      // Find the reference by name (also clean the reference name for comparison)
+      const reference = references.find(ref => {
+        const cleanRefName = ref.name
+          .replace(/\.png$/i, '')
+          .replace(/\s*\([^)]+\)\s*$/, '')
+          .trim();
+        return cleanRefName === cleanReferenceName;
+      });
 
       if (!reference) {
         const message = `Reference ${match.referenceName} (cleaned: ${cleanReferenceName}) not found, skipping slide ${match.slideNumber}`;
@@ -285,7 +296,7 @@ async function quickCategorizeReference(referenceUrl: string): Promise<string> {
 Respond with ONLY the category name, nothing else.`;
 
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
+      model: 'gemini-3-pro-preview', // Upgraded to 3.0 Pro for better vision
       contents: [
         {
           inlineData: {
