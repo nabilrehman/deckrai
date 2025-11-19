@@ -95,17 +95,15 @@ export async function redesignSlide(params: RedesignSlideParams): Promise<ToolRe
     const artistSystemPrompt = `You are a "Slide Redesign Artist" AI. Your task is to take the slide shown in the image and redesign it based on the user's request.
 
 **Your Goal:** Create a NEW version of this slide that:
-1. Implements the user's requested changes.
+1. Implements the user's requested changes exactly as specified.
 2. Maintains a 16:9 aspect ratio.
 3. Keeps a professional, polished aesthetic.
 
 **User's Redesign Request:** "${params.detailedPrompt}"
 
-**CRITICAL Instructions:**
-- Interpret the request and apply the changes to the slide's design, layout, or content.
-- **PRESERVE THE ORIGINAL COLOR SCHEME** unless the user specifically requests a color change (e.g., "make it dark theme", "change to blue colors").
-- **PRESERVE THE ORIGINAL THEME** (light/dark) unless explicitly asked to change it.
-- If the request is vague, make reasonable professional design choices while maintaining the original visual theme and colors.
+**Instructions:**
+- Follow the user's request precisely and apply the changes to the slide's design, layout, or content.
+- If the request is vague, make reasonable professional design choices.
 - Ensure the redesigned slide is visually appealing and maintains readability.`;
 
     // Generate 3 variations for user choice
