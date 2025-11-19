@@ -29,6 +29,18 @@ app.post('/api/chat', async (req, res) => {
   });
 });
 
+// GET handler for browser visits
+app.get('/api/chat', (req, res) => {
+  res.json({
+    message: 'Deckr ADK Chat Endpoint',
+    method: 'POST',
+    status: 'Phase 1 Complete ✓',
+    usage: 'Send POST request with JSON body: { "userId": "...", "message": "..." }',
+    implementation: 'Phase 2-6 in progress',
+    nextPhase: 'Implement vision tools (analyzeSlideTool, analyzeDeckTool)'
+  });
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`🤖 Deckr ADK Server running on port ${PORT}`);
