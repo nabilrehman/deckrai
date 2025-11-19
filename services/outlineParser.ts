@@ -40,7 +40,15 @@ function tryExtractJSON(markdownOutput: string): any | null {
 
     for (let i = 0; i < blocks.length; i++) {
       try {
-        const jsonText = blocks[i][1].trim();
+        let jsonText = blocks[i][1].trim();
+
+        // Extract JSON from response - handle conversational text before JSON
+        // Try to find JSON object in the response if direct parse fails
+        const objMatch = jsonText.match(/\{[\s\S]*\}/);
+        if (objMatch) {
+          jsonText = objMatch[0];
+        }
+
         const parsed = JSON.parse(jsonText);
 
         // Extract brand research from first block that has it
