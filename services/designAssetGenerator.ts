@@ -5,7 +5,7 @@
 
 import { GoogleGenerativeAI } from '@google/genai';
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const GEMINI_API_KEY = process.env.VITE_GEMINI_API_KEY;
 
 export interface DesignAsset {
   name: string;

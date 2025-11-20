@@ -37,13 +37,14 @@ function fileToGenerativePart(base64Data: string) {
 
 /**
  * Helper: Generate single redesigned variation
+ * Now accepts an array of image parts (can include multiple images)
  */
 async function generateRedesignedVariation(
-  originalImagePart: any,
+  imageParts: any[],
   systemPrompt: string,
   deepMode: boolean
 ): Promise<{ image: string; finalPrompt: string }> {
-  const parts = [originalImagePart, { text: systemPrompt }];
+  const parts = [...imageParts, { text: systemPrompt }];
 
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
@@ -86,12 +87,34 @@ export async function redesignSlide(params: RedesignSlideParams): Promise<ToolRe
 
   try {
     console.log(`[redesignSlideTool] Redesigning slide with instruction: ${params.detailedPrompt.substring(0, 100)}...`);
+    console.log(`[redesignSlideTool] Additional Images: ${params.additionalImages?.length || 0}`);
     console.log(`[redesignSlideTool] Deep Mode: ${params.deepMode}`);
 
-    // Prepare original image part
-    const originalImagePart = fileToGenerativePart(params.base64Image);
+    // Build image parts array
+    const imageParts: any[] = [];
+
+    // Add original slide
+    imageParts.push({ text: '--- ORIGINAL SLIDE (TO REDESIGN) ---' });
+    imageParts.push(fileToGenerativePart(params.base64Image));
+
+    // Add additional images (for style inspiration, content to include, etc.)
+    if (params.additionalImages && params.additionalImages.length > 0) {
+      params.additionalImages.forEach((img, idx) => {
+        imageParts.push({ text: `--- REFERENCE IMAGE ${idx + 1}: ${img.label} ---` });
+        imageParts.push(fileToGenerativePart(img.image));
+      });
+    }
 
     // Build artist system prompt
+    let additionalContext = '';
+    if (params.additionalImages && params.additionalImages.length > 0) {
+      additionalContext = '\n\n**Additional Reference Images:**\n';
+      params.additionalImages.forEach((img, idx) => {
+        additionalContext += `- Image ${idx + 1}: ${img.label}\n`;
+      });
+      additionalContext += '\nUse these reference images as inspiration or to incorporate specific elements as needed.';
+    }
+
     const artistSystemPrompt = `You are a "Slide Redesign Artist" AI. Your task is to take the slide shown in the image and redesign it based on the user's request.
 
 **Your Goal:** Create a NEW version of this slide that:
@@ -99,7 +122,7 @@ export async function redesignSlide(params: RedesignSlideParams): Promise<ToolRe
 2. Maintains a 16:9 aspect ratio.
 3. Keeps a professional, polished aesthetic.
 
-**User's Redesign Request:** "${params.detailedPrompt}"
+**User's Redesign Request:** "${params.detailedPrompt}"${additionalContext}
 
 **Instructions:**
 - Follow the user's request precisely and apply the changes to the slide's design, layout, or content.
@@ -118,7 +141,7 @@ export async function redesignSlide(params: RedesignSlideParams): Promise<ToolRe
     // Generate all variations in parallel
     const promises = variationPrompts.map((prompt, idx) => {
       console.log(`[redesignSlideTool] Generating variation ${idx + 1}/3...`);
-      return generateRedesignedVariation(originalImagePart, prompt, params.deepMode);
+      return generateRedesignedVariation(imageParts, prompt, params.deepMode);
     });
 
     const settledResults = await Promise.allSettled(promises);
@@ -177,7 +200,7 @@ export async function redesignSlide(params: RedesignSlideParams): Promise<ToolRe
  */
 export const redesignSlideTool = {
   name: 'redesignSlideTool',
-  description: 'Completely REDESIGN an existing slide based on new instructions. Generates 3 different variations for the user to choose from. Use this for major changes to layout, style, or content structure.',
+  description: 'Completely REDESIGN an existing slide based on new instructions. Generates 3 different variations for the user to choose from. Use this for major changes to layout, style, or content structure. Supports multiple additional images that Gemini 2.5 Flash can reference during redesign.',
   parameters: {
     type: 'object',
     properties: {
@@ -188,6 +211,24 @@ export const redesignSlideTool = {
       detailedPrompt: {
         type: 'string',
         description: 'Detailed instructions for how to redesign the slide (e.g., "Make it more visual with icons", "Change to a dark theme", "Simplify the layout and reduce text")',
+      },
+      additionalImages: {
+        type: 'array',
+        description: 'OPTIONAL: Array of additional images to use as reference or inspiration during redesign. Can pass any number of images.',
+        items: {
+          type: 'object',
+          properties: {
+            image: {
+              type: 'string',
+              description: 'Base64 data URL of the image',
+            },
+            label: {
+              type: 'string',
+              description: 'Description/label for this image (e.g., "Style reference", "Example layout", "Visual inspiration")',
+            },
+          },
+          required: ['image', 'label'],
+        },
       },
       deepMode: {
         type: 'boolean',

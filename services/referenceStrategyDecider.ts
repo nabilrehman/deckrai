@@ -16,8 +16,13 @@ import type {
 } from '../types/referenceMatching';
 import type { SlideSpecification } from './referenceMatchingEngine';
 
+// Handle both Node.js (backend) and browser (frontend) environments
+const apiKey = (typeof import.meta !== 'undefined' && import.meta.env)
+  ? import.meta.env.VITE_GEMINI_API_KEY
+  : process.env.VITE_GEMINI_API_KEY;
+
 // Initialize Gemini API
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey });
 
 /**
  * Strategy decision prompt for Gemini 2.5 Pro

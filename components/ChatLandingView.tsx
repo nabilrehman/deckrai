@@ -9,6 +9,7 @@ import UndoActionButton from './UndoActionButton';
 import ChatInputWithMentions from './ChatInputWithMentions';
 import VariationThumbnailGrid from './VariationThumbnailGrid';
 import ArtifactsVariationView from './ArtifactsVariationView';
+import ChatSidebar from './ChatSidebar';
 import { Slide, StyleLibraryItem, StoredChatMessage} from '../types';
 import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationContext } from '../services/intelligentGeneration';
 import { detectVibeFromNotes, getDesignerStylesForVibe, getDesignerStyleById, generateStylePromptModifier, PresentationVibe } from '../services/vibeDetection';
@@ -16,6 +17,11 @@ import { createSlideFromPrompt, findBestStyleReferenceFromPrompt, executeSlideTa
 import { researchBrandAndCreateTheme } from '../services/brandResearch';
 import { saveChat, getUserChats, getChat } from '../services/firestoreService';
 import { SavedChat } from '../types';
+// Backend ADK Agent Integration (NEW)
+import { callChatAPI } from '../services/chatApi';
+
+// Feature flag for backend ADK agent (set to true to enable)
+const USE_BACKEND_AGENT = true; // ✅ ENABLED FOR TESTING
 
 interface ChatMessage {
   id: string;
@@ -179,6 +185,7 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
   const [currentChatId, setCurrentChatId] = useState(`chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
   const [savedChats, setSavedChats] = useState<SavedChat[]>([]);
   const [loadingChats, setLoadingChats] = useState(false);
+  const isLoadingExistingChatRef = useRef(false);
 
   // Debug: Log styleLibrary on mount and when it changes
   useEffect(() => {
@@ -212,6 +219,9 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
   useEffect(() => {
     if (!user || messages.length === 0) return;
 
+    // Skip auto-save if we're just loading an existing chat (not sending new messages)
+    if (isLoadingExistingChatRef.current) return;
+
     const storedMessages = messages.map(chatMessageToStoredMessage);
 
     // Save and then refresh the chat list
@@ -229,6 +239,19 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
 
     return () => clearTimeout(saveTimeout);
   }, [messages, user, currentChatId]);
+
+  // Auto-complete all thinking steps when processing finishes
+  useEffect(() => {
+    if (!isProcessing && thinkingSteps.length > 0) {
+      // Check if there are any active or pending steps
+      const hasIncompleteSteps = thinkingSteps.some(s => s.status !== 'completed');
+
+      if (hasIncompleteSteps) {
+        console.log('[ChatLandingView] Processing finished - marking all thinking steps as completed');
+        setThinkingSteps(prev => prev.map(s => ({ ...s, status: 'completed' as const })));
+      }
+    }
+  }, [isProcessing, thinkingSteps]);
 
   const suggestedPrompts = [
     'Sales deck for enterprise clients',
@@ -437,54 +460,118 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
    * Helper: Load a saved chat
    */
   const handleLoadChat = useCallback(async (chatId: string) => {
-    if (!user) return;
+    if (!user) {
+      console.error('[ChatLandingView] Cannot load chat: no user');
+      return;
+    }
 
     try {
+      setLoadingChats(true);
+      isLoadingExistingChatRef.current = true; // Prevent auto-save from updating updatedAt
+
       const chatData = await getChat(user.uid, chatId);
       if (!chatData) {
-        console.error('Chat not found');
+        console.error('[ChatLandingView] Chat not found:', chatId);
+        isLoadingExistingChatRef.current = false;
         return;
       }
 
-      // Convert StoredChatMessages back to ChatMessages
-      const loadedMessages: ChatMessage[] = chatData.messages.map(stored => ({
-        id: stored.id,
-        role: stored.role,
-        content: stored.content,
-        timestamp: stored.timestamp,
-        thinking: stored.thinkingSteps ? {
-          steps: stored.thinkingSteps,
-          duration: 'a few seconds'
-        } : undefined,
-        slidePreview: stored.slideData?.map(data => ({
-          id: data.id,
-          name: data.name,
-          originalSrc: data.storageUrl,
-          history: [data.storageUrl]
-        }))
-      }));
+      console.log('[ChatLandingView] Loading chat:', chatId, `(${chatData.messages.length} messages)`);
 
-      setMessages(loadedMessages);
+      // Convert StoredChatMessages back to ChatMessages
+      const loadedMessages: ChatMessage[] = chatData.messages.map(storedMsg => {
+        const chatMsg: ChatMessage = {
+          id: storedMsg.id,
+          role: storedMsg.role,
+          content: storedMsg.content,
+          timestamp: storedMsg.timestamp,
+        };
+
+        // Restore thinking steps if present
+        if (storedMsg.thinkingSteps && storedMsg.thinkingSteps.length > 0) {
+          const totalDuration = storedMsg.thinkingSteps.reduce((sum, step) => {
+            return sum + (step.duration || 0);
+          }, 0);
+          chatMsg.thinking = {
+            steps: storedMsg.thinkingSteps,
+            duration: totalDuration > 0 ? `${Math.round(totalDuration / 1000)}s` : '0s'
+          };
+        }
+
+        // Restore slide previews if present
+        if (storedMsg.slideData && storedMsg.slideData.length > 0) {
+          chatMsg.slidePreview = storedMsg.slideData.map(sd => ({
+            id: sd.id,
+            name: sd.name,
+            originalSrc: sd.storageUrl,
+            history: [sd.storageUrl]
+          }));
+        }
+
+        // Restore mentioned slides
+        if (storedMsg.mentionedSlideIds) {
+          chatMsg.mentionedSlides = storedMsg.mentionedSlideIds;
+        }
+
+        // Restore attached images
+        if (storedMsg.attachedImageUrls) {
+          chatMsg.attachedImages = storedMsg.attachedImageUrls;
+        }
+
+        return chatMsg;
+      });
+
+      // Update state
       setCurrentChatId(chatId);
+      setMessages(loadedMessages);
       setChatActive(true);
 
-      console.log(`✅ Loaded chat: ${chatData.chat.title}`);
+      // If chat had generated slides, notify parent to restore them to editor
+      const lastAssistantMsg = loadedMessages.filter(m => m.role === 'assistant').pop();
+      if (lastAssistantMsg?.slidePreview && onSlidesGenerated) {
+        console.log('[ChatLandingView] Restoring slides to editor:', lastAssistantMsg.slidePreview.length);
+        onSlidesGenerated(lastAssistantMsg.slidePreview);
+      }
+
+      console.log('[ChatLandingView] Chat loaded successfully:', chatId);
+
+      // Clear the loading flag after a brief delay to ensure auto-save doesn't trigger
+      setTimeout(() => {
+        isLoadingExistingChatRef.current = false;
+      }, 100);
     } catch (error) {
-      console.error('Failed to load chat:', error);
+      console.error('[ChatLandingView] Failed to load chat:', error);
+      isLoadingExistingChatRef.current = false;
+    } finally {
+      setLoadingChats(false);
     }
-  }, [user]);
+  }, [user, onSlidesGenerated]);
 
   /**
-   * Helper: Start a new chat
+   * Conversation Management: Start a new chat
    */
   const handleNewChat = useCallback(() => {
+    // Generate new chat ID
+    const newChatId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Clear current conversation state
+    setCurrentChatId(newChatId);
     setMessages([]);
+    setThinkingSteps([]);
     setInputValue('');
-    setCurrentChatId(`chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
-    setChatActive(false);
     setGenerationPlan(null);
     setDetectedVibe(null);
-    setThinkingSteps([]);
+    setEditingPlan(null);
+    setAwaitingPlanEdit(false);
+    setUploadedDeckSlides([]);
+    setUploadedAssets([]);
+    setCurrentMentionedSlides([]);
+    setCurrentAttachedImages([]);
+
+    // Reset chat UI
+    setChatActive(false);
+
+    console.log('[ChatLandingView] Started new chat:', newChatId);
   }, []);
 
   // Auto-scroll to bottom when messages change
@@ -575,10 +662,7 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
       setThinkingSteps([]);
 
       try {
-        // Let LLM handle everything via generateDeckExecutionPlan
-        const { generateDeckExecutionPlan, createSlideFromPrompt: createSlide } = await import('../services/geminiService');
-
-        // Build context with uploaded files
+        // Build context with uploaded files first (needed for both backend and old code)
         const allUploadedFiles = [
           ...uploadedDeckSlides,
           ...uploadedAssets.map(asset => ({
@@ -588,6 +672,64 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
             name: asset.name
           }))
         ];
+
+        // Build extended prompt with asset info
+        let extendedPrompt = userPrompt;
+        if (uploadedAssets.length > 0) {
+          const assetList = uploadedAssets.map(a => `- ${a.name}`).join('\n');
+          extendedPrompt += `\n\n**User also uploaded these image files:**\n${assetList}\n\nAnalyze these images to determine their purpose (logo, slide to recreate, reference, etc.) and use them appropriately in your plan.`;
+        }
+
+        // ====================================================================
+        // BACKEND ADK AGENT INTEGRATION
+        // ====================================================================
+        if (USE_BACKEND_AGENT) {
+          console.log('🔄 Using Backend ADK Agent');
+
+          // Call backend API with context
+          const response = await callChatAPI(
+            extendedPrompt,
+            messages.map(m => ({ role: m.role, content: m.content })),
+            user?.uid,
+            {
+              uploadedFiles: allUploadedFiles.map(f => ({ name: f.name, src: f.originalSrc })),
+              styleLibrary: styleLibrary,
+              mentionedSlides: mentionedSlideIds
+            }
+          );
+
+          const duration = ((Date.now() - thinkingStartTime) / 1000).toFixed(1);
+
+          // Display agent response with thinking steps
+          addMessage({
+            role: 'assistant',
+            content: response.response || 'Processing complete',
+            thinking: response.thinking ? {
+              steps: response.thinking.steps,
+              duration: response.thinking.duration || `${duration}s`
+            } : undefined,
+            actions: response.toolCalls && response.toolCalls.length > 0 ? {
+              label: 'Tools Used',
+              icon: 'sparkles',
+              items: response.toolCalls.map(call => ({
+                id: call.tool,
+                label: call.tool.replace('Tool', ''),
+                status: 'completed',
+                diff: call.result?.success ? '✓' : '❌'
+              }))
+            } : undefined
+          });
+
+          setIsProcessing(false);
+          setThinkingSteps([]);
+          return;
+        }
+
+        // ====================================================================
+        // ORIGINAL CODE PATH (when USE_BACKEND_AGENT = false)
+        // ====================================================================
+        console.log('🔄 Using Direct Gemini Service');
+        const { generateDeckExecutionPlan, createSlideFromPrompt: createSlide } = await import('../services/geminiService');
 
         // Show detailed analysis steps
         addThinkingStep({
@@ -635,13 +777,6 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
         updateThinkingStep('understand-intent', { status: 'completed' });
 
         updateThinkingStep('create-plan', { status: 'active' });
-
-        // Build extended prompt with asset info for LLM
-        let extendedPrompt = userPrompt;
-        if (uploadedAssets.length > 0) {
-          const assetList = uploadedAssets.map(a => `- ${a.name}`).join('\n');
-          extendedPrompt += `\n\n**User also uploaded these image files:**\n${assetList}\n\nAnalyze these images to determine their purpose (logo, slide to recreate, reference, etc.) and use them appropriately in your plan.`;
-        }
 
         // Generate execution plan - LLM decides what to do (with vision!)
         const plan = await generateDeckExecutionPlan(
@@ -987,85 +1122,8 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
       return;
     }
 
-    // Check if user has style library → ask for mode selection (only for NEW deck creation)
-    const hasStyleLibrary = styleLibrary && styleLibrary.length > 0;
-
-    console.log('🔍 handleUserPrompt: Checking styleLibrary', {
-      styleLibraryExists: !!styleLibrary,
-      styleLibraryLength: styleLibrary?.length || 0,
-      hasStyleLibrary,
-      willShowModal: hasStyleLibrary
-    });
-
-    if (hasStyleLibrary) {
-      // Ask user to select mode before proceeding
-      setPendingUserPrompt(userPrompt);
-      addMessage({
-        role: 'assistant',
-        content: `I found ${styleLibrary.length} reference slide${styleLibrary.length > 1 ? 's' : ''} in your library! Would you like me to:\n\n**Use your company templates** - I'll match your content to uploaded references for perfect brand consistency.\n\n**Or start from scratch** - I'll research your brand from your website and create fresh designs with maximum creativity.`,
-        component: (
-          <div style={{
-            display: 'flex',
-            gap: '12px',
-            marginTop: '16px'
-          }}>
-            <button
-              onClick={() => continueWithMode('template', userPrompt)}
-              style={{
-                padding: '8px 20px',
-                background: '#8B5CF6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '20px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                boxShadow: 'none'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#7C3AED';
-                e.currentTarget.style.boxShadow = '0 1px 3px rgba(139, 92, 246, 0.3)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#8B5CF6';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              Use Templates
-            </button>
-            <button
-              onClick={() => continueWithMode('crazy', userPrompt)}
-              style={{
-                padding: '8px 20px',
-                background: 'transparent',
-                color: '#8B5CF6',
-                border: '1.5px solid #E0E0E0',
-                borderRadius: '20px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#FAFAFA';
-                e.currentTarget.style.borderColor = '#BDBDBD';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.borderColor = '#E0E0E0';
-              }}
-            >
-              Start from Scratch
-            </button>
-          </div>
-        )
-      });
-      return; // Wait for mode selection
-    }
-
-    // No style library → proceed directly with crazy mode
-    continueWithMode('crazy', userPrompt);
+    // Backend handles mode selection automatically
+    continueWithMode('template', userPrompt);
   }, [inputValue, addMessage, styleLibrary, artifactSlides, awaitingPlanEdit, generationPlan, onSlideUpdate]);
 
   /**
@@ -1137,6 +1195,103 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
     setThinkingSteps([]);
 
     try {
+      // ====================================================================
+      // BACKEND ADK AGENT INTEGRATION (Main Chat Flow)
+      // ====================================================================
+      if (USE_BACKEND_AGENT) {
+        console.log('🔄 Using Backend ADK Agent');
+
+        // Call backend API with streaming callback
+        const response = await callChatAPI(
+          userPrompt,
+          messages.map(m => ({ role: m.role, content: m.content })),
+          user?.uid,
+          {
+            styleLibrary: styleLibrary,
+            mode: mode
+          },
+          // Streaming callback - updates thinking steps in real-time
+          (event) => {
+            console.log('📡 Stream event:', event.type, event.data);
+
+            if (event.type === 'thinking') {
+              // Update thinking steps as they come in
+              setThinkingSteps(prev => {
+                const existingIndex = prev.findIndex(step => step.id === event.data.id);
+
+                if (existingIndex >= 0) {
+                  // Update existing step
+                  const updated = [...prev];
+                  updated[existingIndex] = {
+                    ...updated[existingIndex],
+                    ...event.data
+                  };
+                  return updated;
+                } else {
+                  // Add new step
+                  return [...prev, event.data];
+                }
+              });
+            }
+          }
+        );
+
+        const duration = ((Date.now() - thinkingStartTime) / 1000).toFixed(1);
+
+        // Extract generated slides from createSlideTool calls
+        const generatedSlides: Slide[] = [];
+        if (response.toolCalls) {
+          response.toolCalls.forEach((call, index) => {
+            if (call.tool === 'createSlideTool' && call.result?.success && call.result.data?.images) {
+              call.result.data.images.forEach((imageSrc: string, imgIndex: number) => {
+                generatedSlides.push({
+                  id: `slide-${Date.now()}-${index}-${imgIndex}`,
+                  originalSrc: imageSrc,
+                  history: []
+                });
+              });
+            }
+          });
+        }
+
+        // Update artifacts if slides were generated
+        if (generatedSlides.length > 0) {
+          console.log(`✅ Generated ${generatedSlides.length} slides from backend`);
+          generatedSlides.forEach(slide => {
+            onAddSlide?.(slide);
+          });
+        }
+
+        // Display agent response with thinking steps and slide preview
+        addMessage({
+          role: 'assistant',
+          content: response.response || 'Processing complete',
+          thinking: response.thinking ? {
+            steps: response.thinking.steps,
+            duration: response.thinking.duration || `${duration}s`
+          } : undefined,
+          actions: response.toolCalls && response.toolCalls.length > 0 ? {
+            label: 'Tools Used',
+            icon: 'sparkles',
+            items: response.toolCalls.map((call, index) => ({
+              name: call.tool.replace('Tool', ''),
+              status: 'completed',
+              changes: call.result?.success ? '✓' : '❌'
+            }))
+          } : undefined,
+          slidePreview: generatedSlides.length > 0 ? generatedSlides : undefined
+        });
+
+        setIsProcessing(false);
+        setThinkingSteps([]);
+        return;
+      }
+
+      // ====================================================================
+      // ORIGINAL CODE PATH (when USE_BACKEND_AGENT = false)
+      // ====================================================================
+      console.log('🔄 Using Direct Gemini Service');
+
       // Step 1: Detect vibe
       const step1: ThinkingStep = {
         id: 'step-vibe',
@@ -1235,6 +1390,18 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
       setIsProcessing(false);
     }
   }, [inputValue, thinkingStartTime, thinkingSteps, addMessage, addThinkingStep, updateThinkingStep]);
+
+  /**
+   * Conversation Management: Generate title from first message
+   */
+  const generateChatTitle = useCallback((firstUserMessage: string): string => {
+    // Take first 50 chars and truncate at word boundary
+    const truncated = firstUserMessage.substring(0, 50);
+    const lastSpace = truncated.lastIndexOf(' ');
+    return lastSpace > 0
+      ? truncated.substring(0, lastSpace) + '...'
+      : truncated + '...';
+  }, []);
 
   /**
    * Handle message submission from ChatInputWithMentions
@@ -1871,6 +2038,15 @@ CONTENT FOCUS: ${customization.description}`;
       position: 'relative',
       overflow: 'hidden'
     }}>
+      {/* Chat Sidebar */}
+      <ChatSidebar
+        user={user}
+        recentChats={savedChats}
+        onNewChat={handleNewChat}
+        onSelectChat={handleLoadChat}
+        activeChatId={currentChatId}
+      />
+
       {/* Animated Background - Fades out when chat is active */}
       <div style={{
         position: 'absolute',
@@ -1956,7 +2132,7 @@ CONTENT FOCUS: ${customization.description}`;
       }}>
 
         {/* LEFT SIDEBAR - Only in chat mode */}
-        {chatActive && (
+        {false && chatActive && (
           <div style={{
             width: '260px',
             flexShrink: 0,

@@ -18,65 +18,97 @@
 // Phase 2: Vision & Analysis Tools ✅ COMPLETE
 // ============================================================================
 
-export { analyzeSlideTool } from './analyzeSlide';
-export { analyzeDeckTool } from './analyzeDeck';
+import { analyzeSlideTool } from './analyzeSlide';
+import { analyzeDeckTool } from './analyzeDeck';
+
+export { analyzeSlideTool, analyzeDeckTool };
 
 // ============================================================================
 // Phase 3: Slide Generation & Editing Tools ✅ COMPLETE
 // ============================================================================
 
-export { createSlideTool } from './createSlide';
-export { minorEditSlideTool } from './minorEditSlide';
-export { redesignSlideTool } from './redesignSlide';
+import { createSlideTool } from './createSlide';
+import { minorEditSlideTool } from './minorEditSlide';
+import { redesignSlideTool } from './redesignSlide';
+
+export { createSlideTool, minorEditSlideTool, redesignSlideTool };
 
 // ============================================================================
-// Phase 4: Research & Brand Tools (TODO)
+// Phase 4: Research & Brand Tools ✅ COMPLETE
 // ============================================================================
 
-// TODO: researchCompanyTool - Google Search + Gemini synthesis
-// TODO: analyzeBrandTool - wraps generateThemeFromWebsite
-// TODO: fetchCompanyLogoTool - Cloud Run API (fallback after Gemini search)
-// TODO: extractPainPointsTool - NLP extraction from notes
+import { researchCompanyTool } from './researchCompany';
+import { analyzeBrandTool } from './analyzeBrand';
+// import { fetchCompanyLogoTool } from './fetchLogo'; // ⏸️ DISABLED: Incomplete implementation
 
-export const researchCompanyTool = null;
-export const analyzeBrandTool = null;
-export const fetchCompanyLogoTool = null;
-export const extractPainPointsTool = null;
+export { researchCompanyTool, analyzeBrandTool };
 
 // ============================================================================
-// Phase 5: Infrastructure Tools (TODO)
+// Phase 5: Reference Matching Tools ✅ COMPLETE
 // ============================================================================
 
-// TODO: uploadFileTool - PDF extraction, Firebase Storage upload
+import { matchSlidesToReferencesTool } from './matchReferences';
 
-export const uploadFileTool = null;
+export { matchSlidesToReferencesTool };
+
+// ============================================================================
+// Phase 6: Planning Tools ✅ COMPLETE
+// ============================================================================
+
+import { planDeckTool } from './planDeck';
+
+export { planDeckTool };
+
+// ============================================================================
+// Tool Registry for ADK Agent
+// ============================================================================
 
 /**
- * Tool Implementation Guidelines:
- *
- * 1. Each tool should use ADK's tool creation pattern
- * 2. Clear name and description for LLM understanding
- * 3. Well-defined parameter schemas
- * 4. Wrap existing service functions (preserve all logic)
- * 5. Return structured outputs
- * 6. Handle errors gracefully
- *
- * Example structure:
- *
- * export const exampleTool = createTool({
- *   name: 'exampleTool',
- *   description: 'Clear description of what this tool does',
- *   parameters: {
- *     type: 'object',
- *     properties: {
- *       param1: { type: 'string', description: '...' }
- *     },
- *     required: ['param1']
- *   },
- *   execute: async (params) => {
- *     // Wrap existing service function
- *     const result = await existingServiceFunction(params);
- *     return result;
- *   }
- * });
+ * Complete list of all available tools
  */
+export const allTools = [
+  // Planning
+  planDeckTool,
+
+  // Analysis
+  analyzeSlideTool,
+  analyzeDeckTool,
+
+  // Slide Generation & Editing
+  createSlideTool,
+  minorEditSlideTool,
+  redesignSlideTool,
+
+  // Research & Brand
+  researchCompanyTool,
+  analyzeBrandTool,
+  // fetchCompanyLogoTool, // ⏸️ DISABLED: Incomplete implementation
+
+  // Reference Matching
+  matchSlidesToReferencesTool,
+] as const;
+
+/**
+ * Tool categories for organized access
+ */
+export const toolCategories = {
+  planning: [planDeckTool],
+  analysis: [analyzeSlideTool, analyzeDeckTool],
+  slideEditing: [createSlideTool, minorEditSlideTool, redesignSlideTool],
+  research: [researchCompanyTool, analyzeBrandTool], // fetchCompanyLogoTool disabled
+  referenceMatching: [matchSlidesToReferencesTool],
+} as const;
+
+/**
+ * Get tool by name
+ */
+export function getToolByName(name: string) {
+  return allTools.find(tool => tool.name === name);
+}
+
+/**
+ * Get tools by category
+ */
+export function getToolsByCategory(category: keyof typeof toolCategories) {
+  return toolCategories[category];
+}

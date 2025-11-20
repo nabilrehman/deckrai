@@ -3,7 +3,14 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 import { DeckAiExecutionPlan, StyleLibraryItem, Slide, DebugLog, DebugSession, CompanyTheme, PersonalizationAction, TextReplacementAction, ImageReplacementAction, DeckAiTask, EditSlideTask, AddSlideTask } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+// Handle both Node.js (backend) and browser (frontend) environments
+// In Vite/browser: import.meta.env exists
+// In Node.js: only process.env exists
+const apiKey = (typeof import.meta !== 'undefined' && import.meta.env)
+  ? import.meta.env.VITE_GEMINI_API_KEY
+  : process.env.VITE_GEMINI_API_KEY;
+
+const ai = new GoogleGenAI({ apiKey });
 
 /**
  * Agentic Intent Detection - Parses user's natural language to determine editing intent
@@ -1629,4 +1636,91 @@ export const detectClickedText = async (
         console.error("Failed to parse text detection response:", e, jsonText);
         return null;
     }
+};
+
+// Demo Player functions (from AI Studio)
+import { BrandProfile, SlideContent } from '../types';
+import { GoogleGenAI, Type, Schema } from "@google/genai";
+
+export const analyzeBrand = async (companyName: string): Promise<BrandProfile> => {
+  const model = "gemini-2.5-flash";
+
+  const prompt = `
+    Analyze the brand identity for "${companyName}".
+    Return a JSON object with:
+    - name: company name
+    - primaryColor: hex code
+    - secondaryColor: hex code
+    - fontFamily: font name
+    - logoStyle: "modern", "classic", or "tech"
+    - keywords: array of brand keywords
+
+    Adhere strictly to this schema.
+  `;
+
+  const response = await genAI.models.generateContent({
+    model,
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          name: { type: Type.STRING },
+          primaryColor: { type: Type.STRING },
+          secondaryColor: { type: Type.STRING },
+          fontFamily: { type: Type.STRING },
+          logoStyle: { type: Type.STRING, enum: ["modern", "classic", "tech"] },
+          keywords: { type: Type.ARRAY, items: { type: Type.STRING } }
+        },
+        required: ["name", "primaryColor", "secondaryColor", "keywords"]
+      } as Schema
+    }
+  });
+
+  const text = response.text;
+  if (!text) throw new Error("No response from AI");
+  return JSON.parse(text) as BrandProfile;
+};
+
+export const generateDeckStructure = async (
+  topic: string,
+  audience: string,
+  brandContext: BrandProfile
+): Promise<SlideContent[]> => {
+  const model = "gemini-2.5-flash";
+
+  const prompt = `
+    Create a 4-slide technical deck content for "${topic}".
+    Target audience: ${audience}
+    Brand: ${brandContext.name}.
+
+    Generate professional slide content following the brand guidelines.
+  `;
+
+  const response = await genAI.models.generateContent({
+    model,
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            type: { type: Type.STRING, enum: ["title", "architecture", "code", "bullet_points", "pricing", "impact", "security"] },
+            content: { type: Type.ARRAY, items: { type: Type.STRING } },
+            codeSnippet: { type: Type.STRING },
+            diagramNodes: { type: Type.ARRAY, items: { type: Type.STRING } }
+          },
+          required: ["title", "type", "content"]
+        }
+      } as Schema
+    }
+  });
+
+  const text = response.text;
+  if (!text) throw new Error("No response from AI");
+  return JSON.parse(text) as SlideContent[];
 };

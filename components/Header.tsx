@@ -117,11 +117,11 @@ const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPd
 
           <div className="relative">
 
-            <svg width="36" height="36" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" className="transition-transform duration-500 group-hover:rotate-12 group-hover:scale-110">
+            <svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="transition-transform duration-500 group-hover:scale-110">
 
               <defs>
 
-                <linearGradient id="logo-gradient" x1="0" y1="0" x2="1" y2="1">
+                <linearGradient id="header-slide1" x1="0%" y1="0%" x2="100%" y2="100%">
 
                   <stop offset="0%" stopColor="#7145FF"/>
 
@@ -131,23 +131,49 @@ const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPd
 
                 </linearGradient>
 
-                <filter id="glow">
+                <linearGradient id="header-slide2" x1="0%" y1="0%" x2="100%" y2="100%">
 
-                  <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                  <stop offset="0%" stopColor="#5D5FEF"/>
 
-                  <feMerge>
+                  <stop offset="100%" stopColor="#6366F1"/>
 
-                    <feMergeNode in="coloredBlur"/>
+                </linearGradient>
 
-                    <feMergeNode in="SourceGraphic"/>
+                <linearGradient id="header-slide3" x1="0%" y1="0%" x2="100%" y2="100%">
 
-                  </feMerge>
+                  <stop offset="0%" stopColor="#4F46E5"/>
 
-                </filter>
+                  <stop offset="100%" stopColor="#5D5FEF"/>
+
+                </linearGradient>
 
               </defs>
 
-              <path d="M18 2C10.268 2 4 8.26801 4 16C4 23.732 10.268 30 18 30C19.5913 30 21.1239 29.753 22.5642 29.2848C18.4983 26.6817 15.6667 21.6963 15.6667 16C15.6667 10.3037 18.4983 5.31829 22.5642 2.71517C21.1239 2.24699 19.5913 2 18 2Z" fill="url(#logo-gradient)" filter="url(#glow)"/>
+              {/* Slide 3 (back) */}
+
+              <g transform="translate(15, 45) rotate(-8 27.5 16.25)">
+
+                <rect width="55" height="32.5" rx="2.5" fill="url(#header-slide3)" opacity="0.8"/>
+
+              </g>
+
+              {/* Slide 2 (middle) */}
+
+              <g transform="translate(17, 40) rotate(-4 27.5 16.25)">
+
+                <rect width="55" height="32.5" rx="2.5" fill="url(#header-slide2)" opacity="0.9"/>
+
+              </g>
+
+              {/* Slide 1 (front) */}
+
+              <g transform="translate(20, 35)">
+
+                <rect width="55" height="32.5" rx="2.5" fill="url(#header-slide1)"/>
+
+                <rect y="0" width="55" height="0.8" rx="2.5" fill="#FFFFFF" opacity="0.2"/>
+
+              </g>
 
             </svg>
 
@@ -157,9 +183,9 @@ const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPd
 
           <div className="flex flex-col">
 
-            <span className="font-display font-bold text-2xl gradient-text">deckr.ai</span>
+            <span className="text-2xl text-slate-900" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif', fontWeight: 600, letterSpacing: '-0.035em' }}>Deckr.ai</span>
 
-            <span className="text-[10px] font-medium text-brand-text-tertiary tracking-wider uppercase">AI Deck Studio</span>
+            <span className="text-slate-500" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif', fontSize: '10px', fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>AI Deck Studio</span>
 
           </div>
 

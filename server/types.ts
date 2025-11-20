@@ -111,25 +111,31 @@ export interface AnalyzeDeckParams {
   analysisGoal: 'structure' | 'full' | 'recommendations';
 }
 
+export interface ImageInput {
+  image: string; // base64 data URL
+  label: string; // Description/label for this image (e.g., "Reference slide for style", "Company logo", "Product screenshot")
+  purpose: 'reference' | 'logo' | 'custom'; // Image purpose
+}
+
 export interface CreateSlideParams {
   detailedPrompt: string;
-  referenceSlideImage?: string | null; // Optional reference slide (base64 data URL)
   deepMode: boolean;
   theme?: BrandTheme | null;
-  logoImage?: string | null; // Company logo (base64 data URL)
-  customImage?: string | null; // Custom image to include (base64 data URL)
+  images?: ImageInput[]; // Optional: Array of images (reference slides, logos, custom images). Can pass any number of images.
 }
 
 export interface MinorEditSlideParams {
   prompt: string; // Edit instruction
   base64Image: string; // Original slide image (base64 data URL)
   base64Mask?: string; // Optional: Mask highlighting area to edit (base64 data URL). If provided, only masked region is edited (inpainting). If not provided, entire slide can be edited based on instruction.
+  additionalImages?: Array<{ image: string; label: string }>; // Optional: Additional reference images (e.g., logos to add, style references). Can pass any number of images.
   deepMode: boolean;
 }
 
 export interface RedesignSlideParams {
   base64Image: string; // Slide to redesign (base64 data URL)
   detailedPrompt: string; // Redesign instruction
+  additionalImages?: Array<{ image: string; label: string }>; // Optional: Additional reference images for style inspiration. Can pass any number of images.
   deepMode: boolean;
 }
 
@@ -218,6 +224,67 @@ export interface ToolResult<T = any> {
     executionTime: number;
     model?: string;
     tokensUsed?: number;
+  };
+}
+
+// ============================================================================
+// REFERENCE MATCHING TOOL TYPES
+// ============================================================================
+
+/**
+ * Slide specification (compatible with both designer modes)
+ */
+export interface SlideSpecification {
+  slideNumber: number;
+  slideType?: string;
+  title?: string;
+  headline: string;
+  subhead?: string;
+  content?: string;
+  visualDescription?: string;
+  dataVisualization?: string;
+  brandContext?: string;
+}
+
+/**
+ * Style library item (reference slide)
+ */
+export interface StyleLibraryItem {
+  name: string;
+  src: string; // Firebase Storage URL or data URL
+  id?: string;
+  createdAt?: number;
+}
+
+/**
+ * Parameters for matchSlidesToReferences tool
+ */
+export interface MatchReferencesParams {
+  slideSpecifications: SlideSpecification[];
+  styleLibraryItems: StyleLibraryItem[];
+}
+
+/**
+ * Reference match result with statistics
+ */
+export interface MatchReferencesResult {
+  matches: Array<{
+    slideNumber: number;
+    referenceName: string;
+    referenceSrc: string;
+    matchScore: number;
+    matchReason: string;
+    category?: string;
+    blueprint?: any; // DeepDesignBlueprint - full blueprint from deep analyzer
+  }>;
+  statistics: {
+    totalSlides: number;
+    totalReferences: number;
+    matchedSlides: number;
+    unmatchedSlides: number[];
+    averageMatchScore: number;
+    byCategory: { [category: string]: number };
+    byReference: { [referenceName: string]: number };
   };
 }
 

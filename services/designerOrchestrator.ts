@@ -413,7 +413,12 @@ export async function generateDesignerOutline(
   const startTime = Date.now();
 
   try {
-    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+    // Handle both Node.js (backend) and browser (frontend) environments
+    const apiKey = (typeof import.meta !== 'undefined' && import.meta.env)
+      ? import.meta.env.VITE_GEMINI_API_KEY
+      : process.env.VITE_GEMINI_API_KEY;
+
+    const ai = new GoogleGenAI({ apiKey });
 
     // Phase 1: Master Planning
     onProgress?.({

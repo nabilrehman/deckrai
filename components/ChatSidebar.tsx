@@ -1,23 +1,22 @@
 import React, { useState } from 'react';
 import { Menu, Plus, MessageSquare, ChevronDown, LogOut, Zap, BookOpen, HelpCircle, BarChart3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { SavedChat } from '../types';
 
 interface ChatSidebarProps {
   user?: any;
   onNewChat?: () => void;
-  recentChats?: Array<{
-    id: string;
-    title: string;
-    timestamp: number;
-  }>;
+  recentChats?: SavedChat[];
   onSelectChat?: (chatId: string) => void;
+  activeChatId?: string;
 }
 
 export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   user,
   onNewChat,
   recentChats = [],
-  onSelectChat
+  onSelectChat,
+  activeChatId
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -130,7 +129,6 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 <button
                   onClick={() => {
                     onNewChat?.();
-                    setIsExpanded(false);
                   }}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#6366F1] to-[#4F46E5] hover:scale-[1.02] text-white transition-all duration-150 shadow-sm hover:shadow-md"
                   style={{
@@ -160,21 +158,39 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                     </div>
                   ) : (
                     <div className="space-y-1">
-                      {recentChats.slice(0, 10).map((chat) => (
-                        <button
-                          key={chat.id}
-                          onClick={() => {
-                            onSelectChat?.(chat.id);
-                            setIsExpanded(false);
-                          }}
-                          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-100/60 transition-all text-left group"
-                        >
-                          <MessageSquare size={16} className="text-slate-400 group-hover:text-slate-700 flex-shrink-0" strokeWidth={2} />
-                          <span className="text-sm text-slate-700 group-hover:text-slate-900 truncate font-normal">
-                            {chat.title}
-                          </span>
-                        </button>
-                      ))}
+                      {recentChats.slice(0, 10).map((chat) => {
+                        const isActive = chat.id === activeChatId;
+                        return (
+                          <button
+                            key={chat.id}
+                            onClick={() => {
+                              onSelectChat?.(chat.id);
+                            }}
+                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-left group ${
+                              isActive
+                                ? 'bg-indigo-50 border border-indigo-200'
+                                : 'hover:bg-slate-100/60'
+                            }`}
+                          >
+                            <MessageSquare
+                              size={16}
+                              className={`flex-shrink-0 ${
+                                isActive
+                                  ? 'text-indigo-600'
+                                  : 'text-slate-400 group-hover:text-slate-700'
+                              }`}
+                              strokeWidth={2}
+                            />
+                            <span className={`text-sm truncate font-normal ${
+                              isActive
+                                ? 'text-indigo-900 font-medium'
+                                : 'text-slate-700 group-hover:text-slate-900'
+                            }`}>
+                              {chat.title}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

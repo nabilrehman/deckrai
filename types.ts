@@ -211,3 +211,54 @@ export interface SavedChat {
   // Link to generated deck (if any)
   generatedDeckId?: string;
 }
+
+// View state for routing
+export type ViewState = 'HOME' | 'DASHBOARD';
+
+// Demo Player types (from AI Studio)
+export enum AppState {
+  IDLE = 'IDLE',
+  TYPING_PROMPT = 'TYPING_PROMPT',
+  ANALYZING_REQUEST = 'ANALYZING_REQUEST',
+  REVIEWING_PLAN = 'REVIEWING_PLAN',
+  EXECUTING_WORKFLOW = 'EXECUTING_WORKFLOW',
+  COMPLETE = 'COMPLETE'
+}
+
+export enum WorkflowStep {
+  RESEARCH = 'RESEARCH',
+  ASSETS = 'ASSETS',
+  CONTEXT = 'CONTEXT',
+  STRUCTURE = 'STRUCTURE',
+  GENERATION = 'GENERATION'
+}
+
+export interface BrandProfile {
+  name: string;
+  primaryColor: string;
+  secondaryColor: string;
+  fontFamily: string;
+  logoStyle: 'modern' | 'classic' | 'tech';
+  keywords: string[];
+}
+
+export interface SlideContent {
+  title: string;
+  type: 'title' | 'architecture' | 'code' | 'bullet_points' | 'pricing' | 'impact' | 'security';
+  content: string[];
+  codeSnippet?: string;
+  diagramNodes?: string[];
+}
+
+export interface DeckData {
+  topic: string;
+  targetAudience: string;
+  slides: SlideContent[];
+}
+
+export interface LogEntry {
+  id: string;
+  timestamp: number;
+  message: string;
+  type: 'info' | 'success' | 'process';
+}

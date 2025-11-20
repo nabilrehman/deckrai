@@ -161,7 +161,7 @@ const ThinkingSection: React.FC<ThinkingSectionProps> = ({
         }}>
           {steps.map((step, index) => (
             <div
-              key={step.id}
+              key={`${step.id}-${index}`}
               style={{
                 display: 'flex',
                 gap: '12px',

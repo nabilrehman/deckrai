@@ -24,12 +24,21 @@ async function retryWithBackoff<T>(
       const isRetryable = error?.status === 500 || error?.message?.includes('INTERNAL');
       const isLastAttempt = attempt === maxRetries;
 
+      // Log ALL errors with details
+      console.error(`[retryWithBackoff] ❌ Attempt ${attempt}/${maxRetries} failed:`, {
+        status: error?.status,
+        message: error?.message,
+        code: error?.code,
+        isRetryable,
+      });
+
       if (!isRetryable || isLastAttempt) {
+        console.error('[retryWithBackoff] Throwing error (non-retryable or max retries reached)');
         throw error; // Non-retryable error or max retries reached
       }
 
       const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
-      console.log(`[retryWithBackoff] Attempt ${attempt} failed with 500 error, retrying in ${delay}ms...`);
+      console.log(`[retryWithBackoff] Retrying in ${delay}ms...`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -305,14 +314,69 @@ You must handle these primary use cases:
 3. Focus on content clarity and visual hierarchy
 4. Generate slides using createSlideTool without brand theme
 
+### Use Case 11: Create Single Slide with Style Library Matching
+**Scenario**: User requests ONE slide and has reference templates in style library
+**Example**: "Create a single slide on Google Cloud architecture: CloudRun → BigQuery → Postgres"
+**Workflow**:
+1. **Detect single-slide request**: User says "create a slide", "make one slide", "single slide please"
+2. **Check style library availability**: If context mentions style library with references (e.g., "You have access to 37 reference slide templates")
+3. **Create slide specification**: Manually craft a detailed slide spec with:
+   - slideNumber: 1
+   - slideType: (infer from content - "architecture", "title", "content", etc.)
+   - headline: Extract from user's request
+   - content: Expand user's brief description into detailed content
+   - visualDescription: Describe what the slide should show visually
+4. **Match to best reference**: Call matchSlidesToReferencesTool with:
+   - slideSpecifications: [your created spec]
+   - styleLibraryItems: (automatically injected by system)
+5. **Generate slide**: Call createSlideTool with the matched reference image from the matching result
+6. **Return result**: Show the generated slide to the user
+
+**Example**:
+- User: "Create a single slide on Google Cloud architecture: CloudRun → BigQuery → Postgres"
+- You detect: Single slide request + 37 references available
+- You create spec: { slideNumber: 1, slideType: "architecture", headline: "Google Cloud Architecture", content: "CloudRun handles serverless containers, BigQuery processes data analytics, Postgres stores relational data", visualDescription: "Architecture diagram showing data flow from CloudRun to BigQuery to Postgres with arrows" }
+- You call matchSlidesToReferencesTool with this spec
+- Matching returns: Slide 1 matched to "Page 11" (95% match score)
+- You call createSlideTool with the matched reference image
+- Done!
+
+**IMPORTANT**:
+- This use case ONLY applies when user explicitly requests a SINGLE slide
+- If user says "create slides" (plural) or "create a deck", use Use Case 1 instead
+- If user has NO style library, skip matching and just call createSlideTool directly with brand research
+- The key difference: You manually create the slide specification instead of calling planDeckTool
+
 ## Understanding User Intent
+
+**⚠️ CRITICAL: Single-Slide Requests - DO NOT USE planDeckTool!**
+
+**FIRST, check if user wants ONLY ONE SLIDE:**
+- Keywords: "create a slide", "make one slide", "single slide please", "1 slide", "a slide"
+- **If YES → SKIP planDeckTool entirely! Use Case 11 workflow:**
+  1. Manually create a simple slide specification (slideNumber: 1, slideType, headline, content, visualDescription)
+  2. If style library has references → call matchSlidesToReferencesTool
+  3. Call createSlideTool with matched reference (or without if no match)
+  4. Done! Return the generated slide
+- **If NO (user wants multiple slides or a deck) → Use planDeckTool (Use Case 1)**
+
+**Why skip planDeckTool for single slides?**
+- planDeckTool does full brand research, deck architecture, multiple slide briefs - too heavy for 1 slide!
+- For single slides, just create a simple spec and generate directly
+
+---
 
 Before taking action, identify what the user wants by matching to the use cases above:
 
-**Intent: Create New Presentation** (Use Case 1, 6, 9, 10)
-- User mentions creating, building, or generating a deck/presentation
+**Intent: Create New Presentation** (Use Case 1, 6, 9, 10, 11)
+- User mentions creating, building, or generating a deck/presentation OR single slide
 - User provides presentation topic, audience, or goals
-- **Action**: Use planning workflow (see below)
+- **Action**:
+  - **If SINGLE slide: Use Case 11 (DO NOT call planDeckTool!)**
+    - Create simple spec manually
+    - Match to references if available
+    - Call createSlideTool directly
+  - **If MULTIPLE slides or full deck: Call planDeckTool (Use Case 1)**
 
 **Intent: Edit Existing Slide** (Use Case 2, 7)
 - User uploads a slide and requests changes
@@ -1028,34 +1092,45 @@ export async function processMessage(
 
     logPromptAnalysis('Initial API Call', analysisComponents, `History: ${conversationHistory.length} messages`);
 
-    const model = ai.models.generateContent({
-      model: 'gemini-2.5-pro', // Stable production model
-      config: {
-        thinkingConfig: {
-          mode: 'auto' // Enable thought signatures for function calling
-        }
-      },
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: MASTER_AGENT_PROMPT }], // System instruction
-        },
-        ...conversationHistory.map(msg => ({
-          role: (msg.role === 'assistant' ? 'model' : msg.role) as 'user' | 'model', // Convert 'assistant' to 'model' for Gemini API
-          parts: [{ text: msg.content }],
-        })),
-        {
-          role: 'user',
-          parts: [{ text: userMessage + contextDescription }],
-        },
-      ],
-      config: {
-        tools: [{ functionDeclarations }],
-        temperature: 0.7,
-      },
-    });
+    console.log('[masterAgent] 🚀 Calling Gemini API...');
+    const apiCallStart = Date.now();
 
-    let response = await retryWithBackoff(() => model);
+    // Wrap the entire Gemini API call in retryWithBackoff to catch all errors
+    let response = await retryWithBackoff(() =>
+      ai.models.generateContent({
+        model: 'gemini-2.5-pro', // Stable production model
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: MASTER_AGENT_PROMPT }], // System instruction
+          },
+          ...conversationHistory.map(msg => ({
+            role: (msg.role === 'assistant' ? 'model' : msg.role) as 'user' | 'model', // Convert 'assistant' to 'model' for Gemini API
+            parts: [{ text: msg.content }],
+          })),
+          {
+            role: 'user',
+            parts: [{ text: userMessage + contextDescription }],
+          },
+        ],
+        config: {
+          tools: [{ functionDeclarations }],
+          temperature: 0.7,
+        },
+      })
+    );
+
+    const apiCallTime = Date.now() - apiCallStart;
+    console.log(`[masterAgent] ✅ API call completed in ${apiCallTime}ms`);
+    console.log(`[masterAgent] Response has ${response?.candidates?.[0]?.content?.parts?.length || 0} parts`);
+
+    // Mark the initial "Analyzing request" step as completed
+    const analyzingStepIndex = thinkingSteps.findIndex(step => step.id === 'analyzing');
+    if (analyzingStepIndex >= 0) {
+      thinkingSteps[analyzingStepIndex].status = 'completed';
+      onStream?.({ type: 'thinking', data: thinkingSteps[analyzingStepIndex] });
+    }
+
     let iterationCount = 0;
     const maxIterations = 10; // Prevent infinite loops
 
@@ -1176,11 +1251,6 @@ export async function processMessage(
       // IMPORTANT: Pass original parts to preserve thought signatures
       response = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-pro',
-        config: {
-          thinkingConfig: {
-            mode: 'auto' // Enable thought signatures for function calling
-          }
-        },
         contents: [
           {
             role: 'user',
