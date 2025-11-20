@@ -1,0 +1,97 @@
+<svg width="400" height="400" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradients for slides -->
+    <linearGradient id="slide1-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7145FF;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#5D5FEF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#818CF8;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="slide2-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#5D5FEF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6366F1;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="slide3-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4F46E5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#5D5FEF;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Glow filter for entire composition -->
+    <filter id="outer-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="20"/>
+      <feOffset dx="0" dy="0" result="offsetblur"/>
+      <feFlood flood-color="#7145FF" flood-opacity="0.2"/>
+      <feComposite in2="offsetblur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Shadow filter for slides -->
+    <filter id="slide-shadow">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+
+    <!-- Sparkle gradient -->
+    <linearGradient id="sparkle-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FFA500;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Main group with outer glow -->
+  <g filter="url(#outer-glow)">
+    <!-- Slide 3 (back) - rotated and offset -->
+    <g transform="translate(90, 180) rotate(-8)">
+      <rect width="220" height="130" rx="10" fill="url(#slide3-gradient)" filter="url(#slide-shadow)"/>
+      <!-- Subtle highlight on top edge -->
+      <rect y="0" width="220" height="3" rx="10" fill="#FFFFFF" opacity="0.1"/>
+    </g>
+
+    <!-- Slide 2 (middle) - slightly rotated -->
+    <g transform="translate(95, 165) rotate(-4)">
+      <rect width="220" height="130" rx="10" fill="url(#slide2-gradient)" filter="url(#slide-shadow)"/>
+      <!-- Subtle highlight on top edge -->
+      <rect y="0" width="220" height="3" rx="10" fill="#FFFFFF" opacity="0.15"/>
+    </g>
+
+    <!-- Slide 1 (front) - main slide -->
+    <g transform="translate(100, 150)">
+      <rect width="220" height="130" rx="10" fill="url(#slide1-gradient)" filter="url(#slide-shadow)"/>
+      <!-- Subtle highlight on top edge -->
+      <rect y="0" width="220" height="3" rx="10" fill="#FFFFFF" opacity="0.2"/>
+
+      <!-- Subtle content lines to suggest text -->
+      <g opacity="0.15">
+        <rect x="20" y="25" width="120" height="3" rx="1.5" fill="#FFFFFF"/>
+        <rect x="20" y="40" width="180" height="2" rx="1" fill="#FFFFFF"/>
+        <rect x="20" y="50" width="170" height="2" rx="1" fill="#FFFFFF"/>
+        <rect x="20" y="60" width="160" height="2" rx="1" fill="#FFFFFF"/>
+
+        <!-- Small chart/graph representation -->
+        <rect x="20" y="80" width="15" height="30" rx="2" fill="#FFFFFF"/>
+        <rect x="40" y="70" width="15" height="40" rx="2" fill="#FFFFFF"/>
+        <rect x="60" y="75" width="15" height="35" rx="2" fill="#FFFFFF"/>
+        <rect x="80" y="65" width="15" height="45" rx="2" fill="#FFFFFF"/>
+      </g>
+    </g>
+
+    <!-- AI Sparkle accent (top right) -->
+    <g transform="translate(300, 140)" opacity="0.9">
+      <path d="M 0,-12 L 1.5,-1.5 L 12,0 L 1.5,1.5 L 0,12 L -1.5,1.5 L -12,0 L -1.5,-1.5 Z"
+            fill="url(#sparkle-gradient)">
+        <animateTransform
+          attributeName="transform"
+          type="rotate"
+          from="0 0 0"
+          to="360 0 0"
+          dur="4s"
+          repeatCount="indefinite"/>
+      </path>
+      <!-- Inner sparkle -->
+      <circle cx="0" cy="0" r="3" fill="#FFFFFF" opacity="0.8"/>
+    </g>
+  </g>
+</svg>
