@@ -508,28 +508,24 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
         }
       }
 
-      // Step 4: Generate slides from specifications
-      setCurrentPhase('creating');
-      setProgressMessage('Creating slides from designer specifications...');
+      // Step 4: Generate ALL slides in PARALLEL
+      setCurrentPhase('parallel');
+      setProgressMessage(`Generating ALL ${slideSpecs.length} slides in parallel...`);
       setCurrentSlideProgress(0);
+      setTotalSlides(slideSpecs.length);
 
       const slideSpecs = result.outline.slideSpecifications;
-      const slides: Slide[] = [];
 
-      // Limit slides in test mode
-      const specsToGenerate = isTestMode && slideSpecs.length > 5
-        ? slideSpecs.slice(0, 5)
-        : slideSpecs;
+      console.log(`🚀 Starting parallel generation of ${slideSpecs.length} slides`);
 
-      for (let i = 0; i < specsToGenerate.length; i++) {
-        const spec = specsToGenerate[i];
+      // Generate all slides in parallel with Promise.all
+      const slidePromises = slideSpecs.map(async (spec, i) => {
         const slideNumber = i + 1;
-        setProgressMessage(`Creating slide ${slideNumber} of ${specsToGenerate.length}: ${spec.title}`);
-        setCurrentSlideProgress(slideNumber);
+        const startTime = Date.now();
 
         // Build prompt from specification
         const prompt = buildPromptFromSpec(spec, result.outline.brandResearch);
-        console.log(`📝 Slide ${slideNumber} prompt:`, prompt.substring(0, 200) + '...');
+        console.log(`📝 Slide ${slideNumber}/${slideSpecs.length} starting:`, spec.title);
 
         // Determine style reference:
         // 1. Template mode: use matched reference
@@ -557,45 +553,58 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
 
         let finalImage: string;
 
-        if (isTitleSlide && matchInfo?.match?.referenceSrc) {
-          // Use edit-based generation for title slides
-          console.log(`🎨 Title Slide Mode - Using edit-based generation`);
-          console.log(`🔍 DEBUG: customerLogo value:`, customerLogo ? 'YES (length: ' + customerLogo.length + ')' : 'NO (null/undefined)');
+        try {
+          if (isTitleSlide && matchInfo?.match?.referenceSrc) {
+            // Use edit-based generation for title slides
+            console.log(`🎨 Title Slide Mode - Slide ${slideNumber} - Using edit-based generation`);
+            console.log(`🔍 DEBUG: customerLogo value:`, customerLogo ? 'YES (length: ' + customerLogo.length + ')' : 'NO (null/undefined)');
 
-          const titleSlide = await createTitleSlideFromTemplate(
-            matchInfo.match.referenceSrc,  // Template image
-            spec.headline || spec.title || 'Untitled',  // New title text
-            customerLogo  // Logo (if provided)
-          );
+            const titleSlide = await createTitleSlideFromTemplate(
+              matchInfo.match.referenceSrc,  // Template image
+              spec.headline || spec.title || 'Untitled',  // New title text
+              customerLogo  // Logo (if provided)
+            );
 
-          finalImage = await launderImageSrc(titleSlide);
-          console.log(`✅ Title slide ${slideNumber} created with edit-based approach`);
-        } else {
-          // Use current generation approach for content slides
-          console.log(`🎨 Content Slide Mode - Using generation-based approach`);
+            finalImage = await launderImageSrc(titleSlide);
+            console.log(`✅ Title slide ${slideNumber} completed in ${Date.now() - startTime}ms`);
+          } else {
+            // Use current generation approach for content slides
+            console.log(`🎨 Content Slide Mode - Slide ${slideNumber} - Using generation-based approach`);
 
-          const { images } = await createSlideFromPrompt(
-            styleRef,
-            prompt,
-            false,
-            [],
-            undefined,
-            theme,
-            customerLogo,   // Pass customer logo
-            customImage     // Pass custom image
-          );
+            const { images } = await createSlideFromPrompt(
+              styleRef,
+              prompt,
+              false,
+              [],
+              undefined,
+              theme,
+              customerLogo,   // Pass customer logo
+              customImage     // Pass custom image
+            );
 
-          finalImage = await launderImageSrc(images[0]);
-          console.log(`✅ Content slide ${slideNumber} created successfully`);
+            finalImage = await launderImageSrc(images[0]);
+            console.log(`✅ Content slide ${slideNumber} completed in ${Date.now() - startTime}ms`);
+          }
+
+          // Update progress
+          setCurrentSlideProgress(prev => prev + 1);
+
+          return {
+            id: `designer-slide-${Date.now()}-${i}`,
+            originalSrc: finalImage,
+            history: [finalImage],
+            name: spec.title || `Slide ${i + 1}`,
+          };
+        } catch (error) {
+          console.error(`❌ Slide ${slideNumber} generation failed:`, error);
+          throw error;
         }
+      });
 
-        slides.push({
-          id: `designer-slide-${Date.now()}-${i}`,
-          originalSrc: finalImage,
-          history: [finalImage],
-          name: spec.title || `Slide ${i + 1}`,
-        });
-      }
+      // Wait for ALL slides to complete in parallel
+      console.log(`⏳ Waiting for all ${slideSpecs.length} slides to complete...`);
+      const slides = await Promise.all(slidePromises);
+      console.log(`✅ All ${slides.length} slides generated successfully in parallel!`);
 
       // Stop timer
       if (timerRef.current) {
@@ -657,7 +666,7 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
         initialPrompt: `Designer Mode: ${slideCount} slides for ${context.myCompany}`,
         finalImages: slides.map(s => s.originalSrc),
         logs: debugLogs,
-        model: 'gemini-3-pro-preview + gemini-2.5-flash-image',
+        model: 'gemini-3-pro-preview + gemini-3-pro-image-preview',
         deepMode: false
       };
 
