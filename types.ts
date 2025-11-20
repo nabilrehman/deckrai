@@ -120,7 +120,7 @@ export type PersonalizationAction = TextReplacementAction | ImageReplacementActi
 
 
 // USER MANAGEMENT & PRICING TYPES
-export type UserPlan = 'free' | 'pro' | 'enterprise';
+export type UserPlan = 'free' | 'business' | 'enterprise';
 
 export interface UserUsage {
   slidesThisMonth: number;
@@ -137,12 +137,51 @@ export interface UserSubscription {
   cancelAtPeriodEnd?: boolean;
 }
 
+// CREDIT SYSTEM TYPES
+export interface CreditBalance {
+  current: number; // Current available credits
+  monthlyAllowance: number; // Monthly credits based on plan
+  rolledOver: number; // Credits rolled over from previous month (paid plans only)
+  purchased: number; // One-time purchased credits (never expire)
+  lastResetAt: number; // timestamp of last monthly reset
+  nextResetAt: number; // timestamp of next monthly reset
+}
+
+export type CreditTransactionType =
+  | 'monthly_reset'
+  | 'rollover'
+  | 'purchase'
+  | 'slide_generation'
+  | 'deck_generation'
+  | 'minor_edit'
+  | 'redesign'
+  | 'refund'
+  | 'bonus';
+
+export interface CreditTransaction {
+  id: string;
+  userId: string;
+  type: CreditTransactionType;
+  amount: number; // Positive for additions, negative for deductions
+  balanceBefore: number;
+  balanceAfter: number;
+  timestamp: number;
+  metadata?: {
+    slideId?: string;
+    slideName?: string;
+    deckId?: string;
+    stripePaymentId?: string;
+    reason?: string;
+  };
+}
+
 export interface UserProfile {
   uid: string;
   email: string;
   displayName: string;
   photoURL?: string;
   plan: UserPlan;
+  credits: CreditBalance; // New: Credit system
   usage: UserUsage;
   subscription: UserSubscription;
   createdAt: number; // timestamp
@@ -160,11 +199,45 @@ export interface SavedDeck {
   thumbnailUrl?: string; // First slide thumbnail
 }
 
-export const PLAN_LIMITS: Record<UserPlan, { slidesPerMonth: number; decksPerMonth: number }> = {
-  free: { slidesPerMonth: 10, decksPerMonth: 3 },
-  pro: { slidesPerMonth: 100, decksPerMonth: 50 },
-  enterprise: { slidesPerMonth: 500, decksPerMonth: 200 }
+export const PLAN_LIMITS: Record<UserPlan, {
+  slidesPerMonth: number;
+  decksPerMonth: number;
+  creditsPerMonth: number; // New: Credits per month
+  allowRollover: boolean; // New: Whether plan allows credit rollover
+  maxRollover: number; // New: Max credits that can be rolled over (as multiplier, e.g., 2 = 2x monthly allowance)
+}> = {
+  free: {
+    slidesPerMonth: 50,
+    decksPerMonth: 10,
+    creditsPerMonth: 50,
+    allowRollover: false,
+    maxRollover: 0
+  },
+  business: {
+    slidesPerMonth: 250,
+    decksPerMonth: 100,
+    creditsPerMonth: 250,
+    allowRollover: true,
+    maxRollover: 2 // Can rollover up to 500 credits (2x 250)
+  },
+  enterprise: {
+    slidesPerMonth: 999999, // Effectively unlimited
+    decksPerMonth: 999999,
+    creditsPerMonth: 999999,
+    allowRollover: true,
+    maxRollover: 1 // No need for rollover with unlimited
+  }
 };
+
+// Credit costs for different operations
+export const CREDIT_COSTS = {
+  SLIDE_GENERATION: 1,
+  DECK_GENERATION_PER_SLIDE: 1,
+  MINOR_EDIT: 0.5,
+  REDESIGN: 1,
+  INPAINT: 1,
+  NEW_SLIDE: 1
+} as const;
 
 // CHAT STORAGE TYPES
 export interface ThinkingStep {

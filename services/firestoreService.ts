@@ -18,6 +18,7 @@ import {
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import { UserProfile, UserPlan, UserUsage, SavedDeck, Slide, PLAN_LIMITS, StyleLibraryItem, SavedChat, StoredChatMessage } from '../types';
+import { initializeCredits } from './creditService';
 
 // ============================================================================
 // USER PROFILE OPERATIONS
@@ -47,12 +48,14 @@ export const createOrUpdateUserProfile = async (
         return userSnap.data() as UserProfile;
     } else {
         // Create new user with default free plan
+        const plan: UserPlan = 'free';
         const newUser: UserProfile = {
             uid,
             email,
             displayName,
             photoURL,
-            plan: 'free',
+            plan,
+            credits: initializeCredits(plan), // Initialize with 50 free credits
             usage: {
                 slidesThisMonth: 0,
                 decksThisMonth: 0,
@@ -67,6 +70,10 @@ export const createOrUpdateUserProfile = async (
         };
 
         await setDoc(userRef, newUser);
+        console.log('[firestoreService] Created new user with credits:', {
+            uid,
+            credits: newUser.credits.current
+        });
         return newUser;
     }
 };
@@ -86,12 +93,22 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
 
 /**
  * Update user's plan
+ * Also resets credits to new plan's allowance
  */
 export const updateUserPlan = async (uid: string, plan: UserPlan): Promise<void> => {
     const userRef = doc(db, 'users', uid);
+    const newCredits = initializeCredits(plan);
+
     await updateDoc(userRef, {
         plan,
+        credits: newCredits,
         'subscription.status': plan === 'free' ? 'none' : 'active'
+    });
+
+    console.log('[firestoreService] Updated user plan:', {
+        uid,
+        plan,
+        newCredits: newCredits.current
     });
 };
 
