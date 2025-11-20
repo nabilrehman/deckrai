@@ -120,7 +120,108 @@ export type PersonalizationAction = TextReplacementAction | ImageReplacementActi
 
 
 // USER MANAGEMENT & PRICING TYPES
-export type UserPlan = 'free' | 'pro' | 'enterprise';
+export type UserPlan = 'free' | 'business' | 'enterprise';
+
+// ============================================================================
+// CREDIT SYSTEM TYPES
+// ============================================================================
+
+/**
+ * Credit balance tracking for a user
+ */
+export interface CreditBalance {
+  current: number; // Current available credits
+  monthlyAllowance: number; // Base monthly credits from plan
+  rolledOver: number; // Credits rolled over from previous month (paid plans only)
+  purchased: number; // One-time purchased credits (never expire)
+  lastResetAt: number; // Last monthly reset timestamp
+  nextResetAt: number; // Next monthly reset timestamp
+}
+
+/**
+ * Transaction types for credit operations
+ */
+export type CreditTransactionType =
+  | 'monthly_reset' // Monthly credit allowance reset
+  | 'rollover' // Credits rolled over from previous month
+  | 'purchase' // One-time credit purchase
+  | 'slide_generation' // Credit deduction for slide generation
+  | 'deck_generation' // Credit deduction for deck generation
+  | 'minor_edit' // Credit deduction for minor slide edit
+  | 'redesign' // Credit deduction for slide redesign
+  | 'refund' // Credit refund
+  | 'bonus'; // Bonus credits (promotions, referrals)
+
+/**
+ * Credit transaction record (immutable audit trail)
+ */
+export interface CreditTransaction {
+  id: string; // Transaction ID
+  userId: string;
+  type: CreditTransactionType;
+  amount: number; // Positive for additions, negative for deductions
+  balanceBefore: number;
+  balanceAfter: number;
+  timestamp: number;
+  metadata?: {
+    slideId?: string;
+    slideName?: string;
+    deckId?: string;
+    stripePaymentId?: string;
+    reason?: string;
+  };
+}
+
+/**
+ * Credit costs for operations
+ */
+export const CREDIT_COSTS = {
+  SLIDE_GENERATION: 2, // Cost per slide generated
+  DECK_GENERATION_PER_SLIDE: 1, // Cost per slide in deck generation (bulk discount)
+  MINOR_EDIT: 1, // Cost for minor edits (text change, color change)
+  REDESIGN: 3, // Cost for major redesign (3 variations)
+  INPAINTING: 2, // Cost for inpainting operations
+} as const;
+
+/**
+ * Plan limits and credit allocation
+ */
+export const PLAN_LIMITS: Record<
+  UserPlan,
+  {
+    creditsPerMonth: number;
+    allowRollover: boolean;
+    maxRollover: number; // Multiplier of monthly allowance (e.g., 2x = can rollover up to 2x monthly)
+    slidesPerMonth: number; // Legacy field (for backward compatibility)
+    decksPerMonth: number; // Legacy field (for backward compatibility)
+  }
+> = {
+  free: {
+    creditsPerMonth: 50,
+    allowRollover: false,
+    maxRollover: 0,
+    slidesPerMonth: 10, // ~25 slides at 2 credits each
+    decksPerMonth: 3,
+  },
+  business: {
+    creditsPerMonth: 250,
+    allowRollover: true,
+    maxRollover: 2, // Can accumulate up to 500 credits (2x monthly)
+    slidesPerMonth: 100, // ~125 slides at 2 credits each
+    decksPerMonth: 50,
+  },
+  enterprise: {
+    creditsPerMonth: 999999, // Effectively unlimited
+    allowRollover: false,
+    maxRollover: 0,
+    slidesPerMonth: 500,
+    decksPerMonth: 200,
+  },
+};
+
+// ============================================================================
+// USER PROFILE TYPES
+// ============================================================================
 
 export interface UserUsage {
   slidesThisMonth: number;
@@ -143,7 +244,8 @@ export interface UserProfile {
   displayName: string;
   photoURL?: string;
   plan: UserPlan;
-  usage: UserUsage;
+  credits: CreditBalance; // New: Credit-based system
+  usage: UserUsage; // Legacy: Keep for analytics
   subscription: UserSubscription;
   createdAt: number; // timestamp
   lastLoginAt: number; // timestamp
@@ -159,12 +261,6 @@ export interface SavedDeck {
   slideCount: number;
   thumbnailUrl?: string; // First slide thumbnail
 }
-
-export const PLAN_LIMITS: Record<UserPlan, { slidesPerMonth: number; decksPerMonth: number }> = {
-  free: { slidesPerMonth: 10, decksPerMonth: 3 },
-  pro: { slidesPerMonth: 100, decksPerMonth: 50 },
-  enterprise: { slidesPerMonth: 500, decksPerMonth: 200 }
-};
 
 // CHAT STORAGE TYPES
 export interface ThinkingStep {
@@ -210,4 +306,57 @@ export interface SavedChat {
   messageCount: number;
   // Link to generated deck (if any)
   generatedDeckId?: string;
+}
+
+// ============================================================================
+// LANDING PAGE DEMO TYPES (from visualizer)
+// ============================================================================
+
+export enum AppState {
+  IDLE = 'IDLE',
+  TYPING_PROMPT = 'TYPING_PROMPT',
+  ANALYZING_REQUEST = 'ANALYZING_REQUEST',
+  REVIEWING_PLAN = 'REVIEWING_PLAN',
+  EXECUTING_WORKFLOW = 'EXECUTING_WORKFLOW',
+  COMPLETE = 'COMPLETE'
+}
+
+export enum WorkflowStep {
+  RESEARCH = 'RESEARCH',
+  ASSETS = 'ASSETS',
+  CONTEXT = 'CONTEXT', // Scanning Org Library
+  STRUCTURE = 'STRUCTURE',
+  GENERATION = 'GENERATION'
+}
+
+export type ViewState = 'HOME' | 'DASHBOARD';
+
+export interface BrandProfile {
+  name: string;
+  primaryColor: string;
+  secondaryColor: string;
+  fontFamily: string;
+  logoStyle: 'modern' | 'classic' | 'tech';
+  keywords: string[];
+}
+
+export interface SlideContent {
+  title: string;
+  type: 'title' | 'architecture' | 'code' | 'bullet_points' | 'pricing' | 'impact' | 'security';
+  content: string[];
+  codeSnippet?: string;
+  diagramNodes?: string[];
+}
+
+export interface DeckData {
+  topic: string;
+  targetAudience: string;
+  slides: SlideContent[];
+}
+
+export interface LogEntry {
+  id: string;
+  timestamp: number;
+  message: string;
+  type: 'info' | 'success' | 'process';
 }

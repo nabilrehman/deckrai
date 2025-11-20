@@ -1,7 +1,7 @@
 
 
-import { GoogleGenAI, Modality } from "@google/genai";
-import { DeckAiExecutionPlan, StyleLibraryItem, Slide, DebugLog, DebugSession, CompanyTheme, PersonalizationAction, TextReplacementAction, ImageReplacementAction, DeckAiTask, EditSlideTask, AddSlideTask } from '../types';
+import { GoogleGenAI, Modality, Type, Schema } from "@google/genai";
+import { DeckAiExecutionPlan, StyleLibraryItem, Slide, DebugLog, DebugSession, CompanyTheme, PersonalizationAction, TextReplacementAction, ImageReplacementAction, DeckAiTask, EditSlideTask, AddSlideTask, BrandProfile, SlideContent } from '../types';
 
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
@@ -1629,4 +1629,105 @@ export const detectClickedText = async (
         console.error("Failed to parse text detection response:", e, jsonText);
         return null;
     }
+};
+
+// ============================================================================
+// LANDING PAGE DEMO FUNCTIONS
+// ============================================================================
+
+/**
+ * Analyze brand identity for landing page demo
+ * Used by DemoPlayer component on the landing page
+ */
+export const analyzeBrand = async (companyName: string): Promise<BrandProfile> => {
+  const model = "gemini-2.5-flash";
+
+  // Note: For the demo visualizer, we want to ensure we get the Atlassian colors
+  // exactly right for the video effect, but we still use the AI to demonstrate the capability.
+  const prompt = `
+    Analyze the brand identity for "Atlassian".
+    Return a JSON object with:
+    - primaryColor: "#0052CC" (Atlassian Blue)
+    - secondaryColor: "#172B4D" (Neutral Dark)
+    - fontFamily: "Inter" or "sans-serif"
+    - logoStyle: "modern"
+    - keywords: ["Agile", "Teamwork", "Open", "Cloud"]
+
+    Adhere strictly to this schema.
+  `;
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          name: { type: Type.STRING },
+          primaryColor: { type: Type.STRING },
+          secondaryColor: { type: Type.STRING },
+          fontFamily: { type: Type.STRING },
+          logoStyle: { type: Type.STRING, enum: ["modern", "classic", "tech"] },
+          keywords: { type: Type.ARRAY, items: { type: Type.STRING } }
+        },
+        required: ["name", "primaryColor", "secondaryColor", "keywords"]
+      } as Schema
+    }
+  });
+
+  const text = response.text;
+  if (!text) throw new Error("No response from AI");
+  return JSON.parse(text) as BrandProfile;
+};
+
+/**
+ * Generate deck structure for landing page demo
+ * Used by DemoPlayer component on the landing page
+ */
+export const generateDeckStructure = async (
+  topic: string,
+  audience: string,
+  brandContext: BrandProfile
+): Promise<SlideContent[]> => {
+  const model = "gemini-2.5-flash";
+
+  const prompt = `
+    Create a 4-slide technical deck content for "Enterprise Security".
+    Brand: Atlassian.
+
+    Slides:
+    1. Title: "Enterprise Trust & Security" (Type: title)
+    2. Architecture: "Security Layer" (Type: architecture)
+    3. Compliance: "SOC2 & ISO" (Type: security)
+    4. Impact: "Risk Reduction" (Type: impact)
+
+    Ensure content is high-quality and technical.
+  `;
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            type: { type: Type.STRING, enum: ["title", "architecture", "code", "bullet_points", "pricing", "impact", "security"] },
+            content: { type: Type.ARRAY, items: { type: Type.STRING } },
+            codeSnippet: { type: Type.STRING },
+            diagramNodes: { type: Type.ARRAY, items: { type: Type.STRING } }
+          },
+          required: ["title", "type", "content"]
+        }
+      } as Schema
+    }
+  });
+
+  const text = response.text;
+  if (!text) throw new Error("No response from AI");
+  return JSON.parse(text) as SlideContent[];
 };

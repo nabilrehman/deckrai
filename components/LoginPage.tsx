@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 interface LoginPageProps {
@@ -7,6 +8,7 @@ interface LoginPageProps {
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onCancel }) => {
+  const navigate = useNavigate();
   const { signInWithGoogle, signInWithFacebook } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -14,7 +16,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onCancel }) => {
     setIsLoading(true);
     try {
       await signInWithGoogle();
-      if (onSuccess) onSuccess();
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        // Navigate to app after successful sign-in
+        navigate('/app');
+      }
     } catch (error) {
       console.error('Google sign-in failed:', error);
       setIsLoading(false);
@@ -25,7 +32,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onCancel }) => {
     setIsLoading(true);
     try {
       await signInWithFacebook();
-      if (onSuccess) onSuccess();
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        // Navigate to app after successful sign-in
+        navigate('/app');
+      }
     } catch (error) {
       console.error('Facebook sign-in failed:', error);
       setIsLoading(false);

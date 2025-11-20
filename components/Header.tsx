@@ -2,6 +2,7 @@
 
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../contexts/AuthContext';
 import { useUserUsage } from '../hooks/useUserUsage';
@@ -57,6 +58,7 @@ const Spinner: React.FC = () => (
 
 const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPdf, isDownloading, onPresent, isTestMode, onToggleTestMode, onSaveDeck, onOpenDeckLibrary, onExportToGoogleSlides, isExportingToSlides, onDeleteAllStyleLibrary }) => {
 
+  const navigate = useNavigate();
   const { user, signOut: authSignOut } = useAuth();
   const { userProfile, usage } = useUserUsage();
 
@@ -87,15 +89,8 @@ const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPd
 
       setImageError(false); // Reset image error on sign out
 
-      // Redirect to landing page
-      const landingPage = document.getElementById('landing-page');
-      const appRoot = document.getElementById('root');
-
-      if (landingPage && appRoot) {
-        landingPage.style.display = 'block';
-        appRoot.style.display = 'none';
-        document.documentElement.classList.remove('app-loaded');
-      }
+      // Navigate to landing page after sign out
+      navigate('/');
 
     } catch (error) {
 
