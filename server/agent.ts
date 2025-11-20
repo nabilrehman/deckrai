@@ -37,6 +37,66 @@ async function retryWithBackoff<T>(
 }
 
 /**
+ * Token estimation helper
+ * Rough estimate: 1 token ≈ 4 characters
+ */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+/**
+ * Format token count with percentage of limit
+ */
+function formatTokens(tokens: number, limit: number = 1048576): string {
+  const percentage = ((tokens / limit) * 100).toFixed(1);
+  const formatted = tokens.toLocaleString();
+  const warning = tokens > limit * 0.9 ? ' ⚠️ APPROACHING LIMIT' : tokens > limit ? ' ❌ EXCEEDS LIMIT' : '';
+  return `${formatted} tokens (${percentage}% of ${(limit / 1000).toFixed(0)}K)${warning}`;
+}
+
+/**
+ * Truncate text for logging
+ */
+function truncateText(text: string, maxLength: number = 500): string {
+  if (text.length <= maxLength) return text;
+  const half = Math.floor((maxLength - 20) / 2);
+  return text.substring(0, half) + '\n\n... [TRUNCATED] ...\n\n' + text.substring(text.length - half);
+}
+
+/**
+ * Log detailed prompt analysis
+ */
+function logPromptAnalysis(label: string, components: { name: string; content: string }[], context?: string) {
+  console.log(`\n${'='.repeat(80)}`);
+  console.log(`[TOKEN_ANALYSIS] ${label}`);
+  console.log('='.repeat(80));
+
+  let totalTokens = 0;
+
+  components.forEach(({ name, content }) => {
+    const tokens = estimateTokens(content);
+    totalTokens += tokens;
+    const size = content.length.toLocaleString();
+    console.log(`  ${name}: ${formatTokens(tokens)}`);
+    console.log(`    Characters: ${size}`);
+
+    // Warn on very large components
+    if (tokens > 100000) {
+      console.log(`    ⚠️ WARNING: This component is very large (${Math.ceil(tokens / 1000)}K tokens)`);
+    }
+  });
+
+  console.log(`  ${'-'.repeat(76)}`);
+  console.log(`  TOTAL: ${formatTokens(totalTokens)}`);
+
+  if (context) {
+    console.log(`  Context: ${context}`);
+  }
+
+  console.log('='.repeat(80) + '\n');
+}
+
+/**
  * Master Agent System Prompt
  *
  * Defines the agent's personality, capabilities, and tool usage guidelines
@@ -881,6 +941,26 @@ export async function processMessage(
     // Initialize Gemini with function calling
     const functionDeclarations = convertToolsToGeminiFunctions();
 
+    // Log detailed token analysis BEFORE first API call
+    const analysisComponents = [
+      { name: 'System Prompt', content: MASTER_AGENT_PROMPT },
+    ];
+
+    // Add each conversation history message separately
+    conversationHistory.forEach((msg, index) => {
+      analysisComponents.push({
+        name: `History Message ${index + 1} (${msg.role})`,
+        content: msg.content
+      });
+    });
+
+    analysisComponents.push(
+      { name: 'User Message', content: userMessage },
+      { name: 'Context Description', content: contextDescription }
+    );
+
+    logPromptAnalysis('Initial API Call', analysisComponents, `History: ${conversationHistory.length} messages`);
+
     const model = ai.models.generateContent({
       model: 'gemini-2.5-pro', // Stable production model
       config: {
@@ -923,6 +1003,13 @@ export async function processMessage(
       const functionCalls = modelResponseParts
         .filter((part: any) => part.functionCall)
         .map((part: any) => part.functionCall);
+
+      // Log tool calls before execution
+      console.log(`\n[TOOL_EXECUTION] Executing ${functionCalls.length} tool(s) in parallel:`);
+      functionCalls.forEach((fc: any, i: number) => {
+        const argsSize = JSON.stringify(fc.args).length;
+        console.log(`  ${i + 1}. ${fc.name} (args: ${argsSize.toLocaleString()} chars, ~${estimateTokens(JSON.stringify(fc.args)).toLocaleString()} tokens)`);
+      });
 
       // Execute all function calls in parallel
       const functionResponses = await Promise.all(
@@ -968,6 +1055,10 @@ export async function processMessage(
             onStream?.({ type: 'thinking', data: thinkingSteps[stepIndex] });
           }
 
+          // Log tool result size
+          const resultStr = JSON.stringify(toolResult);
+          console.log(`  ✓ ${fc.name} completed: ${resultStr.length.toLocaleString()} chars, ~${estimateTokens(resultStr).toLocaleString()} tokens`);
+
           return {
             functionResponse: {
               name: fc.name,
@@ -975,6 +1066,36 @@ export async function processMessage(
             },
           };
         })
+      );
+
+      // Log token analysis BEFORE next API call (function calling loop iteration)
+      const loopComponents = [
+        { name: 'System Prompt', content: MASTER_AGENT_PROMPT },
+      ];
+
+      conversationHistory.forEach((msg, index) => {
+        loopComponents.push({
+          name: `History Message ${index + 1} (${msg.role})`,
+          content: msg.content
+        });
+      });
+
+      loopComponents.push(
+        { name: 'User Message', content: userMessage },
+        {
+          name: 'Model Response Parts',
+          content: JSON.stringify(modelResponseParts)
+        },
+        {
+          name: 'Function Responses',
+          content: JSON.stringify(functionResponses)
+        }
+      );
+
+      logPromptAnalysis(
+        `Function Calling Loop - Iteration ${iterationCount}`,
+        loopComponents,
+        `${functionCalls.length} tool(s) executed, ${toolCalls.length} total calls so far`
       );
 
       // Continue conversation with function results
