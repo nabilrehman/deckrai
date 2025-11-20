@@ -83,6 +83,12 @@ function logPromptAnalysis(label: string, components: { name: string; content: s
   let totalTokens = 0;
 
   components.forEach(({ name, content }) => {
+    // Skip if content is undefined or null
+    if (!content) {
+      console.log(`  ${name}: (empty)`);
+      return;
+    }
+
     const tokens = estimateTokens(content);
     totalTokens += tokens;
     const size = content.length.toLocaleString();
