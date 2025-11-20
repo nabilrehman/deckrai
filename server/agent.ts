@@ -490,6 +490,18 @@ After generation:
 - **Example:** "Create one slide about data warehousing" → Use createSlideTool directly
 - **Example:** After planDeckTool returns specs → Use createSlideTool for each spec
 
+**Use matchSlidesToReferencesTool when:**
+- User has uploaded reference slides (style library)
+- You need to match slide specifications to best-fit references
+- **REQUIRED WORKFLOW when style library exists:**
+  1. First: Call planDeckTool → get slide specifications
+  2. Then: Call matchSlidesToReferencesTool → match specs to references
+  3. Finally: Call createSlideTool for EACH slide with its matched reference
+     - Pass ONLY the ONE matched reference (not all 37)
+     - Use the match result: images: [{image: matchedReferenceUrl, label: name, purpose: 'reference'}]
+- **CRITICAL:** Do NOT pass all reference slides to createSlideTool - this causes token explosion
+- The matching tool tells you which ONE reference to use for each slide
+
 **Use minorEditSlideTool when:**
 - User asks to change text, dates, or small details
 - User wants to add a logo/image to an existing slide
@@ -821,6 +833,54 @@ function convertToolsToGeminiFunctions() {
 }
 
 /**
+ * Strip base64 image data from tool results before sending to Gemini
+ * Gemini doesn't need to see generated images - only success/failure status
+ * This prevents token explosion when sending function responses back to the model
+ */
+function sanitizeToolResult(result: any, toolName: string): any {
+  // Strip base64 from createSlideTool responses
+  if (toolName === 'createSlideTool' && result.success && result.data?.images) {
+    const imageCount = Array.isArray(result.data.images) ? result.data.images.length : 0;
+    console.log(`[sanitizeToolResult] Stripping ${imageCount} base64 images from createSlideTool response`);
+    return {
+      ...result,
+      data: {
+        ...result.data,
+        images: result.data.images.map((_: any, index: number) =>
+          `[Slide ${index + 1} generated successfully - base64 image data removed to save tokens]`
+        )
+      }
+    };
+  }
+
+  // Strip base64 from redesignSlideTool responses
+  if (toolName === 'redesignSlideTool' && result.success && result.data?.imageData) {
+    console.log(`[sanitizeToolResult] Stripping base64 image from redesignSlideTool response`);
+    return {
+      ...result,
+      data: {
+        ...result.data,
+        imageData: '[Redesigned slide generated successfully - base64 image data removed to save tokens]'
+      }
+    };
+  }
+
+  // Strip base64 from minorEditSlideTool responses
+  if (toolName === 'minorEditSlideTool' && result.success && result.data?.imageData) {
+    console.log(`[sanitizeToolResult] Stripping base64 image from minorEditSlideTool response`);
+    return {
+      ...result,
+      data: {
+        ...result.data,
+        imageData: '[Edited slide generated successfully - base64 image data removed to save tokens]'
+      }
+    };
+  }
+
+  return result;
+}
+
+/**
  * Execute a tool call
  */
 async function executeTool(
@@ -844,19 +904,9 @@ async function executeTool(
   console.log(`[masterAgent] Executing tool: ${toolName}`);
   console.log(`[masterAgent] Arguments:`, JSON.stringify(toolArgs, null, 2));
 
-  // Inject styleLibrary as reference images for createSlideTool
-  if (toolName === 'createSlideTool' && context?.styleLibrary && context.styleLibrary.length > 0) {
-    const referenceImages = context.styleLibrary.map(item => ({
-      image: item.src,
-      label: item.name,
-      purpose: 'reference' as const
-    }));
-
-    // Add to existing images array or create new one
-    toolArgs.images = [...(toolArgs.images || []), ...referenceImages];
-
-    console.log(`[masterAgent] ✅ Injected ${referenceImages.length} style library references into createSlideTool`);
-  }
+  // NOTE: Auto-injection of ALL style library references was removed to prevent token explosion.
+  // The agent should use matchSlidesToReferencesTool first, then pass only the matched reference.
+  // See MASTER_AGENT_PROMPT for the correct workflow.
 
   // Auto-inject styleLibrary for matchSlidesToReferencesTool
   if (toolName === 'matchSlidesToReferencesTool' && context?.styleLibrary && context.styleLibrary.length > 0) {
@@ -1055,14 +1105,21 @@ export async function processMessage(
             onStream?.({ type: 'thinking', data: thinkingSteps[stepIndex] });
           }
 
-          // Log tool result size
+          // Log tool result size BEFORE sanitization
           const resultStr = JSON.stringify(toolResult);
           console.log(`  ✓ ${fc.name} completed: ${resultStr.length.toLocaleString()} chars, ~${estimateTokens(resultStr).toLocaleString()} tokens`);
+
+          // Sanitize result to remove base64 images before sending back to Gemini
+          const sanitizedResult = sanitizeToolResult(toolResult, fc.name);
+          const sanitizedStr = JSON.stringify(sanitizedResult);
+          if (sanitizedStr.length !== resultStr.length) {
+            console.log(`  📊 Sanitized to: ${sanitizedStr.length.toLocaleString()} chars, ~${estimateTokens(sanitizedStr).toLocaleString()} tokens (saved ${((1 - sanitizedStr.length / resultStr.length) * 100).toFixed(1)}%)`);
+          }
 
           return {
             functionResponse: {
               name: fc.name,
-              response: toolResult,
+              response: sanitizedResult,  // ← Use sanitized version
             },
           };
         })
