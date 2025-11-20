@@ -258,7 +258,7 @@ export async function createSlide(params: CreateSlideParams): Promise<ToolResult
     // Generate the slide
     console.log(`[createSlideTool] Generating slide with Gemini 2.5 Flash Image...`);
     const result = await generateSingleImage(
-      'gemini-2.5-flash-image',
+      'gemini-3-pro-image-preview',
       imageParts,
       designerSystemPrompt,
       params.deepMode,
@@ -276,7 +276,7 @@ export async function createSlide(params: CreateSlideParams): Promise<ToolResult
       },
       metadata: {
         executionTime,
-        model: 'gemini-2.5-flash-image',
+        model: 'gemini-3-pro-image-preview',
       },
     };
   } catch (error: any) {

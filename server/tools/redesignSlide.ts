@@ -46,7 +46,7 @@ async function generateRedesignedVariation(
   const parts = [originalImagePart, { text: systemPrompt }];
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
+    model: 'gemini-3-pro-image-preview',
     contents: [{ role: 'user', parts }],
     config: {
       thinking: deepMode
@@ -151,7 +151,7 @@ export async function redesignSlide(params: RedesignSlideParams): Promise<ToolRe
       },
       metadata: {
         executionTime,
-        model: 'gemini-2.5-flash-image',
+        model: 'gemini-3-pro-image-preview',
       },
     };
   } catch (error: any) {

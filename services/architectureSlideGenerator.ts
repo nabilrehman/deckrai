@@ -23,7 +23,7 @@ export type ArchitectureType =
  * Detect architecture type from natural language
  */
 export async function detectArchitectureType(prompt: string): Promise<ArchitectureType | null> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-preview' });
 
   const detectionPrompt = `You are an expert in software architecture patterns.
 Analyze this user prompt and determine which architecture pattern they're referring to.
@@ -72,7 +72,7 @@ export async function generateArchitectureSlide(
   styleReference?: string
 ): Promise<string> {
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3-pro-preview',
     generationConfig: {
       temperature: 0.8,
       topP: 0.95,

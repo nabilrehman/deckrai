@@ -62,7 +62,7 @@ Respond with ONLY valid JSON. Omit fields that aren't being changed.`;
 
   try {
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-pro-preview',
       contents: prompt
     });
     const responseText = result.text.trim();
@@ -124,7 +124,7 @@ Respond with ONLY valid JSON matching the EditIntent format. No explanation.`;
 
   try {
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-pro-preview',
       contents: prompt
     });
     const responseText = result.text.trim();
@@ -345,7 +345,7 @@ Respond with ONLY valid JSON. No explanation.`;
 
   try {
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-pro',
+      model: 'gemini-3-pro-preview',
       config: {
         thinkingConfig: {
           thinkingBudget: 16384  // Good thinking for strategic planning
@@ -438,7 +438,7 @@ const verifyImage = async (originalImage: any, generatedImage: any, prompt: stri
 
 
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3-pro-preview",
         contents: { parts: verificationParts},
     });
 
@@ -629,7 +629,7 @@ export const getPersonalizedVariationsFromPlan = async (plan: PersonalizationAct
 
     onProgress('Generating personalized variation...');
     const promises = basePrompts.map(p =>
-        generateSingleImage('gemini-2.5-flash-image', [originalImagePart], p, deepMode, logs)
+        generateSingleImage('gemini-3-pro-image-preview', [originalImagePart], p, deepMode, logs)
     );
     const settledResults = await Promise.allSettled(promises);
 
@@ -671,7 +671,7 @@ export const getGenerativeVariations = async (model: string, prompt: string, bas
 
         onProgress('Analyst is creating a high-fidelity visual plan...');
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-pro-preview",
             contents: { parts: [originalImagePart, {text: systemPrompt}] },
         });
         
@@ -734,7 +734,7 @@ export const getInpaintingVariations = async (
     onProgress('Generating inpainting result...');
     const promises = basePrompts.map(p =>
         generateSingleImage(
-            'gemini-2.5-flash-image',
+            'gemini-3-pro-image-preview',
             [originalImagePart, maskImagePart],
             p,
             deepMode,
@@ -799,7 +799,7 @@ const extractContentAsJson = async (base64Image: string, onProgress: (message: s
 **CRITICAL:** Your output MUST be a single, valid JSON object and nothing else.`;
 
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3-pro-preview",
         contents: { parts: [originalImagePart, { text: systemPrompt }] },
         config: { responseMimeType: "application/json" },
     });
@@ -983,7 +983,7 @@ Render the content from the JSON BLUEPRINT according to the user's GOAL, ensurin
     onProgress(`Briefing AI artists with 3 design directions based on "${bestReference.name}"...`);
     const promises = basePrompts.map(p => {
         return generateSingleImage(
-            'gemini-2.5-flash-image',
+            'gemini-3-pro-image-preview',
             [referenceImagePart], 
             p,
             deepMode,
@@ -1204,7 +1204,7 @@ export const executeSlideTask = async (base64Image: string, detailedPrompt: stri
         `${artistSystemPrompt}\n(For this version, offer another clean and professional alternative.)`,
     ];
 
-    const promises = basePrompts.map(p => generateSingleImage('gemini-2.5-flash-image', [originalImagePart], p, deepMode));
+    const promises = basePrompts.map(p => generateSingleImage('gemini-3-pro-image-preview', [originalImagePart], p, deepMode));
     const settledResults = await Promise.allSettled(promises);
     
     const images: string[] = [];
@@ -1302,7 +1302,7 @@ export const createSlideFromPrompt = async (
     onProgress?.('Generating new slide...');
     const promises = basePrompts.map((p, idx) => {
         console.log(`[createSlideFromPrompt] Variation ${idx + 1}/${basePrompts.length} prompt length: ${p.length} chars`);
-        return generateSingleImage('gemini-2.5-flash-image', imageParts, p, deepMode, logs, onProgress);
+        return generateSingleImage('gemini-3-pro-image-preview', imageParts, p, deepMode, logs, onProgress);
     });
     const settledResults = await Promise.allSettled(promises);
 
@@ -1448,7 +1448,7 @@ Your final output MUST be a JSON array of strings, with each string being the ne
 // Dummy functions for older, unused features to prevent compilation errors if they are still referenced somewhere.
 export const editImage = async (base64Image: string, prompt: string, deepMode: boolean = false): Promise<string> => {
     const originalImagePart = fileToGenerativePart(base64Image);
-    const { image } = await generateSingleImage('gemini-2.5-flash-image', [originalImagePart], prompt, deepMode);
+    const { image } = await generateSingleImage('gemini-3-pro-image-preview', [originalImagePart], prompt, deepMode);
     return image;
 };
 export const compositeImage = async (baseImage: string, overlayImage: string, prompt: string): Promise<string> => { throw new Error("Composite feature is not supported in this version.") };
@@ -1546,7 +1546,7 @@ export const detectAllTextRegions = async (
 - If no text is found, return: []`;
 
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3-pro-preview",
         contents: { parts: [imagePart, { text: prompt }] },
     });
 
@@ -1611,7 +1611,7 @@ export const detectClickedText = async (
 - If no text is near those coordinates, return: {"text": "NO_TEXT_FOUND"}`;
 
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3-pro-preview",
         contents: { parts: [imagePart, { text: prompt }] },
     });
 

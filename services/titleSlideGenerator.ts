@@ -46,7 +46,7 @@ export async function createTitleSlideFromTemplate(
 
   // Step 3: Call Gemini AI to edit the slide
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
+    model: 'gemini-3-pro-image-preview',
     contents: { parts: [imagePart, { text: prompt }] },
     config: {
       responseModalities: [Modality.IMAGE],

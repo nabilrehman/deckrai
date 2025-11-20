@@ -49,7 +49,7 @@ async function generateInpaintedImage(
   ];
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
+    model: 'gemini-3-pro-image-preview',
     contents: [{ role: 'user', parts }],
     config: {
       thinking: deepMode
@@ -91,7 +91,7 @@ async function generateEditedImage(
   const parts = [originalImagePart, { text: prompt }];
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
+    model: 'gemini-3-pro-image-preview',
     contents: [{ role: 'user', parts }],
     config: {
       thinking: deepMode
@@ -190,7 +190,7 @@ Make the following MINOR edit to this slide. Keep the overall design, layout, an
       },
       metadata: {
         executionTime,
-        model: 'gemini-2.5-flash-image',
+        model: 'gemini-3-pro-image-preview',
       },
     };
   } catch (error: any) {

@@ -21,7 +21,7 @@ export async function generateDesignAsset(
   aspectRatio: '1:1' | '16:9' | '3:2' = '1:1'
 ): Promise<string> {
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-image' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-image-preview' });
 
   const result = await model.generateContent({
     contents: [

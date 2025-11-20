@@ -821,7 +821,7 @@ export interface AgentConfig {
 }
 
 export const masterAgentConfig: AgentConfig = {
-  model: 'gemini-2.5-pro', // Switched from 3.0 preview for stability
+  model: 'gemini-3-pro-preview', // Switched from 3.0 preview for stability
   systemPrompt: MASTER_AGENT_PROMPT,
   tools: allTools,
   temperature: 0.7, // Balanced creativity and consistency
@@ -1029,7 +1029,7 @@ export async function processMessage(
     logPromptAnalysis('Initial API Call', analysisComponents, `History: ${conversationHistory.length} messages`);
 
     const model = ai.models.generateContent({
-      model: 'gemini-2.5-pro', // Stable production model
+      model: 'gemini-3-pro-preview', // Stable production model
       config: {
         thinkingConfig: {
           mode: 'auto' // Enable thought signatures for function calling
@@ -1175,7 +1175,7 @@ export async function processMessage(
       // Continue conversation with function results
       // IMPORTANT: Pass original parts to preserve thought signatures
       response = await retryWithBackoff(() => ai.models.generateContent({
-        model: 'gemini-2.5-pro',
+        model: 'gemini-3-pro-preview',
         config: {
           thinkingConfig: {
             mode: 'auto' // Enable thought signatures for function calling
@@ -1233,7 +1233,7 @@ export async function processMessage(
       metadata: {
         executionTime,
         iterationCount,
-        model: 'gemini-2.5-pro',
+        model: 'gemini-3-pro-preview',
       },
     };
   } catch (error: any) {
