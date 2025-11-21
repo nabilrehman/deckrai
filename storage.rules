@@ -26,5 +26,12 @@ service firebase.storage {
       allow write: if isOwner(userId);
       allow delete: if isOwner(userId);
     }
+
+    // Style library images (alternate path used by code)
+    match /users/{userId}/styleLibrary/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId);
+      allow delete: if isOwner(userId);
+    }
   }
 }

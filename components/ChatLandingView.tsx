@@ -15,9 +15,12 @@ import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationConte
 import { detectVibeFromNotes, getDesignerStylesForVibe, getDesignerStyleById, generateStylePromptModifier, PresentationVibe } from '../services/vibeDetection';
 import { createSlideFromPrompt, findBestStyleReferenceFromPrompt, executeSlideTask } from '../services/geminiService';
 import { researchBrandAndCreateTheme } from '../services/brandResearch';
-import { saveChat, getUserChats, getChat } from '../services/firestoreService';
+import { saveChat, getUserChats, getChat, batchAddToStyleLibrary } from '../services/firestoreService';
 import { SavedChat } from '../types';
 import { useUsageValidation } from '../hooks/useUsageValidation';
+
+// PDF.js library type declaration (loaded via CDN in index.html)
+declare const pdfjsLib: any;
 
 interface ChatMessage {
   id: string;
@@ -66,6 +69,9 @@ interface ChatLandingViewProps {
 
   // Props for deck library
   onOpenDeckLibrary?: () => void;
+
+  // Props for style library
+  onStyleLibraryUpdated?: () => void;  // Callback when style library changes
 }
 
 /**
@@ -75,18 +81,24 @@ const launderImageSrc = (src: string): Promise<string> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('Failed to get canvas context'));
-        return;
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Failed to get canvas context'));
+          return;
+        }
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      } catch (error) {
+        reject(new Error(`Failed to process image: ${(error as Error).message}`));
       }
-      ctx.drawImage(img, 0, 0);
-      resolve(canvas.toDataURL('image/png'));
     };
-    img.onerror = () => reject(new Error('Failed to load image'));
+    img.onerror = () => {
+      reject(new Error('Failed to load image'));
+    };
     img.src = src;
   });
 };
@@ -139,7 +151,8 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
   onVariationModeChange,
   onSetPendingVariations,
   onSetVariationTargetSlide,
-  onOpenDeckLibrary
+  onOpenDeckLibrary,
+  onStyleLibraryUpdated
 }) => {
   // UI State
   const [inputValue, setInputValue] = useState('');
@@ -495,6 +508,121 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
     setDetectedVibe(null);
     setThinkingSteps([]);
   }, []);
+
+  /**
+   * Helper: Upload files to style library
+   */
+  const handleUploadToStyleLibrary = async (files: FileList): Promise<void> => {
+    if (!user) {
+      alert('Please log in to upload to style library');
+      return;
+    }
+
+    const fileArray = Array.from(files);
+    const newItems: StyleLibraryItem[] = [];
+
+    try {
+      // Process each file
+      for (const file of fileArray) {
+        if (file.type === 'application/pdf') {
+          // PDF processing → extract all pages
+          const fileReader = new FileReader();
+          await new Promise<void>((resolve, reject) => {
+            fileReader.onload = async (event) => {
+              try {
+                const typedarray = new Uint8Array(event.target?.result as ArrayBuffer);
+                const pdf = await pdfjsLib.getDocument(typedarray).promise;
+
+                for (let i = 1; i <= pdf.numPages; i++) {
+                  const page = await pdf.getPage(i);
+                  const viewport = page.getViewport({ scale: 1.5 });
+                  const canvas = document.createElement('canvas');
+                  const context = canvas.getContext('2d');
+                  canvas.height = viewport.height;
+                  canvas.width = viewport.width;
+
+                  if (context) {
+                    await page.render({ canvasContext: context, viewport }).promise;
+                    const id = `${file.name}-p${i}-${Date.now()}`;
+                    const src = canvas.toDataURL('image/png');
+                    const name = pdf.numPages === 1
+                      ? file.name.replace('.pdf', '')
+                      : `${file.name.replace('.pdf', '')} - Page ${i}`;
+
+                    // Validate src before pushing
+                    if (src && src.startsWith('data:image')) {
+                      newItems.push({ id, src, name });
+                      console.log(`✅ Processed page ${i}: ${name}`);
+                    } else {
+                      console.error(`❌ Failed to generate valid image for page ${i}`);
+                    }
+                  }
+                }
+                resolve();
+              } catch (err) {
+                console.error("PDF processing error:", err);
+                reject(new Error("Failed to process PDF file."));
+              }
+            };
+            fileReader.onerror = () => reject(new Error("Failed to read PDF file."));
+            fileReader.readAsArrayBuffer(file);
+          });
+        } else if (file.type.startsWith('image/')) {
+          // Image processing → direct upload
+          const fileReader = new FileReader();
+          await new Promise<void>((resolve, reject) => {
+            fileReader.onload = async (event) => {
+              try {
+                const src = event.target?.result as string;
+                const laundered = await launderImageSrc(src);
+                const id = `${file.name}-${Date.now()}`;
+                const name = file.name.replace(/\.(png|jpg|jpeg|gif|webp)$/i, '');
+
+                // Validate laundered src before pushing
+                if (laundered && laundered.startsWith('data:image')) {
+                  newItems.push({ id, src: laundered, name });
+                  console.log(`✅ Processed image: ${name}`);
+                } else {
+                  console.error(`❌ Failed to launder image: ${file.name}`);
+                }
+                resolve();
+              } catch (err) {
+                console.error("Image processing error:", err);
+                reject(new Error("Failed to process image file."));
+              }
+            };
+            fileReader.onerror = () => reject(new Error("Failed to read image file."));
+            fileReader.readAsDataURL(file);
+          });
+        }
+      }
+
+      // Upload to Firestore
+      if (newItems.length > 0) {
+        console.log(`📤 Uploading ${newItems.length} items to style library...`);
+        console.log(`🔍 Sample item:`, newItems[0]);
+
+        // Double-check all items have valid src fields
+        const invalidItems = newItems.filter(item => !item.src || !item.src.startsWith('data:image'));
+        if (invalidItems.length > 0) {
+          console.error(`❌ Found ${invalidItems.length} invalid items:`, invalidItems);
+          throw new Error(`${invalidItems.length} items have invalid image data`);
+        }
+
+        await batchAddToStyleLibrary(user.uid, newItems);
+        console.log(`✅ Successfully uploaded ${newItems.length} items`);
+
+        // Notify parent to refresh style library
+        onStyleLibraryUpdated?.();
+
+        alert(`✅ Successfully added ${newItems.length} item${newItems.length > 1 ? 's' : ''} to your style library!`);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert(`❌ Error uploading files: ${(error as Error).message}`);
+      throw error;
+    }
+  };
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -1293,6 +1421,7 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
         role: 'assistant',
         content: `❌ ${validation.error}\n\nYou have used ${validation.currentUsage}/${validation.limit} slides this month.${validation.isTrialExpired ? '\n\n🚀 Upgrade to continue generating slides!' : '\n\nUpgrade your plan to generate more slides.'}`
       });
+      setIsProcessing(false); // Reset processing state on early return
       return;
     }
 
@@ -1369,9 +1498,14 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
       const designerStyle = selectedStyle.id ? getDesignerStyleById(selectedStyle.id) : null;
 
       // Build style library for AI Style Scout
+      // Only use style library in 'template' mode, not in 'crazy' (scratch) mode
       let styleLibraryForScout: StyleLibraryItem[] = [];
-      if (styleLibrary.length > 0) {
-        styleLibraryForScout = styleLibrary;
+      if (generationMode === 'template' && styleLibrary.length > 0) {
+        // Limit to 10 most recent images to prevent API overload
+        styleLibraryForScout = styleLibrary.slice(0, 10);
+        console.log(`✅ Template mode: Using ${styleLibraryForScout.length} reference slides from style library`);
+      } else if (generationMode === 'crazy') {
+        console.log('✅ Start from Scratch mode: Skipping style library (generating fresh designs)');
       }
 
       // Add designer-specific prompt modifier
@@ -1398,44 +1532,75 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
           };
           addThinkingStep(step);
 
-          // Use AI Style Scout to pick the best reference for this specific slide
-          let referenceSrc: string | null = null;
-          if (styleLibraryForScout.length > 0) {
-            const bestReference = await findBestStyleReferenceFromPrompt(
-              description,
-              styleLibraryForScout
+          try {
+            // Use AI Style Scout to pick the best reference for this specific slide
+            let referenceSrc: string | null = null;
+            if (styleLibraryForScout.length > 0) {
+              const bestReference = await findBestStyleReferenceFromPrompt(
+                description,
+                styleLibraryForScout
+              );
+              referenceSrc = bestReference?.src || null;
+            }
+
+            // Apply designer style modifier to prompt
+            const finalPrompt = description + stylePromptModifier;
+
+            const { images } = await createSlideFromPrompt(
+              referenceSrc,
+              finalPrompt,
+              false,
+              [],
+              undefined,
+              brandTheme,  // theme - use researched brand colors
+              null,  // logoImage
+              currentAttachedImages.length > 0 ? currentAttachedImages[0] : null  // customImage - use first uploaded image
             );
-            referenceSrc = bestReference?.src || null;
+
+            const finalImage = await launderImageSrc(images[0]);
+
+            updateThinkingStep(`step-slide-${slideNumber}`, { status: 'completed' });
+
+            return {
+              success: true as const,
+              slide: {
+                id: `slide-${Date.now()}-${slideNumber}`,
+                originalSrc: finalImage,
+                history: [finalImage],
+                name: description.substring(0, 40).split('\n')[0] || `Slide ${slideNumber}`,
+              }
+            };
+          } catch (error) {
+            // Individual slide failure should not crash entire batch
+            console.error(`[Batch] Slide ${slideNumber} failed:`, error);
+            updateThinkingStep(`step-slide-${slideNumber}`, {
+              status: 'error',
+              content: (error as Error).message || 'Generation failed'
+            });
+            return {
+              success: false as const,
+              error: (error as Error).message || 'Generation failed'
+            };
           }
-
-          // Apply designer style modifier to prompt
-          const finalPrompt = description + stylePromptModifier;
-
-          const { images } = await createSlideFromPrompt(
-            referenceSrc,
-            finalPrompt,
-            false,
-            [],
-            undefined,
-            brandTheme,  // theme - use researched brand colors
-            null,  // logoImage
-            currentAttachedImages.length > 0 ? currentAttachedImages[0] : null  // customImage - use first uploaded image
-          );
-
-          const finalImage = await launderImageSrc(images[0]);
-
-          updateThinkingStep(`step-slide-${slideNumber}`, { status: 'completed' });
-
-          return {
-            id: `slide-${Date.now()}-${slideNumber}`,
-            originalSrc: finalImage,
-            history: [finalImage],
-            name: description.substring(0, 40).split('\n')[0] || `Slide ${slideNumber}`,
-          };
         });
 
-        const batchResults = await Promise.all(batchPromises);
-        generatedSlides.push(...batchResults);
+        // Use Promise.allSettled to allow partial batch success
+        const batchResults = await Promise.allSettled(batchPromises);
+
+        // Extract successful slides
+        const successfulSlides = batchResults
+          .filter((result): result is PromiseFulfilledResult<{success: true; slide: Slide}> =>
+            result.status === 'fulfilled' && result.value.success
+          )
+          .map(result => result.value.slide);
+
+        generatedSlides.push(...successfulSlides);
+
+        // Log any failures
+        const failedCount = batchResults.length - successfulSlides.length;
+        if (failedCount > 0) {
+          console.warn(`⚠️ ${failedCount} slide(s) failed in this batch`);
+        }
       }
 
       const duration = ((Date.now() - thinkingStartTime) / 1000).toFixed(1);
@@ -1908,6 +2073,7 @@ CONTENT FOCUS: ${customization.description}`;
         onSelectChat={handleLoadChat}
         activeChatId={currentChatId}
         onOpenDeckLibrary={onOpenDeckLibrary}
+        onUploadToStyleLibrary={handleUploadToStyleLibrary}
         chatActive={chatActive}
       />
 
