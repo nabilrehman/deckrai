@@ -14,7 +14,6 @@ import { Slide, StyleLibraryItem, StoredChatMessage} from '../types';
 import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationContext } from '../services/intelligentGeneration';
 import { detectVibeFromNotes, getDesignerStylesForVibe, getDesignerStyleById, generateStylePromptModifier, PresentationVibe } from '../services/vibeDetection';
 import { createSlideFromPrompt, findBestStyleReferenceFromPrompt, executeSlideTask } from '../services/geminiService';
-import { researchBrandAndCreateTheme } from '../services/brandResearch';
 import { saveChat, getUserChats, getChat, batchAddToStyleLibrary } from '../services/firestoreService';
 import { SavedChat } from '../types';
 import { useUsageValidation } from '../hooks/useUsageValidation';
@@ -1475,24 +1474,9 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
         content: `Created ${slideDescriptions.length} slide specifications`
       });
 
-      // Step 2.5: Research brand colors (if company mentioned)
+      // Step 2.5: Brand colors (disabled - use Deckr.ai branding only)
+      // User only wants Deckr.ai branding, not target customer brand research
       let brandTheme = null;
-      const brandStep: ThinkingStep = {
-        id: 'step-brand',
-        title: 'Researching brand colors',
-        status: 'active',
-        type: 'thinking'
-      };
-      addThinkingStep(brandStep);
-
-      brandTheme = await researchBrandAndCreateTheme(plan.userPrompt);
-
-      updateThinkingStep('step-brand', {
-        status: 'completed',
-        content: brandTheme
-          ? `Found brand colors: ${brandTheme.primaryColor}, ${brandTheme.secondaryColor}`
-          : 'No brand specified, using default colors'
-      });
 
       // Step 3: Get designer style configuration
       const designerStyle = selectedStyle.id ? getDesignerStyleById(selectedStyle.id) : null;
