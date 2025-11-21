@@ -870,6 +870,41 @@ Analyze the target slide to understand its fundamental layout and content struct
     return styleLibrary[0];
 };
 
+/**
+ * Helper: Convert URL to base64 data URL (for Firebase Storage URLs)
+ */
+const urlToBase64 = async (url: string): Promise<string> => {
+    // If already base64, return as-is
+    if (url.startsWith('data:image/')) {
+        return url;
+    }
+
+    // Fetch and convert to base64
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth || img.width;
+                canvas.height = img.naturalHeight || img.height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    reject(new Error('Failed to get canvas context'));
+                    return;
+                }
+                ctx.drawImage(img, 0, 0);
+                const dataUrl = canvas.toDataURL('image/png');
+                resolve(dataUrl);
+            } catch (err: any) {
+                reject(new Error(`Canvas processing failed: ${err.message}`));
+            }
+        };
+        img.onerror = () => reject(new Error(`Failed to load image from URL: ${url}`));
+        img.src = url;
+    });
+};
+
 export const findBestStyleReferenceFromPrompt = async (
     prompt: string,
     styleLibrary: StyleLibraryItem[],
@@ -882,7 +917,13 @@ export const findBestStyleReferenceFromPrompt = async (
 
     logs.push({ title: "Style Scout (Text-to-Style): Starting Analysis", content: "Analyzing user prompt to find the best style match from the library." });
 
-    const referenceImageParts = styleLibrary.map(item => ({...fileToGenerativePart(item.src), itemName: item.name }));
+    // Convert Firebase Storage URLs to base64 data URLs
+    const referenceImageParts = await Promise.all(
+        styleLibrary.map(async (item) => {
+            const base64Src = await urlToBase64(item.src);
+            return { ...fileToGenerativePart(base64Src), itemName: item.name };
+        })
+    );
 
     const systemPrompt = `You are a "Style Scout" AI agent, an expert in presentation design and visual analysis. Your task is to find the single best style reference for a new slide based on a user's text prompt.
 
@@ -913,7 +954,7 @@ Analyze the user's prompt to understand the INTENDED layout and content structur
         model: "gemini-3-pro-preview",
         contents,
     });
-    
+
     const bestMatchName = response.text.trim();
     const bestMatch = styleLibrary.find(item => item.name === bestMatchName);
 
@@ -1239,6 +1280,13 @@ export const createSlideFromPrompt = async (
     console.log(`[createSlideFromPrompt] Deep Mode: ${deepMode}`);
     console.log(`[createSlideFromPrompt] Theme: ${theme ? 'YES' : 'NO'}`);
     console.log(`[createSlideFromPrompt] Logo: ${logoImage ? 'YES' : 'NO'}`);
+
+    // Convert Firebase Storage URL to base64 if needed
+    if (referenceSlideImage && !referenceSlideImage.startsWith('data:image/')) {
+        console.log(`[createSlideFromPrompt] Converting reference image URL to base64...`);
+        referenceSlideImage = await urlToBase64(referenceSlideImage);
+        console.log(`[createSlideFromPrompt] ✅ Conversion complete`);
+    }
 
     onProgress?.('Briefing AI Creative Slide Designer...');
     logs.push({ title: "Designer Input", content: detailedPrompt });

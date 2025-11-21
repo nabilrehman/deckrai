@@ -1324,7 +1324,8 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
         style: analysis.suggestions.recommendedStyle,
         audience: analysis.questions[0]?.options[0] || 'Professional audience',
         reasoning: analysis.suggestions.reasoning,
-        userPrompt: inputValue
+        userPrompt: inputValue,
+        mode: mode  // Store mode in plan to avoid stale closure bugs
       };
       setGenerationPlan(plan);
 
@@ -1484,11 +1485,11 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
       // Build style library for AI Style Scout
       // Only use style library in 'template' mode, not in 'crazy' (scratch) mode
       let styleLibraryForScout: StyleLibraryItem[] = [];
-      if (generationMode === 'template' && styleLibrary.length > 0) {
-        // Limit to 10 most recent images to prevent API overload
-        styleLibraryForScout = styleLibrary.slice(0, 10);
+      if (plan.mode === 'template' && styleLibrary.length > 0) {
+        // Use all reference slides from style library
+        styleLibraryForScout = styleLibrary;
         console.log(`✅ Template mode: Using ${styleLibraryForScout.length} reference slides from style library`);
-      } else if (generationMode === 'crazy') {
+      } else if (plan.mode === 'crazy') {
         console.log('✅ Start from Scratch mode: Skipping style library (generating fresh designs)');
       }
 
