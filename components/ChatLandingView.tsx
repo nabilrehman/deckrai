@@ -1644,7 +1644,7 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
     } finally {
       setIsProcessing(false);
     }
-  }, [detectedVibe, thinkingStartTime, thinkingSteps, addMessage, addThinkingStep, updateThinkingStep, onDeckGenerated, onSlidesGenerated, onUndoLastChange, currentAttachedImages, trackUsage, validateGeneration]);
+  }, [detectedVibe, thinkingStartTime, thinkingSteps, addMessage, addThinkingStep, updateThinkingStep, onDeckGenerated, onSlidesGenerated, onUndoLastChange, currentAttachedImages, trackUsage, validateGeneration, generationMode, styleLibrary]);
 
   /**
    * Handler: Execute deck customization plan
