@@ -22,6 +22,39 @@ const Button = ({ children, variant = 'primary', className = "", onClick }: { ch
   return <button onClick={onClick} className={`${baseClass} ${variants[variant]} ${className}`}>{children}</button>;
 };
 
+const BentoCard = ({ title, desc, children, className = "", size = "sm" }: any) => (
+  <div className={`group relative rounded-3xl bg-white border border-slate-200 p-8 overflow-hidden hover:shadow-xl transition-all duration-500 ${size === "lg" ? "md:col-span-2" : ""} ${className}`}>
+     <div className="relative z-10 h-full flex flex-col">
+        <div className="flex-1 mb-6 flex items-center justify-center relative group-hover:scale-105 transition-transform duration-500">
+           {children}
+        </div>
+        <div>
+           <h3 className="text-lg font-bold text-slate-900 mb-2">{title}</h3>
+           <p className="text-sm text-slate-500 leading-relaxed">{desc}</p>
+        </div>
+     </div>
+     <div className="absolute inset-0 bg-gradient-to-br from-slate-50/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+  </div>
+);
+
+const IntegrationIcon = ({ icon: Icon, color }: any) => (
+   <div className="w-12 h-12 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center justify-center hover:-translate-y-1 hover:shadow-md transition-all duration-300">
+      <Icon size={24} className={color} />
+   </div>
+);
+
+const WorkflowStep = ({ step, active }: { step: any, active: boolean }) => (
+  <div className={`flex gap-4 p-4 rounded-xl transition-all duration-500 ${active ? 'bg-white shadow-lg border border-slate-100 scale-105' : 'opacity-50 hover:opacity-80'}`}>
+     <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+        <step.icon size={20} />
+     </div>
+     <div>
+        <h4 className={`font-bold mb-1 transition-colors ${active ? 'text-slate-900' : 'text-slate-600'}`}>{step.title}</h4>
+        <p className="text-xs text-slate-500 leading-relaxed">{step.desc}</p>
+     </div>
+  </div>
+);
+
 // --- Visual Assets ---
 
 const GridBackground = () => (
@@ -114,9 +147,16 @@ const ProductFrame = ({ children, className }: { children: React.ReactNode, clas
 export const LandingPage = () => {
   const navigate = useNavigate();
   const [credits, setCredits] = useState(420);
-  const [heroInput, setHeroInput] = useState("Adapt our 'Enterprise Q3' deck for Atlassian...");
+  const [heroInput, setHeroInput] = useState("Tailor my Atlassian customer facing deck for my upcoming customer meeting with Nike.com");
   const [demoTrigger, setDemoTrigger] = useState(0);
   const demoRef = useRef<HTMLDivElement>(null);
+  const [activeWorkflow, setActiveWorkflow] = useState(0);
+
+  // Workflow Autoplay
+  useEffect(() => {
+     const interval = setInterval(() => setActiveWorkflow(prev => (prev + 1) % 3), 5000);
+     return () => clearInterval(interval);
+  }, []);
 
   const handleNavigateToLogin = () => {
     navigate('/login');
@@ -126,6 +166,12 @@ export const LandingPage = () => {
     setDemoTrigger(prev => prev + 1);
     demoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
+
+  const workflowSteps = [
+    { icon: Layers, title: "1. Ingest your 'Master Deck'", desc: "Upload your best 50 slides. We index them to understand your specific layout preferences and design language." },
+    { icon: Database, title: "2. Paste discovery notes, call notes etc", desc: "Connect CRM notes or discovery calls. We identify pain points and map them to your existing solutions." },
+    { icon: Sparkles, title: "3. Deck ready in 30 seconds tailored to customer", desc: "We generate new slides that look exactly like your best designer made them, tailored to this specific deal." }
+  ];
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-blue-100 overflow-x-hidden">
@@ -145,10 +191,10 @@ export const LandingPage = () => {
                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}
                className="text-6xl md:text-8xl font-bold tracking-tighter text-slate-900 mb-8 mt-10 leading-[0.9] relative"
             >
-               <span className="relative inline-block mt-2 pb-4">
+               <span className="relative inline-block mt-2">
                   <span className="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-blue-600/20 blur-3xl" />
                   <span className="relative text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600 animate-gradient-x">
-                     Tailor your slides,
+                     Tailor your slides
                   </span>
                   {/* Technical HUD Element */}
                   <div className="absolute -bottom-2 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-blue-400 to-transparent opacity-50" />
@@ -156,8 +202,8 @@ export const LandingPage = () => {
                   <div className="absolute -bottom-2 right-[10%] w-1 h-1 bg-purple-500 rounded-full" />
                </span>
                <br/>
-               <span className="text-4xl md:text-6xl text-slate-800">
-                   for every customer meeting.
+               <span className="text-4xl md:text-6xl text-slate-800 block mt-2">
+                   For every customer meeting.
                </span>
             </motion.h1>
 
@@ -185,6 +231,289 @@ export const LandingPage = () => {
          </div>
       </section>
 
+      {/* --- Workflow Section --- */}
+      <section className="py-32 px-6 relative">
+         <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-20">
+               <Badge className="bg-blue-50 text-blue-600 border-blue-100 mb-4">The Deckr Engine</Badge>
+               <h2 className="text-4xl font-bold text-slate-900 mb-4">Your Content + Deal Context = Magic</h2>
+               <p className="text-slate-500 max-w-2xl mx-auto">We don't hallucinate designs. We structurally adapt your approved assets to fit the customer's story.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+               <div className="space-y-6">
+                  {workflowSteps.map((step, i) => (
+                     <div key={i} onClick={() => setActiveWorkflow(i)} className="cursor-pointer">
+                        <WorkflowStep step={step} active={activeWorkflow === i} />
+                     </div>
+                  ))}
+               </div>
+               
+               {/* Workflow Visualization Container */}
+               <div className="relative h-[500px] bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden flex items-center justify-center">
+                  <div className="absolute inset-0 bg-slate-50/50 pattern-grid-lg opacity-50" />
+                  <AnimatePresence mode="wait">
+                     
+                     {/* Visual 1: Dump Context (Hub & Spoke) */}
+                     {activeWorkflow === 0 && (
+                        <motion.div key="step1" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="relative w-full h-full flex items-center justify-center">
+                           {/* Center Logo */}
+                           <div className="w-24 h-24 bg-slate-900 rounded-2xl flex items-center justify-center z-20 shadow-2xl border-4 border-white">
+                              <div className="text-white font-bold text-4xl">D</div>
+                           </div>
+                           
+                           {/* Orbiting Integrations */}
+                           {[
+                              { icon: LayoutTemplate, color: "text-blue-500", label: "Q3 Master Deck" },
+                              { icon: FileText, color: "text-orange-500", label: "Pricing Slides" },
+                              { icon: Database, color: "text-purple-500", label: "Tech Specs" },
+                              { icon: FileText, color: "text-slate-500", label: "Case Studies" },
+                              { icon: FileJson, color: "text-green-500", label: "Brand Tokens" }
+                           ].map((item, i) => (
+                              <motion.div 
+                                 key={i}
+                                 className="absolute"
+                                 initial={{ scale: 0, opacity: 0 }}
+                                 animate={{ 
+                                    scale: 1, 
+                                    opacity: 1,
+                                    rotate: 360 
+                                 }}
+                                 transition={{ 
+                                    rotate: { duration: 30, repeat: Infinity, ease: "linear" },
+                                    scale: { delay: i * 0.1 }
+                                 }}
+                                 style={{ width: '100%', height: '100%' }}
+                              >
+                                 <div 
+                                    className="absolute top-1/2 left-1/2 w-16 h-16 -ml-8 -mt-8 bg-white rounded-xl shadow-lg border border-slate-100 flex flex-col items-center justify-center gap-1"
+                                    style={{ transform: `rotate(${i * 72}deg) translateX(140px) rotate(-${i * 72}deg) rotate(-360deg)` }}
+                                 >
+                                    <motion.div animate={{ rotate: -360 }} transition={{ duration: 30, repeat: Infinity, ease: "linear" }} className="flex flex-col items-center gap-1">
+                                       <item.icon size={20} className={item.color} />
+                                       <span className="text-[8px] font-bold text-slate-500 uppercase text-center leading-none px-1">{item.label}</span>
+                                    </motion.div>
+                                 </div>
+                                 {/* Connection Line */}
+                                 <div className="absolute top-1/2 left-1/2 w-[140px] h-[1px] bg-slate-200 -z-10 origin-left" style={{ transform: `rotate(${i * 72}deg)` }} />
+                              </motion.div>
+                           ))}
+                           
+                           <div className="absolute bottom-8 text-xs font-bold text-slate-400 bg-white px-3 py-1 rounded-full border border-slate-100 shadow-sm">
+                              Getting pain points from discovery notes
+                           </div>
+                        </motion.div>
+                     )}
+
+                     {/* Visual 2: Planning (Scanning) */}
+                     {activeWorkflow === 1 && (
+                        <motion.div key="step2" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="w-full h-full flex flex-col items-center justify-center relative overflow-hidden">
+                           {/* Grid of Slides */}
+                           <div className="grid grid-cols-3 gap-3 opacity-50 scale-95">
+                              {[...Array(9)].map((_, i) => (
+                                 <motion.div 
+                                    key={i}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: i * 0.05 }}
+                                    className="w-24 h-16 bg-white border border-slate-200 rounded shadow-sm overflow-hidden relative flex items-center justify-center"
+                                 >
+                                    {i === 4 ? <div className="text-[8px] font-bold text-slate-300">PAIN POINT</div> : <div className="h-2 w-12 bg-slate-100 rounded m-2" />}
+                                    {i !== 4 && <div className="h-8 bg-slate-50 m-2 rounded-sm" />}
+                                 </motion.div>
+                              ))}
+                           </div>
+
+                           {/* Scanner Line */}
+                           <motion.div 
+                              className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-500/10 to-transparent z-10 border-b-2 border-blue-500/30"
+                              initial={{ top: '-100%' }}
+                              animate={{ top: '100%' }}
+                              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                           />
+
+                           {/* Resulting Plan */}
+                           <motion.div 
+                              initial={{ scale: 0.5, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              transition={{ delay: 1, type: 'spring' }}
+                              className="absolute z-20 bg-slate-900 text-white p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-3 border border-slate-700"
+                           >
+                              <div className="flex items-center gap-2 text-sm font-bold text-blue-300">
+                                 <Search size={16} /> Mapping Solutions
+                              </div>
+                              <div className="w-32 space-y-2 text-[10px] text-slate-400">
+                                 <div className="flex justify-between"><span>Pain Point</span><span className="text-white">Data Silos</span></div>
+                                 <div className="flex justify-between"><span>Solution</span><span className="text-white">Slide #42 (Arch)</span></div>
+                              </div>
+                              <div className="mt-2 flex gap-1">
+                                 {[1,2,3].map(i => <div key={i} className="w-2 h-2 rounded-full bg-green-400 animate-pulse" style={{animationDelay: `${i*0.2}s`}} />)}
+                              </div>
+                           </motion.div>
+
+                           <div className="absolute bottom-8 text-xs font-bold text-slate-400 bg-white px-3 py-1 rounded-full border border-slate-100 shadow-sm">
+                              Tailoring for Nike.com language
+                           </div>
+                        </motion.div>
+                     )}
+
+                     {/* Visual 3: Shiny Delivery */}
+                     {activeWorkflow === 2 && (
+                        <motion.div key="step3" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="relative w-full h-full flex items-center justify-center">
+                           {/* Glow Background */}
+                           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
+                           
+                           {/* The Deck Card */}
+                           <motion.div 
+                              className="relative w-72 aspect-[4/3] bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden group"
+                              initial={{ rotateY: 90 }}
+                              animate={{ rotateY: 0 }}
+                              transition={{ duration: 0.8, type: "spring" }}
+                           >
+                              {/* Shine Effect */}
+                              <motion.div 
+                                 className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/60 to-transparent z-20"
+                                 animate={{ x: ['-100%', '200%'] }}
+                                 transition={{ duration: 2, repeat: Infinity, delay: 1, repeatDelay: 3 }}
+                              />
+                              
+                              <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-600 to-purple-600" />
+                              
+                              <div className="p-6 flex flex-col h-full justify-between relative z-10">
+                                 <div>
+                                    <div className="text-xs font-bold text-slate-400 mb-4 uppercase tracking-wider">Customized for Vercel</div>
+                                    <div className="text-2xl font-bold text-slate-900 mb-2">Q4 Strategic<br/>Growth Plan</div>
+                                 </div>
+                                 <div className="flex justify-between items-end">
+                                    <div className="flex -space-x-2">
+                                       {[1,2].map(i => <div key={i} className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white" />)}
+                                    </div>
+                                    <div className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1">
+                                       <FileText size={10} /> PPTX
+                                    </div>
+                                 </div>
+                              </div>
+                           </motion.div>
+
+                           {/* Sparkles */}
+                           {[...Array(6)].map((_, i) => (
+                              <motion.div
+                                 key={i}
+                                 className="absolute text-yellow-400"
+                                 initial={{ scale: 0, opacity: 0 }}
+                                 animate={{ 
+                                    scale: [0, 1, 0], 
+                                    opacity: [0, 1, 0],
+                                    x: Math.random() * 200 - 100,
+                                    y: Math.random() * 200 - 100
+                                 }}
+                                 transition={{ 
+                                    duration: 2, 
+                                    repeat: Infinity, 
+                                    delay: i * 0.3,
+                                    repeatDelay: 1
+                                 }}
+                              >
+                                 <Sparkles size={24} />
+                              </motion.div>
+                           ))}
+                           
+                           <motion.div 
+                              initial={{ y: 20, opacity: 0 }}
+                              animate={{ y: 0, opacity: 1 }}
+                              transition={{ delay: 0.5 }}
+                              className="absolute -bottom-12 bg-green-50 text-green-700 px-4 py-2 rounded-full text-sm font-bold shadow-lg border border-green-100 flex items-center gap-2"
+                           >
+                              <CheckCircle2 size={16} /> Brand Match 100%
+                           </motion.div>
+                        </motion.div>
+                     )}
+                  </AnimatePresence>
+               </div>
+            </div>
+         </div>
+      </section>
+
+      {/* --- Bento Grid Features --- */}
+      <section className="py-32 bg-white border-y border-slate-100">
+         <div className="max-w-6xl mx-auto px-6">
+            <div className="mb-16">
+               <h2 className="text-3xl font-bold text-slate-900 mb-4">Enterprise Grade by Design</h2>
+               <p className="text-slate-500">We don't reinvent the wheel. We make your wheel spin faster.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[600px]">
+               <BentoCard 
+                  size="lg"
+                  title="Live Data Connections" 
+                  desc="Don't present stale data. Charts update in real-time when you open the deck."
+                  className="bg-slate-50"
+               >
+                  <div className="relative w-full max-w-md mx-auto h-48 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex gap-4 items-end overflow-hidden">
+                     <div className="absolute top-4 right-4 flex gap-2">
+                        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                        <span className="text-[10px] text-slate-400 font-mono">LIVE_STREAM</span>
+                     </div>
+                     {[30, 45, 25, 60, 40, 70, 55].map((h, i) => (
+                        <motion.div 
+                           key={i} 
+                           initial={{ height: 0 }} 
+                           whileInView={{ height: `${h}%` }} 
+                           viewport={{ once: true }}
+                           transition={{ delay: i * 0.1, duration: 0.8, type: "spring" }}
+                           className="flex-1 bg-blue-500 rounded-t-md opacity-80 hover:opacity-100 transition-opacity"
+                        />
+                     ))}
+                  </div>
+               </BentoCard>
+               
+               <BentoCard 
+                  title="Brand Governance" 
+                  desc="We enforce your fonts, colors, and spacing tokens. No AI hallucinations."
+               >
+                  <div className="flex flex-col gap-3 w-full max-w-[200px]">
+                     <div className="flex items-center gap-2 bg-white border border-slate-100 p-2 rounded-lg shadow-sm">
+                        <div className="w-6 h-6 rounded bg-blue-600" />
+                        <div className="flex-1 h-2 bg-slate-100 rounded" />
+                        <Check size={14} className="text-green-500" />
+                     </div>
+                     <div className="flex items-center gap-2 bg-white border border-slate-100 p-2 rounded-lg shadow-sm opacity-50">
+                        <div className="w-6 h-6 rounded bg-red-500" />
+                        <div className="flex-1 h-2 bg-slate-100 rounded" />
+                        <Shield size={14} className="text-slate-400" />
+                     </div>
+                  </div>
+               </BentoCard>
+
+               <BentoCard 
+                  title="Role-Based Access" 
+                  desc="Granular permissions for Sales, Marketing, and Engineering teams."
+               >
+                   <div className="flex -space-x-3">
+                      {[1,2,3,4].map(i => (
+                         <div key={i} className="w-10 h-10 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-xs font-bold text-slate-500 shadow-sm">
+                            U{i}
+                         </div>
+                      ))}
+                      <div className="w-10 h-10 rounded-full bg-slate-900 text-white border-2 border-white flex items-center justify-center text-xs font-bold shadow-sm">+12</div>
+                   </div>
+               </BentoCard>
+
+               <BentoCard 
+                  title="Ecosystem Integrations" 
+                  desc="Works with your existing revenue stack."
+                  size="lg"
+               >
+                  <div className="flex gap-4 opacity-60">
+                     <IntegrationIcon icon={Database} color="text-blue-500" />
+                     <IntegrationIcon icon={Globe} color="text-green-500" />
+                     <IntegrationIcon icon={LayoutTemplate} color="text-orange-500" />
+                     <IntegrationIcon icon={Command} color="text-purple-500" />
+                     <IntegrationIcon icon={Share2} color="text-pink-500" />
+                  </div>
+               </BentoCard>
+            </div>
+         </div>
+      </section>
       {/* --- CTA --- */}
       <section className="py-32 px-6">
          <div className="max-w-5xl mx-auto bg-slate-900 rounded-[2.5rem] p-12 md:p-24 text-center relative overflow-hidden shadow-2xl">

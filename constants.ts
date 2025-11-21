@@ -2,16 +2,16 @@
 import { BrandProfile, SlideContent } from './types';
 
 export const MOCK_BRAND_PROFILE: BrandProfile = {
-  name: "Atlassian",
-  primaryColor: "#0052CC", // Atlassian Blue
-  secondaryColor: "#253858", // Neutral Dark
+  name: "Nike",
+  primaryColor: "#000000", // Nike Black
+  secondaryColor: "#FF6B00", // Nike Orange
   fontFamily: "sans-serif",
   logoStyle: "modern",
-  keywords: ["Agile", "Teamwork", "Open", "Blue"]
+  keywords: ["Innovation", "Performance", "Athletic", "Bold"]
 };
 
 // Updated messaging for Sales/Presales context - adapting EXISTING assets
-export const DEMO_PROMPT = "tailor our sales deck for the upcoming meeting with Atlassion";
+export const DEMO_PROMPT = "tailor our sales deck for the upcoming meeting with Nike";
 
 export const PLAN_STEPS = [
   {
@@ -20,11 +20,11 @@ export const PLAN_STEPS = [
   },
   {
     title: "Injecting Prospect Context",
-    description: "Connecting Salesforce opportunity 'Atlassian' (Stage: Security Review)."
+    description: "Connecting Salesforce opportunity 'Nike' (Stage: Security Review)."
   },
   {
     title: "Extracting Brand Tokens",
-    description: "Enforcing 'Atlassian Sans' and primary color #0052CC."
+    description: "Enforcing Nike brand guidelines and primary color #000000."
   },
   {
     title: "Adapting Architecture Slide",
@@ -46,9 +46,9 @@ export const INITIAL_SLIDES: SlideContent[] = [
     type: "architecture",
     content: [
       "Data Ingestion",
-      "Processing Layer", 
+      "Processing Layer",
       "Analytics Output"
-    ] 
+    ]
   },
   {
     title: "Operational Impact",

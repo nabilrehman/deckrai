@@ -159,7 +159,7 @@ export const DemoPlayer: React.FC<DemoPlayerProps> = ({ onDeductCredits, externa
     setCurrentPlanStep(2);
     setWorkflowStep(WorkflowStep.ASSETS);
     let brand = MOCK_BRAND_PROFILE;
-    try { if (process.env.API_KEY) brand = await analyzeBrand("Atlassian"); } catch (e) {}
+    try { if (process.env.API_KEY) brand = await analyzeBrand("Nike"); } catch (e) {}
     setBrandProfile(brand);
     await new Promise(r => setTimeout(r, 2000));
 
