@@ -76,29 +76,30 @@ const App: React.FC = () => {
   }, []);
 
   // Load user's style library from Firestore when they sign in
-  useEffect(() => {
-    const loadStyleLibrary = async () => {
-      if (user) {
-        try {
-          console.log(`🔍 DEBUG: Loading style library for user ${user.uid}`);
-          const library = await getUserStyleLibrary(user.uid);
-          console.log(`🔍 DEBUG: Loaded ${library.length} items from Firestore`);
-          if (library.length > 0) {
-            console.log('🔍 DEBUG: First 3 items:', library.slice(0, 3).map(item => ({ id: item.id, name: item.name })));
-          }
-          setStyleLibrary(library);
-        } catch (error) {
-          console.error('❌ Error loading style library:', error);
+  const loadStyleLibrary = useCallback(async () => {
+    if (user) {
+      try {
+        console.log(`🔍 DEBUG: Loading style library for user ${user.uid}`);
+        const library = await getUserStyleLibrary(user.uid);
+        console.log(`🔍 DEBUG: Loaded ${library.length} items from Firestore`);
+        if (library.length > 0) {
+          console.log('🔍 DEBUG: First 3 items:', library.slice(0, 3).map(item => ({ id: item.id, name: item.name })));
         }
-      } else {
-        console.log('🔍 DEBUG: User signed out, clearing style library');
-        // Clear style library when user signs out
-        setStyleLibrary([]);
+        setStyleLibrary(library);
+      } catch (error) {
+        console.error('❌ Error loading style library:', error);
       }
-    };
+    } else {
+      console.log('🔍 DEBUG: User signed out, clearing style library');
+      // Clear style library when user signs out
+      setStyleLibrary([]);
+    }
+  }, [user]);
 
+  // Load style library on user sign in
+  useEffect(() => {
     loadStyleLibrary();
-  }, [user?.uid]);
+  }, [loadStyleLibrary]);
 
   const handleAddSessionToHistory = useCallback((session: DebugSession) => {
     setSessionHistory(prevHistory => {
@@ -634,6 +635,7 @@ const App: React.FC = () => {
               }
             }}
             onOpenDeckLibrary={handleOpenDeckLibrary}
+            onStyleLibraryUpdated={loadStyleLibrary}
           />
         )}
       </main>
