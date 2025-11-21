@@ -150,7 +150,7 @@ def run_test(test_case_name, thinking_budget=16384, save_thoughts=True):
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-pro",
+            model="gemini-3-pro-preview",
             contents=prompt,
             config=types.GenerateContentConfig(
                 thinking_config=types.ThinkingConfig(

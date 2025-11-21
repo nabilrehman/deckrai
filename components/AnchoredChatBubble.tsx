@@ -240,19 +240,20 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
             {/* Chat Bubble - no backdrop so slide remains clickable */}
             <div
                 style={bubbleStyle}
-                className="animate-slideIn flex flex-col"
+                className="animate-slideIn flex flex-col relative"
                 onClick={(e) => e.stopPropagation()}
             >
+                {/* Close button - positioned outside content box */}
+                <button
+                    onClick={onClose}
+                    className="absolute -top-2 -right-2 w-7 h-7 bg-gray-800 text-white rounded-full hover:bg-gray-900 transition-colors flex items-center justify-center shadow-lg z-20"
+                >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+
                 <div className={`${isAnchoredRight ? 'flex flex-col' : 'w-80'} bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200 transition-all duration-300`}>
-                    {/* Close button - minimal */}
-                    <button
-                        onClick={onClose}
-                        className="absolute -top-2 -right-2 w-7 h-7 bg-gray-800 text-white rounded-full hover:bg-gray-900 transition-colors flex items-center justify-center shadow-lg z-10"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
 
                     {/* Conversation History */}
                     {localHistory.length > 0 && (

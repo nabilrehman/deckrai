@@ -44,6 +44,26 @@ service cloud.firestore {
       allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
+    // Stripe customers collection - Required for Firebase Stripe Extension
+    match /customers/{userId} {
+      allow read: if isOwner(userId);
+
+      // Checkout sessions - users can create and read their own sessions
+      match /checkout_sessions/{sessionId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Subscriptions - users can read their own subscriptions
+      match /subscriptions/{subscriptionId} {
+        allow read: if isOwner(userId);
+      }
+
+      // Payments - users can read their own payment records
+      match /payments/{paymentId} {
+        allow read: if isOwner(userId);
+      }
+    }
+
     // Admin access (optional - add your admin email here)
     // Uncomment and replace with your email to enable admin dashboard
     // match /{document=**} {

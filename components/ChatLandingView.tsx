@@ -9,6 +9,7 @@ import UndoActionButton from './UndoActionButton';
 import ChatInputWithMentions from './ChatInputWithMentions';
 import VariationThumbnailGrid from './VariationThumbnailGrid';
 import ArtifactsVariationView from './ArtifactsVariationView';
+import ChatSidebar from './ChatSidebar';
 import { Slide, StyleLibraryItem, StoredChatMessage} from '../types';
 import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationContext } from '../services/intelligentGeneration';
 import { detectVibeFromNotes, getDesignerStylesForVibe, getDesignerStyleById, generateStylePromptModifier, PresentationVibe } from '../services/vibeDetection';
@@ -16,6 +17,7 @@ import { createSlideFromPrompt, findBestStyleReferenceFromPrompt, executeSlideTa
 import { researchBrandAndCreateTheme } from '../services/brandResearch';
 import { saveChat, getUserChats, getChat } from '../services/firestoreService';
 import { SavedChat } from '../types';
+import { useUsageValidation } from '../hooks/useUsageValidation';
 
 interface ChatMessage {
   id: string;
@@ -61,6 +63,9 @@ interface ChatLandingViewProps {
   onVariationModeChange?: (mode: 'normal' | 'variation-selection') => void;
   onSetPendingVariations?: (variations: string[]) => void;
   onSetVariationTargetSlide?: (slideId: string, slideName: string) => void;
+
+  // Props for deck library
+  onOpenDeckLibrary?: () => void;
 }
 
 /**
@@ -133,7 +138,8 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
   onUndoLastChange,
   onVariationModeChange,
   onSetPendingVariations,
-  onSetVariationTargetSlide
+  onSetVariationTargetSlide,
+  onOpenDeckLibrary
 }) => {
   // UI State
   const [inputValue, setInputValue] = useState('');
@@ -164,6 +170,9 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
   // @Mention and Image Upload State (for current message context)
   const [currentMentionedSlides, setCurrentMentionedSlides] = useState<string[]>([]);
   const [currentAttachedImages, setCurrentAttachedImages] = useState<string[]>([]);
+
+  // Usage tracking hook
+  const { trackUsage, validateGeneration } = useUsageValidation();
 
   // Deck Upload State (for deck customization workflow)
   const [uploadedDeckSlides, setUploadedDeckSlides] = useState<Slide[]>([]);
@@ -1276,6 +1285,22 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
   const handleGenerateSlides = useCallback(async (plan: any) => {
     console.log('🎨 ChatLandingView: Generating slides...', plan);
 
+    // VALIDATE usage limits BEFORE generation
+    const validation = await validateGeneration(plan.slideCount);
+
+    if (!validation.allowed) {
+      addMessage({
+        role: 'assistant',
+        content: `❌ ${validation.error}\n\nYou have used ${validation.currentUsage}/${validation.limit} slides this month.${validation.isTrialExpired ? '\n\n🚀 Upgrade to continue generating slides!' : '\n\nUpgrade your plan to generate more slides.'}`
+      });
+      return;
+    }
+
+    // Show warning if approaching limit
+    if (validation.warning) {
+      console.warn(`⚠️ ${validation.warning}`);
+    }
+
     setIsProcessing(true);
     setThinkingStartTime(Date.now());
     setThinkingSteps([]);
@@ -1436,6 +1461,10 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
         undoDescription: `Created ${generatedSlides.length} slides`
       });
 
+      // Track usage for generated slides
+      await trackUsage(generatedSlides.length);
+      console.log(`✅ Tracked ${generatedSlides.length} slides for usage`);
+
       // Pass slides to parent
       setTimeout(() => {
         // Call artifacts callback if in artifacts mode
@@ -1466,7 +1495,7 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
     } finally {
       setIsProcessing(false);
     }
-  }, [detectedVibe, thinkingStartTime, thinkingSteps, addMessage, addThinkingStep, updateThinkingStep, onDeckGenerated, onSlidesGenerated, onUndoLastChange, currentAttachedImages]);
+  }, [detectedVibe, thinkingStartTime, thinkingSteps, addMessage, addThinkingStep, updateThinkingStep, onDeckGenerated, onSlidesGenerated, onUndoLastChange, currentAttachedImages, trackUsage, validateGeneration]);
 
   /**
    * Handler: Execute deck customization plan
@@ -1871,6 +1900,17 @@ CONTENT FOCUS: ${customization.description}`;
       position: 'relative',
       overflow: 'hidden'
     }}>
+      {/* Chat Sidebar */}
+      <ChatSidebar
+        user={user}
+        recentChats={savedChats}
+        onNewChat={handleNewChat}
+        onSelectChat={handleLoadChat}
+        activeChatId={currentChatId}
+        onOpenDeckLibrary={onOpenDeckLibrary}
+        chatActive={chatActive}
+      />
+
       {/* Animated Background - Fades out when chat is active */}
       <div style={{
         position: 'absolute',
@@ -1944,225 +1984,60 @@ CONTENT FOCUS: ${customization.description}`;
         }} />
       </div>
 
+      {/* My Decks Button - Top Left (Hidden - now in ChatSidebar) */}
+      {false && onOpenDeckLibrary && (
+        <button
+          onClick={onOpenDeckLibrary}
+          className="btn-secondary"
+          style={{
+            position: 'fixed',
+            top: '24px',
+            left: '24px',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 16px',
+            background: 'rgba(255, 255, 255, 0.95)',
+            border: '1px solid rgba(113, 69, 255, 0.2)',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: '500',
+            color: '#7145FF',
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(113, 69, 255, 0.1)',
+            transition: 'all 200ms ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(113, 69, 255, 0.05)';
+            e.currentTarget.style.borderColor = 'rgba(113, 69, 255, 0.3)';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(113, 69, 255, 0.15)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
+            e.currentTarget.style.borderColor = 'rgba(113, 69, 255, 0.2)';
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 2px 8px rgba(113, 69, 255, 0.1)';
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          My Decks
+        </button>
+      )}
+
       {/* Content Layer - Gemini Pattern */}
       <div style={{
         position: 'relative',
         zIndex: 1,
         flex: 1,
         display: 'flex',
-        flexDirection: chatActive ? 'row' : 'column',
+        flexDirection: 'column',
         transition: 'all 0.3s ease',
         overflow: 'hidden'
       }}>
-
-        {/* LEFT SIDEBAR - Only in chat mode */}
-        {chatActive && (
-          <div style={{
-            width: '260px',
-            flexShrink: 0,
-            borderRight: '1px solid rgba(0, 0, 0, 0.06)',
-            background: '#FAFBFC',
-            padding: '20px 16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px'
-          }}>
-            {/* New Chat Button */}
-            <button
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                background: '#FFFFFF',
-                border: '1px solid rgba(0, 0, 0, 0.08)',
-                borderRadius: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#1F2937',
-                transition: 'all 150ms ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#F9FAFB';
-                e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.2)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#FFFFFF';
-                e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)';
-              }}
-              onClick={handleNewChat}
-            >
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              <span>New Chat</span>
-            </button>
-
-            {/* Chat History Header */}
-            <div style={{
-              fontSize: '12px',
-              fontWeight: '600',
-              color: '#6B7280',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              marginTop: '16px',
-              marginBottom: '4px',
-              paddingLeft: '8px'
-            }}>
-              Recent
-            </div>
-
-            {/* Chat History Items */}
-            <div style={{
-              flex: 1,
-              overflowY: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px'
-            }}>
-              {!user ? (
-                /* Not logged in - Show sign-in prompt */
-                <div style={{
-                  padding: '20px 16px',
-                  textAlign: 'center'
-                }}>
-                  <div style={{
-                    width: '48px',
-                    height: '48px',
-                    margin: '0 auto 12px',
-                    background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <svg width="24" height="24" fill="white" viewBox="0 0 24 24">
-                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                    </svg>
-                  </div>
-                  <div style={{
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#1F2937',
-                    marginBottom: '6px'
-                  }}>
-                    Sign in to save chats
-                  </div>
-                  <div style={{
-                    fontSize: '12px',
-                    color: '#6B7280',
-                    marginBottom: '16px',
-                    lineHeight: '1.5'
-                  }}>
-                    Your conversations will be saved and accessible across devices
-                  </div>
-                  <button
-                    onClick={() => {
-                      // Scroll to top where sign-in button is in header
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                      // Could also trigger a sign-in modal here if available
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '10px 16px',
-                      background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '10px',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      transition: 'all 150ms ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'scale(1.02)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(99, 102, 241, 0.3)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'scale(1)';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                  >
-                    Sign In
-                  </button>
-                </div>
-              ) : loadingChats ? (
-                <div style={{
-                  padding: '20px',
-                  textAlign: 'center',
-                  fontSize: '13px',
-                  color: '#9CA3AF'
-                }}>
-                  Loading chats...
-                </div>
-              ) : savedChats.length === 0 ? (
-                <div style={{
-                  padding: '20px',
-                  textAlign: 'center',
-                  fontSize: '13px',
-                  color: '#9CA3AF'
-                }}>
-                  No saved chats yet
-                </div>
-              ) : (
-                savedChats.map((chat) => (
-                  <div
-                    key={chat.id}
-                    style={{
-                      padding: '10px 12px',
-                      background: currentChatId === chat.id ? '#F0F1FF' : '#FFFFFF',
-                      borderRadius: '10px',
-                      cursor: 'pointer',
-                      transition: 'all 150ms ease',
-                      fontSize: '14px',
-                      color: currentChatId === chat.id ? '#4F46E5' : '#4B5563',
-                      borderLeft: currentChatId === chat.id ? '3px solid #6366F1' : '3px solid transparent'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (currentChatId !== chat.id) {
-                        e.currentTarget.style.background = '#F9FAFB';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (currentChatId !== chat.id) {
-                        e.currentTarget.style.background = '#FFFFFF';
-                      }
-                    }}
-                    onClick={() => handleLoadChat(chat.id)}
-                  >
-                    <div style={{
-                      fontWeight: '500',
-                      marginBottom: '4px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {chat.title}
-                    </div>
-                    <div style={{
-                      fontSize: '12px',
-                      color: currentChatId === chat.id ? '#818CF8' : '#9CA3AF',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {chat.lastMessage}
-                    </div>
-                    <div style={{
-                      fontSize: '11px',
-                      color: '#D1D5DB',
-                      marginTop: '4px'
-                    }}>
-                      {new Date(chat.updatedAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
 
         {/* MAIN CONTENT AREA */}
         <div style={{

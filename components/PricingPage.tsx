@@ -1,67 +1,80 @@
 import React from 'react';
-import { PLAN_LIMITS } from '../types';
+import { SUBSCRIPTION_PLANS } from '../config/subscriptionPlans';
 
 interface PricingPageProps {
     onClose: () => void;
+    onSelectPlan?: (planId: 'starter' | 'business' | 'enterprise') => void;
 }
 
-const PricingPage: React.FC<PricingPageProps> = ({ onClose }) => {
+const PricingPage: React.FC<PricingPageProps> = ({ onClose, onSelectPlan }) => {
+    const starterPlan = SUBSCRIPTION_PLANS.starter;
+    const businessPlan = SUBSCRIPTION_PLANS.business;
+    const enterprisePlan = SUBSCRIPTION_PLANS.enterprise;
+
     const plans = [
         {
-            name: 'Free',
-            price: '$0',
-            period: 'forever',
-            description: 'Perfect for getting started',
-            features: [
-                `${PLAN_LIMITS.free.slidesPerMonth} slides per month`,
-                `${PLAN_LIMITS.free.decksPerMonth} decks per month`,
-                'Standard AI models',
-                'Save decks to cloud',
-                'Basic export (PDF)',
-                'Community support'
-            ],
-            cta: 'Current Plan',
-            highlighted: false,
-            disabled: true
-        },
-        {
-            name: 'Pro',
-            price: '$15',
+            id: 'starter' as const,
+            name: starterPlan.displayName,
+            price: `$${starterPlan.price}`,
             period: '/month',
-            description: 'For professionals and teams',
+            yearlyPrice: starterPlan.yearlyPrice ? `$${starterPlan.yearlyPrice}/year` : undefined,
+            description: starterPlan.description,
             features: [
-                `${PLAN_LIMITS.pro.slidesPerMonth} slides per month`,
-                `${PLAN_LIMITS.pro.decksPerMonth} decks per month`,
-                'All AI models (Flash, Pro, Imagen)',
+                `${starterPlan.slidesPerMonth} slides per month`,
+                `${starterPlan.decksPerMonth} decks per month`,
+                'Advanced AI models',
                 'Deep mode (AI self-correction)',
                 'No watermarks',
-                'Personalization features',
-                'Priority generation',
+                'Save decks to cloud',
+                'PDF export',
                 'Email support'
             ],
-            cta: 'Coming Soon',
-            highlighted: true,
-            disabled: true
+            cta: 'Get Starter',
+            highlighted: false,
+            disabled: false
         },
         {
-            name: 'Enterprise',
-            price: '$49',
+            id: 'business' as const,
+            name: businessPlan.displayName,
+            price: `$${businessPlan.price}`,
             period: '/month',
-            description: 'For organizations at scale',
+            yearlyPrice: businessPlan.yearlyPrice ? `$${businessPlan.yearlyPrice}/year` : undefined,
+            description: businessPlan.description,
             features: [
-                `${PLAN_LIMITS.enterprise.slidesPerMonth} slides per month`,
-                `${PLAN_LIMITS.enterprise.decksPerMonth} decks per month`,
-                'Everything in Pro',
+                `${businessPlan.slidesPerMonth} slides per month`,
+                `${businessPlan.decksPerMonth} decks per month`,
+                '⭐ Style Library access',
+                '⭐ Brand Adherence',
+                'Priority generation queue',
+                'Advanced AI models',
+                'Deep mode',
+                'No watermarks',
+                'Dedicated support'
+            ],
+            cta: 'Get Business',
+            highlighted: true,
+            disabled: false
+        },
+        {
+            id: 'enterprise' as const,
+            name: enterprisePlan.displayName,
+            price: 'Custom',
+            period: '',
+            description: enterprisePlan.description,
+            features: [
+                'Unlimited slides',
+                'Unlimited decks',
+                'Everything in Business',
                 'Custom branding',
                 'API access',
                 'Team collaboration',
                 'Advanced analytics',
-                'Dedicated support',
-                'SLA guarantee'
+                'SLA guarantee',
+                'Dedicated account manager'
             ],
-            cta: 'Coming Soon',
+            cta: 'Contact Sales',
             highlighted: false,
-            disabled: true
+            disabled: false
         }
     ];
 
@@ -88,11 +101,11 @@ const PricingPage: React.FC<PricingPageProps> = ({ onClose }) => {
                         </div>
                     </div>
                     <p className="text-brand-text-secondary text-lg">
-                        Start free, upgrade when you're ready
+                        Start with a 14-day free trial, no credit card required
                     </p>
-                    <div className="inline-block mt-4 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-                        <p className="text-sm text-blue-700 font-medium">
-                            🎉 Currently in free beta - Enjoy unlimited access!
+                    <div className="inline-block mt-4 px-4 py-2 bg-green-50 border border-green-200 rounded-lg">
+                        <p className="text-sm text-green-700 font-medium">
+                            ✨ All plans include a 14-day free trial
                         </p>
                     </div>
                 </div>
@@ -157,11 +170,20 @@ const PricingPage: React.FC<PricingPageProps> = ({ onClose }) => {
                             </ul>
 
                             <button
+                                onClick={() => {
+                                    if (plan.id === 'enterprise') {
+                                        window.location.href = 'mailto:sales@deckr.ai?subject=Enterprise Plan Inquiry';
+                                    } else if (onSelectPlan) {
+                                        onSelectPlan(plan.id);
+                                    }
+                                }}
                                 disabled={plan.disabled}
                                 className={`w-full py-3 px-6 rounded-lg font-semibold transition-all duration-300 ${
                                     plan.highlighted
-                                        ? 'bg-gradient-to-r from-brand-primary-500 to-brand-accent-500 text-white hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed'
-                                        : 'bg-gray-100 text-brand-text-secondary hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed'
+                                        ? 'bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed'
+                                        : plan.id === 'enterprise'
+                                        ? 'bg-gray-800 text-white hover:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed'
+                                        : 'bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed'
                                 }`}
                             >
                                 {plan.cta}
@@ -178,18 +200,18 @@ const PricingPage: React.FC<PricingPageProps> = ({ onClose }) => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <h4 className="font-semibold text-brand-text-primary mb-2">
-                                When will paid plans be available?
+                                How does the free trial work?
                             </h4>
                             <p className="text-brand-text-secondary text-sm">
-                                We're currently in beta and all features are free! Paid plans will be introduced once we've refined the product based on user feedback.
+                                Start with a 14-day free trial with full access to your chosen plan. No credit card required. Cancel anytime during the trial period with no charges.
                             </p>
                         </div>
                         <div>
                             <h4 className="font-semibold text-brand-text-primary mb-2">
-                                Will my free account be grandfathered?
+                                What happens after my trial ends?
                             </h4>
                             <p className="text-brand-text-secondary text-sm">
-                                Beta users will receive special benefits when we launch paid plans. Stay tuned for announcements!
+                                After your trial, you'll need to select a paid plan to continue. Your data and decks are saved, so you can pick up right where you left off.
                             </p>
                         </div>
                         <div>

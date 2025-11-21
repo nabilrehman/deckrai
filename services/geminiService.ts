@@ -1615,7 +1615,20 @@ export const detectClickedText = async (
         contents: { parts: [imagePart, { text: prompt }] },
     });
 
-    const jsonText = response.text.trim().replace(/^```json\s*|```\s*$/g, '');
+    // Extract JSON from response (may be wrapped in ```json blocks or have explanatory text)
+    let jsonText = response.text.trim();
+
+    // Look for ```json block
+    const jsonBlockMatch = jsonText.match(/```json\s*([\s\S]*?)```/);
+    if (jsonBlockMatch) {
+        jsonText = jsonBlockMatch[1].trim();
+    } else {
+        // No markdown block, try to find raw JSON object
+        const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            jsonText = jsonMatch[0];
+        }
+    }
 
     try {
         const parsed = JSON.parse(jsonText);

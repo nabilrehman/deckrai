@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import {
     getUserProfile,
@@ -73,6 +75,22 @@ export const useUserUsage = (): UseUserUsageReturn => {
     // Load user data on mount and when user changes
     useEffect(() => {
         loadUserData();
+
+        // Set up real-time listener for user profile changes
+        if (!user) return;
+
+        const userRef = doc(db, 'users', user.uid);
+        const unsubscribe = onSnapshot(userRef, (snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.data();
+                setUserProfile(data as UserProfile);
+                if (data.usage) {
+                    setUsage(data.usage as UserUsage);
+                }
+            }
+        });
+
+        return () => unsubscribe();
     }, [user?.uid]);
 
     const refreshUsage = async () => {

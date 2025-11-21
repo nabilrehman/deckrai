@@ -633,6 +633,7 @@ const App: React.FC = () => {
                 setActiveSlideId(artifactSlides[0].id);
               }
             }}
+            onOpenDeckLibrary={handleOpenDeckLibrary}
           />
         )}
       </main>

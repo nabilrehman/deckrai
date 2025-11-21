@@ -89,7 +89,7 @@ Desired Slide Count: [Number]
 
 # Generate with thinking mode
 response = client.models.generate_content(
-    model="gemini-2.5-pro",
+    model="gemini-3-pro-preview",
     contents=your_prompt,
     config=types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(

@@ -9,9 +9,10 @@ interface ChatWithArtifactsProps {
   onSignOut: () => void;
   styleLibrary?: StyleLibraryItem[];
   onOpenInEditor?: (slides: Slide[]) => void;
+  onOpenDeckLibrary?: () => void;
 }
 
-const ChatWithArtifacts: React.FC<ChatWithArtifactsProps> = ({ user, onSignOut, styleLibrary = [], onOpenInEditor }) => {
+const ChatWithArtifacts: React.FC<ChatWithArtifactsProps> = ({ user, onSignOut, styleLibrary = [], onOpenInEditor, onOpenDeckLibrary }) => {
   const [showArtifacts, setShowArtifacts] = useState(false);
   const [artifactSlides, setArtifactSlides] = useState<Slide[]>([]);
   const [slideHistory, setSlideHistory] = useState<Slide[][]>([]); // For undo functionality
@@ -258,6 +259,7 @@ const ChatWithArtifacts: React.FC<ChatWithArtifactsProps> = ({ user, onSignOut, 
             setVariationTargetSlideId(slideId);
             setVariationSlideName(slideName);
           }}
+          onOpenDeckLibrary={onOpenDeckLibrary}
         />
       </div>
 

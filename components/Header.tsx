@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../contexts/AuthContext';
 import { useUserUsage } from '../hooks/useUserUsage';
-import { PLAN_LIMITS } from '../types';
+import { SUBSCRIPTION_PLANS } from '../config/subscriptionPlans';
 
 import AuthModal from './AuthModal';
 
@@ -73,9 +73,9 @@ const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPd
 
 
   // Real usage data from Firestore (fallback to mock for non-authenticated users)
-  const plan = userProfile?.plan || 'free';
+  const plan = userProfile?.plan || 'trial';
   const decksUsed = usage?.decksThisMonth || 0;
-  const decksLimit = PLAN_LIMITS[plan].decksPerMonth;
+  const decksLimit = SUBSCRIPTION_PLANS[plan].decksPerMonth;
 
 
 

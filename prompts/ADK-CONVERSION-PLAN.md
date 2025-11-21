@@ -71,7 +71,7 @@ from google.genai import types
 # Phase 1: Master Planning Agent
 master_agent = LlmAgent(
     name="MasterPlanner",
-    model="gemini-2.5-pro",
+    model="gemini-3-pro-preview",
     instruction=MASTER_PROMPT_TEMPLATE,
     input_keys=["company", "content", "audience", "goal", "slide_count"],
     output_key="master_plan",
@@ -91,7 +91,7 @@ def create_slide_agents(master_plan_output):
     for brief in slide_briefs:
         agent = LlmAgent(
             name=f"SlideAgent_{brief['slide_number']}",
-            model="gemini-2.5-pro",
+            model="gemini-3-pro-preview",
             instruction=SLIDE_AGENT_PROMPT_TEMPLATE,
             input_keys=["slide_brief", "brand_and_design"],
             output_key=f"slide_{brief['slide_number']}_spec",
@@ -356,7 +356,7 @@ def create_master_agent():
     """Create the master planning agent"""
     return LlmAgent(
         name="MasterPlanner",
-        model="gemini-2.5-pro",
+        model="gemini-3-pro-preview",
         instruction=MASTER_PROMPT,
         input_keys=["company", "content", "audience", "goal", "slide_count"],
         output_key="master_plan",
@@ -389,7 +389,7 @@ You are generating the specification for SLIDE {slide_number}.
 
     return LlmAgent(
         name=f"SlideAgent_{slide_number}",
-        model="gemini-2.5-pro",
+        model="gemini-3-pro-preview",
         instruction=instruction,
         input_keys=[],  # All context in instruction
         output_key=f"slide_{slide_number}_spec",

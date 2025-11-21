@@ -382,7 +382,7 @@ const Editor: React.FC<EditorProps> = ({
         const lastEdit: LastSuccessfulEditContext = {
             workflow: 'Remake', 
             userIntentPrompt: slideUnderReview.pendingPersonalization.taskPrompt,
-            model: 'gemini-2.5-flash-image',
+            model: 'gemini-3-pro-image-preview',
             deepMode: isDeckDeepMode,
         };
     }

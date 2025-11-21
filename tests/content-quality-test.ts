@@ -132,7 +132,7 @@ async function evaluateContentQuality(
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-3-pro-preview',
       contents: [{ text: evaluationPrompt }]
     });
 

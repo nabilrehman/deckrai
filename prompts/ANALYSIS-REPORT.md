@@ -4,7 +4,7 @@
 **Test Date:** 2025-01-12
 **Test Case:** Atlassian (B2B Tech Company)
 **Test Duration:** 86.51 seconds
-**Model:** gemini-2.5-pro (thinking_budget: 16,384)
+**Model:** gemini-3-pro-preview (thinking_budget: 16,384)
 
 ---
 

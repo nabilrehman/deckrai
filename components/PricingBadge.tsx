@@ -1,28 +1,36 @@
 import React, { useState } from 'react';
+import { UserPlan } from '../types';
+import { SUBSCRIPTION_PLANS } from '../config/subscriptionPlans';
 
 interface PricingBadgeProps {
-  plan: 'free' | 'pro' | 'team' | 'enterprise';
-  decksUsed?: number;
-  decksLimit?: number;
+  plan: UserPlan;
+  slidesUsed?: number;
+  slidesLimit?: number;
+  trialDaysRemaining?: number;
   onUpgrade: () => void;
 }
 
 const PricingBadge: React.FC<PricingBadgeProps> = ({
   plan,
-  decksUsed = 0,
-  decksLimit = 10,
+  slidesUsed = 0,
+  slidesLimit = 50,
+  trialDaysRemaining,
   onUpgrade
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const percentage = Math.min((decksUsed / decksLimit) * 100, 100);
+  const planConfig = SUBSCRIPTION_PLANS[plan];
+  const percentage = slidesLimit === -1 ? 0 : Math.min((slidesUsed / slidesLimit) * 100, 100);
   const isNearLimit = percentage >= 80;
+  const isTrial = plan === 'trial';
+  const isTrialEnding = isTrial && trialDaysRemaining !== undefined && trialDaysRemaining <= 3;
 
-  if (plan !== 'free') {
+  // Paid plan badge (simple display)
+  if (plan !== 'trial' && plan !== 'starter') {
     return (
       <div className="flex items-center gap-2 px-3 py-1.5 rounded-full glass border border-brand-primary-200/50">
         <div className="w-2 h-2 rounded-full bg-gradient-to-r from-brand-primary-500 to-brand-accent-500 animate-pulse"></div>
-        <span className="text-xs font-semibold gradient-text">{plan.charAt(0).toUpperCase() + plan.slice(1)}</span>
+        <span className="text-xs font-semibold gradient-text">{planConfig.displayName}</span>
       </div>
     );
   }
@@ -35,34 +43,40 @@ const PricingBadge: React.FC<PricingBadgeProps> = ({
     >
       {/* Collapsed State */}
       <div className={`flex items-center gap-3 px-4 py-2 rounded-xl glass border transition-all duration-300 cursor-pointer ${
-        isNearLimit
+        (isNearLimit || isTrialEnding)
           ? 'border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50'
           : 'border-brand-border/30 hover:border-brand-primary-300'
       }`}>
-        <div className="flex flex-col min-w-[120px]">
+        <div className="flex flex-col min-w-[140px]">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-semibold text-brand-text-secondary">Free Plan</span>
-            <span className={`text-xs font-bold ${isNearLimit ? 'text-amber-600' : 'text-brand-text-primary'}`}>
-              {decksUsed}/{decksLimit}
+            <span className="text-xs font-semibold text-brand-text-secondary">
+              {isTrial ? `Trial • ${trialDaysRemaining}d left` : planConfig.displayName}
             </span>
+            {slidesLimit !== -1 && (
+              <span className={`text-xs font-bold ${(isNearLimit || isTrialEnding) ? 'text-amber-600' : 'text-brand-text-primary'}`}>
+                {slidesUsed}/{slidesLimit}
+              </span>
+            )}
           </div>
 
           {/* Progress Bar */}
-          <div className="relative w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-            <div
-              className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ${
-                isNearLimit
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-500'
-                  : 'bg-gradient-to-r from-brand-primary-500 to-brand-accent-500'
-              }`}
-              style={{ width: `${percentage}%` }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
+          {slidesLimit !== -1 && (
+            <div className="relative w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ${
+                  (isNearLimit || isTrialEnding)
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                    : 'bg-gradient-to-r from-brand-primary-500 to-brand-accent-500'
+                }`}
+                style={{ width: `${percentage}%` }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {isNearLimit && (
+        {(isNearLimit || isTrialEnding) && (
           <div className="flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 animate-pulse">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -77,12 +91,14 @@ const PricingBadge: React.FC<PricingBadgeProps> = ({
           <div className="flex items-start justify-between mb-4">
             <div>
               <h4 className="font-display font-bold text-base text-brand-text-primary mb-1">
-                {isNearLimit ? 'Running out of decks!' : 'Free Plan'}
+                {isNearLimit ? 'Running out of slides!' : isTrialEnding ? 'Trial ending soon!' : planConfig.displayName}
               </h4>
               <p className="text-xs text-brand-text-secondary">
                 {isNearLimit
-                  ? `Only ${decksLimit - decksUsed} decks remaining this month`
-                  : 'Perfect for trying deckr.ai'}
+                  ? `Only ${slidesLimit - slidesUsed} slides remaining this month`
+                  : isTrialEnding
+                  ? `Trial expires in ${trialDaysRemaining} day${trialDaysRemaining === 1 ? '' : 's'}`
+                  : `${planConfig.slidesPerMonth} slides per month`}
               </p>
             </div>
             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-brand-primary-50 to-brand-accent-50">
@@ -93,30 +109,32 @@ const PricingBadge: React.FC<PricingBadgeProps> = ({
           </div>
 
           {/* Usage Stats */}
-          <div className="mb-4 p-3 rounded-xl bg-gradient-to-br from-gray-50 to-slate-50 border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-gray-600">This Month</span>
-              <span className="text-xs font-bold text-gray-900">{decksUsed} / {decksLimit} decks</span>
-            </div>
-            <div className="relative w-full h-2 bg-white rounded-full overflow-hidden shadow-inner">
-              <div
-                className="absolute inset-y-0 left-0 bg-gradient-to-r from-brand-primary-500 via-brand-accent-500 to-brand-primary-600 rounded-full transition-all duration-500"
-                style={{ width: `${percentage}%`, backgroundSize: '200% 100%' }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shimmer"></div>
+          {slidesLimit !== -1 && (
+            <div className="mb-4 p-3 rounded-xl bg-gradient-to-br from-gray-50 to-slate-50 border border-gray-200">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-600">This Month</span>
+                <span className="text-xs font-bold text-gray-900">{slidesUsed} / {slidesLimit} slides</span>
+              </div>
+              <div className="relative w-full h-2 bg-white rounded-full overflow-hidden shadow-inner">
+                <div
+                  className="absolute inset-y-0 left-0 bg-gradient-to-r from-brand-primary-500 via-brand-accent-500 to-brand-primary-600 rounded-full transition-all duration-500"
+                  style={{ width: `${percentage}%`, backgroundSize: '200% 100%' }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shimmer"></div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Pro Features Preview */}
+          {/* Business Features Preview */}
           <div className="mb-4">
-            <p className="text-xs font-semibold text-brand-text-secondary mb-2">Unlock with Pro:</p>
+            <p className="text-xs font-semibold text-brand-text-secondary mb-2">Unlock with Business ($99/mo):</p>
             <ul className="space-y-2">
               {[
-                { icon: '∞', text: 'Unlimited decks' },
-                { icon: '🎨', text: 'Remove watermarks' },
-                { icon: '📊', text: 'Analytics dashboard' },
-                { icon: '🔗', text: 'Share with tracking' }
+                { icon: '⭐', text: 'Style Library access' },
+                { icon: '⭐', text: 'Brand Adherence' },
+                { icon: '📊', text: '250 slides per month' },
+                { icon: '🚀', text: 'Priority generation' }
               ].map((feature, idx) => (
                 <li key={idx} className="flex items-center gap-2 text-xs text-brand-text-secondary">
                   <span className="flex items-center justify-center w-5 h-5 rounded-md bg-brand-primary-100 text-brand-primary-600 font-semibold">
@@ -136,8 +154,8 @@ const PricingBadge: React.FC<PricingBadgeProps> = ({
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:scale-110 transition-transform" viewBox="0 0 20 20" fill="currentColor">
               <path d="M5 4a1 1 0 00-2 0v7.268a2 2 0 000 3.464V16a1 1 0 102 0v-1.268a2 2 0 000-3.464V4zM11 4a1 1 0 10-2 0v1.268a2 2 0 000 3.464V16a1 1 0 102 0V8.732a2 2 0 000-3.464V4zM16 3a1 1 0 011 1v7.268a2 2 0 010 3.464V16a1 1 0 11-2 0v-1.268a2 2 0 010-3.464V4a1 1 0 011-1z" />
             </svg>
-            Upgrade to Pro
-            <span className="ml-auto text-xs opacity-90">$29/mo</span>
+            {isTrialEnding ? 'Upgrade Now' : 'Upgrade to Business'}
+            <span className="ml-auto text-xs opacity-90">$99/mo</span>
           </button>
 
           {/* Money-back Guarantee */}

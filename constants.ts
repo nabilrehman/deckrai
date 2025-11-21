@@ -35,7 +35,7 @@ export const PLAN_STEPS = [
     description: "Mapping discovery notes to solution pillars."
   },
   {
-    title: "Visualizing Trust",
+    title: "Creating slide how our solution solves your problem",
     description: "Transforming text requirements into Compliance Grids."
   }
 ];

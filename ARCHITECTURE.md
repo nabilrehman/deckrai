@@ -407,8 +407,8 @@ USER                 FIREBASE              GEMINI API           BROWSER
 │  └─ users/{uid}/styleLibrary/{id}                               │
 │                                                                  │
 │  Google Gemini API                                              │
-│  ├─ gemini-2.5-pro (Planning, Matching, Analysis)               │
-│  └─ gemini-2.5-flash-image (Slide Generation)                   │
+│  ├─ gemini-3-pro-preview (Planning, Matching, Analysis)               │
+│  └─ gemini-3-pro-image-preview (Slide Generation)                   │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```

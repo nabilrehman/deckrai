@@ -120,104 +120,21 @@ export type PersonalizationAction = TextReplacementAction | ImageReplacementActi
 
 
 // USER MANAGEMENT & PRICING TYPES
-export type UserPlan = 'free' | 'business' | 'enterprise';
+export type UserPlan = 'trial' | 'starter' | 'business' | 'enterprise';
 
 // ============================================================================
-// CREDIT SYSTEM TYPES
+// SUBSCRIPTION-BASED USAGE TRACKING
 // ============================================================================
 
 /**
- * Credit balance tracking for a user
+ * Trial information for new users
  */
-export interface CreditBalance {
-  current: number; // Current available credits
-  monthlyAllowance: number; // Base monthly credits from plan
-  rolledOver: number; // Credits rolled over from previous month (paid plans only)
-  purchased: number; // One-time purchased credits (never expire)
-  lastResetAt: number; // Last monthly reset timestamp
-  nextResetAt: number; // Next monthly reset timestamp
+export interface TrialInfo {
+  isActive: boolean;
+  startDate: number; // Timestamp when trial started
+  endDate: number; // Timestamp when trial expires
+  daysRemaining: number; // Calculated field (can be derived from endDate)
 }
-
-/**
- * Transaction types for credit operations
- */
-export type CreditTransactionType =
-  | 'monthly_reset' // Monthly credit allowance reset
-  | 'rollover' // Credits rolled over from previous month
-  | 'purchase' // One-time credit purchase
-  | 'slide_generation' // Credit deduction for slide generation
-  | 'deck_generation' // Credit deduction for deck generation
-  | 'minor_edit' // Credit deduction for minor slide edit
-  | 'redesign' // Credit deduction for slide redesign
-  | 'refund' // Credit refund
-  | 'bonus'; // Bonus credits (promotions, referrals)
-
-/**
- * Credit transaction record (immutable audit trail)
- */
-export interface CreditTransaction {
-  id: string; // Transaction ID
-  userId: string;
-  type: CreditTransactionType;
-  amount: number; // Positive for additions, negative for deductions
-  balanceBefore: number;
-  balanceAfter: number;
-  timestamp: number;
-  metadata?: {
-    slideId?: string;
-    slideName?: string;
-    deckId?: string;
-    stripePaymentId?: string;
-    reason?: string;
-  };
-}
-
-/**
- * Credit costs for operations
- */
-export const CREDIT_COSTS = {
-  SLIDE_GENERATION: 2, // Cost per slide generated
-  DECK_GENERATION_PER_SLIDE: 1, // Cost per slide in deck generation (bulk discount)
-  MINOR_EDIT: 1, // Cost for minor edits (text change, color change)
-  REDESIGN: 3, // Cost for major redesign (3 variations)
-  INPAINTING: 2, // Cost for inpainting operations
-} as const;
-
-/**
- * Plan limits and credit allocation
- */
-export const PLAN_LIMITS: Record<
-  UserPlan,
-  {
-    creditsPerMonth: number;
-    allowRollover: boolean;
-    maxRollover: number; // Multiplier of monthly allowance (e.g., 2x = can rollover up to 2x monthly)
-    slidesPerMonth: number; // Legacy field (for backward compatibility)
-    decksPerMonth: number; // Legacy field (for backward compatibility)
-  }
-> = {
-  free: {
-    creditsPerMonth: 50,
-    allowRollover: false,
-    maxRollover: 0,
-    slidesPerMonth: 10, // ~25 slides at 2 credits each
-    decksPerMonth: 3,
-  },
-  business: {
-    creditsPerMonth: 250,
-    allowRollover: true,
-    maxRollover: 2, // Can accumulate up to 500 credits (2x monthly)
-    slidesPerMonth: 100, // ~125 slides at 2 credits each
-    decksPerMonth: 50,
-  },
-  enterprise: {
-    creditsPerMonth: 999999, // Effectively unlimited
-    allowRollover: false,
-    maxRollover: 0,
-    slidesPerMonth: 500,
-    decksPerMonth: 200,
-  },
-};
 
 // ============================================================================
 // USER PROFILE TYPES
@@ -244,8 +161,8 @@ export interface UserProfile {
   displayName: string;
   photoURL?: string;
   plan: UserPlan;
-  credits: CreditBalance; // New: Credit-based system
-  usage: UserUsage; // Legacy: Keep for analytics
+  trial?: TrialInfo; // Trial information (only for trial users)
+  usage: UserUsage; // Slide/deck usage tracking
   subscription: UserSubscription;
   createdAt: number; // timestamp
   lastLoginAt: number; // timestamp

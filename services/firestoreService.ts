@@ -17,7 +17,8 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
-import { UserProfile, UserPlan, UserUsage, SavedDeck, Slide, PLAN_LIMITS, StyleLibraryItem, SavedChat, StoredChatMessage } from '../types';
+import { UserProfile, UserPlan, UserUsage, SavedDeck, Slide, StyleLibraryItem, SavedChat, StoredChatMessage, TrialInfo } from '../types';
+import { SUBSCRIPTION_PLANS } from '../config/subscriptionPlans';
 
 // ============================================================================
 // USER PROFILE OPERATIONS
@@ -46,13 +47,26 @@ export const createOrUpdateUserProfile = async (
         });
         return userSnap.data() as UserProfile;
     } else {
-        // Create new user with default free plan
+        // Create new user with 14-day trial
+        const plan: UserPlan = 'trial';
+        const trialDays = 14;
+        const trialStartDate = now;
+        const trialEndDate = now + (trialDays * 24 * 60 * 60 * 1000);
+
+        const trial: TrialInfo = {
+            isActive: true,
+            startDate: trialStartDate,
+            endDate: trialEndDate,
+            daysRemaining: trialDays
+        };
+
         const newUser: UserProfile = {
             uid,
             email,
             displayName,
             photoURL,
-            plan: 'free',
+            plan,
+            trial,
             usage: {
                 slidesThisMonth: 0,
                 decksThisMonth: 0,
@@ -60,13 +74,18 @@ export const createOrUpdateUserProfile = async (
                 lastUpdated: now
             },
             subscription: {
-                status: 'none'
+                status: 'trialing'
             },
             createdAt: now,
             lastLoginAt: now
         };
 
         await setDoc(userRef, newUser);
+        console.log('[firestoreService] New user created with trial:', {
+            uid,
+            plan,
+            trialDaysRemaining: trial.daysRemaining
+        });
         return newUser;
     }
 };
@@ -89,10 +108,17 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
  */
 export const updateUserPlan = async (uid: string, plan: UserPlan): Promise<void> => {
     const userRef = doc(db, 'users', uid);
-    await updateDoc(userRef, {
+    const updates: any = {
         plan,
-        'subscription.status': plan === 'free' ? 'none' : 'active'
-    });
+        'subscription.status': plan === 'trial' ? 'trialing' : 'active'
+    };
+
+    // If upgrading from trial, remove trial info
+    if (plan !== 'trial') {
+        updates.trial = null;
+    }
+
+    await updateDoc(userRef, updates);
 };
 
 // ============================================================================
@@ -178,12 +204,15 @@ export const checkUsageLimit = async (uid: string, slidesToGenerate: number): Pr
     }
 
     const usage = await getUserUsage(uid);
-    const limits = PLAN_LIMITS[userProfile.plan];
+    const planConfig = SUBSCRIPTION_PLANS[userProfile.plan];
     const currentUsage = usage.slidesThisMonth;
-    const limit = limits.slidesPerMonth;
+    const limit = planConfig.slidesPerMonth;
+
+    // -1 means unlimited
+    const allowed = limit === -1 || (currentUsage + slidesToGenerate <= limit);
 
     return {
-        allowed: currentUsage + slidesToGenerate <= limit,
+        allowed,
         currentUsage,
         limit,
         plan: userProfile.plan
@@ -773,16 +802,18 @@ export const getTotalUsageStats = async (): Promise<{
     totalUsers: number;
     totalDecks: number;
     totalSlides: number;
-    freeUsers: number;
-    proUsers: number;
+    trialUsers: number;
+    starterUsers: number;
+    businessUsers: number;
     enterpriseUsers: number;
 }> => {
     const usersSnapshot = await getDocs(collection(db, 'users'));
     const decksSnapshot = await getDocs(collection(db, 'decks'));
 
     let totalSlides = 0;
-    let freeUsers = 0;
-    let proUsers = 0;
+    let trialUsers = 0;
+    let starterUsers = 0;
+    let businessUsers = 0;
     let enterpriseUsers = 0;
 
     usersSnapshot.forEach(doc => {
@@ -790,8 +821,9 @@ export const getTotalUsageStats = async (): Promise<{
         totalSlides += user.usage.slidesThisMonth;
 
         switch (user.plan) {
-            case 'free': freeUsers++; break;
-            case 'pro': proUsers++; break;
+            case 'trial': trialUsers++; break;
+            case 'starter': starterUsers++; break;
+            case 'business': businessUsers++; break;
             case 'enterprise': enterpriseUsers++; break;
         }
     });
@@ -800,8 +832,9 @@ export const getTotalUsageStats = async (): Promise<{
         totalUsers: usersSnapshot.size,
         totalDecks: decksSnapshot.size,
         totalSlides,
-        freeUsers,
-        proUsers,
+        trialUsers,
+        starterUsers,
+        businessUsers,
         enterpriseUsers
     };
 };

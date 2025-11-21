@@ -26,7 +26,7 @@ from google.genai import types
 client = genai.Client(api_key=YOUR_API_KEY)
 
 response = client.models.generate_content(
-    model="gemini-2.5-pro",
+    model="gemini-3-pro-preview",
     contents=YOUR_PROMPT,
     config=types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(
@@ -40,7 +40,7 @@ response = client.models.generate_content(
 **JavaScript:**
 ```javascript
 const response = await ai.models.generateContent({
-    model: "gemini-2.5-pro",
+    model: "gemini-3-pro-preview",
     contents: YOUR_PROMPT,
     config: {
         thinkingConfig: {

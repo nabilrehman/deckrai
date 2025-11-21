@@ -55,7 +55,7 @@
 - All tools tested successfully with Gemini 2.5 Flash Image model
 - Type-safe parameter interfaces and result types
 - Proper error handling with detailed error messages
-- Model: `gemini-2.5-flash-image`
+- Model: `gemini-3-pro-image-preview`
 
 ---
 

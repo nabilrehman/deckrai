@@ -83,7 +83,7 @@ interface ProgressStep {
 }
 
 const REDESIGN_KEYWORDS = ['remake', 'restyle', 'redesign', 'make it look', 'use the style of', 'make it nice', 'make it better', 'make it professional'];
-type GenerationModel = 'gemini-2.5-flash-image' | 'imagen-4.0-generate-001';
+type GenerationModel = 'gemini-3-pro-image-preview' | 'imagen-4.0-generate-001';
 
 type WorkflowTab = 'edit' | 'personalize' | 'inpaint' | 'redesign';
 
@@ -108,7 +108,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
   const [isDeepMode, setIsDeepMode] = useState(false);
   const [debugLogs, setDebugLogs] = useState<DebugLog[] | null>(null);
   const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([]);
-  const [selectedModel, setSelectedModel] = useState<GenerationModel>('gemini-2.5-flash-image');
+  const [selectedModel, setSelectedModel] = useState<GenerationModel>('gemini-3-pro-image-preview');
   const [activeTab, setActiveTab] = useState<WorkflowTab>('edit');
 
   const [prompt, setPrompt] = useState('');
@@ -488,7 +488,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
         workflow: 'Personalize',
         initialPrompt: `Personalize for ${companyWebsite}`,
         initialImage: currentSrc,
-        model: 'gemini-2.5-flash-image',
+        model: 'gemini-3-pro-image-preview',
         deepMode: isDeepMode,
     };
 
@@ -541,7 +541,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
             timestamp: new Date().toISOString(),
             workflow: 'Create New Slide',
             initialPrompt: prompt,
-            model: 'gemini-2.5-flash-image',
+            model: 'gemini-3-pro-image-preview',
             deepMode: isDeepMode,
         };
 
@@ -792,7 +792,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
       workflow: 'Inpaint',
       initialPrompt: 'remove this',
       initialImage: currentSrc,
-      model: 'gemini-2.5-flash-image',
+      model: 'gemini-3-pro-image-preview',
       deepMode: isDeepMode,
     };
 
@@ -886,7 +886,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
         workflow: 'Inpaint',
         initialPrompt: inpaintingPrompt,
         initialImage: currentSrc,
-        model: 'gemini-2.5-flash-image',
+        model: 'gemini-3-pro-image-preview',
         deepMode: isDeepMode,
     };
     
@@ -1137,7 +1137,20 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
   // Anchored AI Chat handlers
   const handleSlideClick = async (e: React.MouseEvent<HTMLImageElement>) => {
     // Don't open chat if in inpainting mode or if image generation is in progress
-    if (isInpaintingMode || isGenerating || creationModeInfo || !currentSrc || !imageRef.current) return;
+    console.log('[Edit Mode Click Debug]', {
+      isInpaintingMode,
+      isGenerating,
+      creationModeInfo,
+      hasCurrentSrc: !!currentSrc,
+      hasImageRef: !!imageRef.current
+    });
+
+    if (isInpaintingMode || isGenerating || creationModeInfo || !currentSrc || !imageRef.current) {
+      console.log('[Edit Mode Click] BLOCKED - one or more conditions failed');
+      return;
+    }
+
+    console.log('[Edit Mode Click] PASSED - opening chat bubble');
 
     // Get click position relative to the image
     const rect = imageRef.current.getBoundingClientRect();

@@ -60,7 +60,7 @@ def run_master_planning(company, content, audience, goal, slide_count):
     start_time = time.time()
 
     response = client.models.generate_content(
-        model="gemini-2.5-pro",
+        model="gemini-3-pro-preview",
         contents=master_prompt,
         config=types.GenerateContentConfig(
             thinking_config=types.ThinkingConfig(
@@ -181,7 +181,7 @@ You are generating the specification for SLIDE {slide_number}.
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-pro",
+            model="gemini-3-pro-preview",
             contents=slide_prompt,
             config=types.GenerateContentConfig(
                 thinking_config=types.ThinkingConfig(

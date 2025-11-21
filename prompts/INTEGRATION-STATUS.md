@@ -51,7 +51,7 @@ generateDesignerOutline(
 ```
 
 **Architecture:**
-- **Phase 1:** Master planning agent (gemini-2.5-pro, 16384 thinking budget)
+- **Phase 1:** Master planning agent (gemini-3-pro-preview, 16384 thinking budget)
 - **Phase 2:** Parallel slide agents (Promise.all, 8192 budget each)
 - **Phase 3:** Aggregation and parsing
 
