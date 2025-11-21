@@ -491,9 +491,13 @@ const generateSingleImage = async (
 
 
     // --- GEMINI FLASH WORKFLOW ---
-    console.log(`[generateSingleImage] 📡 Calling Gemini API...`);
+    console.log(`[generateSingleImage] 📡 Calling Gemini API with 2K resolution...`);
     const parts = [...imageParts, { text: prompt }];
-    const config = { responseModalities: [Modality.IMAGE] };
+    const config = {
+        responseModalities: [Modality.IMAGE],
+        image_size: "2K"  // Generate 2K resolution (2048x1152 for 16:9) - same cost as 1K
+    };
+    console.log(`[generateSingleImage] Config:`, JSON.stringify(config, null, 2));
 
     try {
         let response = await ai.models.generateContent({ model, contents: { parts }, config });

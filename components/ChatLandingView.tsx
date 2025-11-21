@@ -1500,8 +1500,8 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
 
       // Step 4: Generate actual slides with AI
       const generatedSlides: Slide[] = [];
-      const BATCH_SIZE = 3;
       const totalSlides = Math.min(slideDescriptions.length, plan.slideCount);
+      const BATCH_SIZE = totalSlides; // Generate all slides in parallel for maximum speed
 
       for (let i = 0; i < totalSlides; i += BATCH_SIZE) {
         const batchDescriptions = slideDescriptions.slice(i, Math.min(i + BATCH_SIZE, totalSlides));
