@@ -27,6 +27,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
+      :root {
+        --radius-lg: 12px;
+        --transition-fast: 0.2s ease;
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      }
+
       body {
         font-family: 'Inter', sans-serif;
         background-color: #f8fafc;
@@ -34,6 +40,14 @@
         overflow-x: hidden;
       }
       .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+      /* Tailwind Size Utilities */
+      .h-4 { height: 1rem; }
+      .w-4 { width: 1rem; }
+      .h-5 { height: 1.25rem; }
+      .w-5 { width: 1.25rem; }
+      .h-7 { height: 1.75rem; }
+      .w-7 { width: 1.75rem; }
 
       /* Enhanced Scrollbar with Brand Colors */
       ::-webkit-scrollbar {
@@ -216,6 +230,14 @@
       .border-brand-primary-300 { border-color: #A5B4FC; }
       .border-brand-border\/30 { border-color: rgba(233, 235, 240, 0.3); }
 
+      /* Utility Classes */
+      .opacity-0 { opacity: 0; }
+      .scale-0 { transform: scale(0); }
+      .z-10 { z-index: 10; }
+      .rounded-full { border-radius: 9999px; }
+      .absolute { position: absolute; }
+      .relative { position: relative; }
+
       /* Hover States */
       .group:hover .group-hover\:bg-brand-primary-100 { background-color: #EDE9FE; }
       .group:hover .group-hover\:bg-brand-primary-500 { background-color: #6366F1; }
@@ -224,6 +246,7 @@
       .group:hover .group-hover\:opacity-100 { opacity: 1; }
       .group:hover .group-hover\:scale-100 { transform: scale(1); }
       .group:hover .group-hover\:scale-105 { transform: scale(1.05); }
+      .group:hover .group-hover\:via-brand-primary-300 { --tw-gradient-stops: var(--tw-gradient-from), #A5B4FC, var(--tw-gradient-to, rgba(165, 180, 252, 0)); }
 
       /* Gradient Backgrounds */
       .bg-gradient-to-br { background-image: linear-gradient(to bottom right, var(--tw-gradient-stops)); }
