@@ -45,6 +45,7 @@ const App: React.FC = () => {
   const [isTestMode, setIsTestMode] = useState(false); // Production mode: no 5-slide limit
   const [isDeckLibraryOpen, setIsDeckLibraryOpen] = useState(false);
   const [currentDeckName, setCurrentDeckName] = useState('Untitled Deck');
+  const [currentDeckId, setCurrentDeckId] = useState<string | null>(null);
   const [isSaveDeckModalOpen, setIsSaveDeckModalOpen] = useState(false);
   const [isSavingDeck, setIsSavingDeck] = useState(false);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
@@ -527,7 +528,10 @@ const App: React.FC = () => {
     setIsSavingDeck(true);
     try {
       setCurrentDeckName(deckName);
-      await saveDeck(user!.uid, deckName, slides);
+      const savedDeck = await saveDeck(user!.uid, deckName, slides);
+
+      // Store deck ID for Edit Mode optimization
+      setCurrentDeckId(savedDeck.id);
 
       // Show success state
       setIsSavingDeck(false);
@@ -546,9 +550,15 @@ const App: React.FC = () => {
   }, [user, slides]);
 
   // Load deck from library
-  const handleLoadDeck = useCallback((loadedSlides: Slide[]) => {
+  const handleLoadDeck = useCallback((loadedSlides: Slide[], deckId: string) => {
     setSlides(loadedSlides);
     setActiveSlideId(loadedSlides[0]?.id || null);
+    setCurrentDeckId(deckId); // Store deck ID for Edit Mode optimization
+  }, []);
+
+  // Update slides after batch text detection
+  const handleSlidesUpdate = useCallback((updatedSlides: Slide[]) => {
+    setSlides(updatedSlides);
   }, []);
 
   // Open deck library
@@ -606,6 +616,8 @@ const App: React.FC = () => {
                 onAddSessionToHistory={handleAddSessionToHistory}
                 pendingExecutionPlan={pendingExecutionPlan}
                 onClearPendingPlan={() => setPendingExecutionPlan(null)}
+                deckId={currentDeckId}
+                onSlidesUpdate={handleSlidesUpdate}
             />
             <StyleLibraryPanel 
                 isVisible={isStylePanelVisible}

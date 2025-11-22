@@ -4,7 +4,7 @@ import { getUserDecks, deleteDeck } from '../services/firestoreService';
 import { SavedDeck } from '../types';
 
 interface DeckLibraryProps {
-    onLoadDeck: (slides: SavedDeck['slides']) => void;
+    onLoadDeck: (slides: SavedDeck['slides'], deckId: string) => void;
     onClose: () => void;
 }
 
@@ -56,7 +56,7 @@ const DeckLibrary: React.FC<DeckLibraryProps> = ({ onLoadDeck, onClose }) => {
     };
 
     const handleLoadDeck = (deck: SavedDeck) => {
-        onLoadDeck(deck.slides);
+        onLoadDeck(deck.slides, deck.id);
         onClose();
     };
 

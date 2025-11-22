@@ -114,10 +114,6 @@ const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPd
           <span className="text-lg font-bold tracking-tight text-slate-900">Deckr.ai</span>
         </div>
 
-        </div>
-
-
-
         <div className="flex items-center gap-3">
 
           {/* Pricing Badge */}

@@ -28,6 +28,8 @@ interface EditorProps {
   onAddSessionToHistory: (session: DebugSession) => void;
   pendingExecutionPlan?: DeckAiExecutionPlan | null;
   onClearPendingPlan?: () => void;
+  deckId?: string | null;
+  onSlidesUpdate?: (slides: Slide[]) => void;
 }
 
 const launderImageSrc = (src: string): Promise<string> => {
@@ -70,6 +72,8 @@ const Editor: React.FC<EditorProps> = ({
     onAddSessionToHistory,
     pendingExecutionPlan,
     onClearPendingPlan,
+    deckId,
+    onSlidesUpdate,
 }) => {
   const [deckAiPrompt, setDeckAiPrompt] = useState('');
   const [isCreatingPlan, setIsCreatingPlan] = useState(false);
@@ -489,6 +493,8 @@ const Editor: React.FC<EditorProps> = ({
                   onCancelCreation={handleCancelAddSlide}
                   slides={slides}
                   onAddNewSlide={onAddNewSlide}
+                  deckId={deckId}
+                  onSlidesUpdate={onSlidesUpdate}
               />
           </div>
 
