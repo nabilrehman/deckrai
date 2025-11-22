@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Slide, StyleLibraryItem, DebugLog, DebugSession, LastSuccessfulEditContext, PersonalizationAction } from '../types';
 import { getGenerativeVariations, getPersonalizationPlan, getPersonalizedVariationsFromPlan, getInpaintingVariations, remakeSlideWithStyleReference, createSlideFromPrompt, findBestStyleReferenceFromPrompt, detectClickedText, detectAllTextRegions, TextRegion } from '../services/geminiService';
+import { incrementSlideCount } from '../services/firestoreService';
+import { useAuth } from '../contexts/AuthContext';
 import VariantSelector from './VariantSelector';
 import DebugLogViewer from './DebugLogViewer';
 import PersonalizationReviewModal from './PersonalizationReviewModal';
@@ -101,6 +103,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     slides,
     onAddNewSlide,
 }) => {
+  const { user } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [variants, setVariants] = useState<{ images: string[], prompts: string[], context: any } | null>(null);
@@ -1306,6 +1309,16 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
           onNewSlideVersion(slide.id, images[0]);
           onSuccessfulSingleSlideEdit(context);
 
+          // Deduct credit for edit
+          if (user?.uid) {
+            try {
+              await incrementSlideCount(user.uid, 1);
+              console.log('[Credit] Deducted 1 credit for edit');
+            } catch (error) {
+              console.error('[Credit] Failed to deduct credit:', error);
+            }
+          }
+
           // Invalidate cache - new image will trigger automatic re-detection via useEffect
           console.log('[Cache Invalidation] Clearing stale cache after edit');
           // Delay cache clear to allow UI to update with new slide first
@@ -1324,6 +1337,16 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
         } else {
           setVariants({ images, prompts: variationPrompts, context });
           onSuccessfulSingleSlideEdit(context);
+
+          // Deduct credit for edit
+          if (user?.uid) {
+            try {
+              await incrementSlideCount(user.uid, 1);
+              console.log('[Credit] Deducted 1 credit for edit');
+            } catch (error) {
+              console.error('[Credit] Failed to deduct credit:', error);
+            }
+          }
 
           // Delay cache clear to allow UI to update
           setTimeout(() => {
