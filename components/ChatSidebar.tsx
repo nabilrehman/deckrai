@@ -120,50 +120,10 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
               {/* Header with logo */}
               <div className="p-4 border-b border-slate-200">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    {/* Deckr Logo - Stacked Slides */}
-                    <svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <defs>
-                        <linearGradient id="sidebar-slide1" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#7145FF"/>
-                          <stop offset="50%" stopColor="#5D5FEF"/>
-                          <stop offset="100%" stopColor="#818CF8"/>
-                        </linearGradient>
-                        <linearGradient id="sidebar-slide2" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#5D5FEF"/>
-                          <stop offset="100%" stopColor="#6366F1"/>
-                        </linearGradient>
-                        <linearGradient id="sidebar-slide3" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#4F46E5"/>
-                          <stop offset="100%" stopColor="#5D5FEF"/>
-                        </linearGradient>
-                      </defs>
-                      {/* Slide 3 (back) */}
-                      <g transform="translate(15, 45) rotate(-8 27.5 16.25)">
-                        <rect width="55" height="32.5" rx="2.5" fill="url(#sidebar-slide3)" opacity="0.8"/>
-                      </g>
-                      {/* Slide 2 (middle) */}
-                      <g transform="translate(17, 40) rotate(-4 27.5 16.25)">
-                        <rect width="55" height="32.5" rx="2.5" fill="url(#sidebar-slide2)" opacity="0.9"/>
-                      </g>
-                      {/* Slide 1 (front) */}
-                      <g transform="translate(20, 35)">
-                        <rect width="55" height="32.5" rx="2.5" fill="url(#sidebar-slide1)"/>
-                        <rect y="0" width="55" height="0.8" rx="2.5" fill="#FFFFFF" opacity="0.2"/>
-                      </g>
-                    </svg>
-                    <div className="flex flex-col">
-                      <span
-                        className="text-lg bg-gradient-to-r from-purple-600 via-indigo-500 to-blue-600 bg-clip-text text-transparent animate-gradient-x"
-                        style={{
-                          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                          fontWeight: 600,
-                          backgroundSize: '200% 200%'
-                        }}
-                      >
-                        Deckr.ai
-                      </span>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    {/* Deckr Logo - Blue D */}
+                    <div className="w-6 h-6 bg-blue-600 rounded-md flex items-center justify-center text-white text-xs font-bold">D</div>
+                    <span className="text-lg font-bold tracking-tight text-slate-900">Deckr.ai</span>
                   </div>
                   <button
                     onClick={() => setIsExpanded(false)}
