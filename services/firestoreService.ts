@@ -455,6 +455,20 @@ export const updateDeck = async (
 };
 
 /**
+ * Update text regions for all slides in a deck (for Edit Mode optimization)
+ */
+export const updateDeckTextRegions = async (
+    deckId: string,
+    slidesWithRegions: Slide[]
+): Promise<void> => {
+    const deckRef = doc(db, 'decks', deckId);
+    await updateDoc(deckRef, {
+        slides: slidesWithRegions,
+        updatedAt: Date.now()
+    });
+};
+
+/**
  * Delete a deck
  */
 export const deleteDeck = async (deckId: string): Promise<void> => {

@@ -108,55 +108,11 @@ const Header: React.FC<HeaderProps> = ({ hasActiveProject, onReset, onDownloadPd
 
       <div className="container mx-auto px-6 md:px-8 py-4 flex justify-between items-center">
 
-        <div className="flex items-center gap-4 group">
-
-          <div className="relative">
-
-            <svg width="36" height="36" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" className="transition-transform duration-500 group-hover:rotate-12 group-hover:scale-110">
-
-              <defs>
-
-                <linearGradient id="logo-gradient" x1="0" y1="0" x2="1" y2="1">
-
-                  <stop offset="0%" stopColor="#7145FF"/>
-
-                  <stop offset="50%" stopColor="#5D5FEF"/>
-
-                  <stop offset="100%" stopColor="#818CF8"/>
-
-                </linearGradient>
-
-                <filter id="glow">
-
-                  <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-
-                  <feMerge>
-
-                    <feMergeNode in="coloredBlur"/>
-
-                    <feMergeNode in="SourceGraphic"/>
-
-                  </feMerge>
-
-                </filter>
-
-              </defs>
-
-              <path d="M18 2C10.268 2 4 8.26801 4 16C4 23.732 10.268 30 18 30C19.5913 30 21.1239 29.753 22.5642 29.2848C18.4983 26.6817 15.6667 21.6963 15.6667 16C15.6667 10.3037 18.4983 5.31829 22.5642 2.71517C21.1239 2.24699 19.5913 2 18 2Z" fill="url(#logo-gradient)" filter="url(#glow)"/>
-
-            </svg>
-
-            <div className="absolute inset-0 bg-brand-primary-500 opacity-20 blur-xl rounded-full animate-pulse-glow"></div>
-
-          </div>
-
-          <div className="flex flex-col">
-
-            <span className="font-display font-bold text-2xl gradient-text">deckr.ai</span>
-
-            <span className="text-[10px] font-medium text-brand-text-tertiary tracking-wider uppercase">AI Deck Studio</span>
-
-          </div>
+        <div className="flex items-center gap-2">
+          {/* Deckr Logo - Blue D */}
+          <div className="w-8 h-8 bg-blue-600 rounded-md flex items-center justify-center text-white text-sm font-bold">D</div>
+          <span className="text-lg font-bold tracking-tight text-slate-900">Deckr.ai</span>
+        </div>
 
         </div>
 

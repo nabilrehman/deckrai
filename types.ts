@@ -19,6 +19,16 @@ export interface Slide {
     variations: string[]; // The base64 image strings
     variationPrompts: string[]; // The specific prompts used for each variation
   };
+  // Cached text regions from Firestore for instant Edit Mode (from geminiService TextRegion interface)
+  textRegions?: Array<{
+    text: string;
+    boundingBox: {
+      xPercent: number;
+      yPercent: number;
+      widthPercent: number;
+      heightPercent: number;
+    };
+  }>;
 }
 
 export interface StyleLibraryItem {

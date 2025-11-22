@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Slide, StyleLibraryItem, DebugLog, DebugSession, LastSuccessfulEditContext, PersonalizationAction } from '../types';
 import { getGenerativeVariations, getPersonalizationPlan, getPersonalizedVariationsFromPlan, getInpaintingVariations, remakeSlideWithStyleReference, createSlideFromPrompt, findBestStyleReferenceFromPrompt, detectClickedText, detectAllTextRegions, TextRegion } from '../services/geminiService';
-import { incrementSlideCount } from '../services/firestoreService';
+import { incrementSlideCount, updateDeckTextRegions } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
 import VariantSelector from './VariantSelector';
 import DebugLogViewer from './DebugLogViewer';
@@ -22,6 +22,8 @@ interface ActiveSlideViewProps {
   onCancelCreation: () => void;
   slides: Slide[];
   onAddNewSlide: (args: { newSlide: Slide, insertAfterSlideId: string }) => void;
+  deckId?: string; // For saving text regions to Firestore
+  onSlidesUpdate?: (slides: Slide[]) => void; // Callback to update slides with text regions
 }
 
 const Spinner: React.FC<{ size?: string, className?: string }> = ({ size = 'h-5 w-5', className = '' }) => (
@@ -102,6 +104,8 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     onCancelCreation,
     slides,
     onAddNewSlide,
+    deckId,
+    onSlidesUpdate,
 }) => {
   const { user } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
@@ -146,6 +150,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
   // Batch detection cache
   const [cachedTextRegions, setCachedTextRegions] = useState<TextRegion[]>([]);
   const [isBatchDetecting, setIsBatchDetecting] = useState(false);
+  const [hasTriggeredBatch, setHasTriggeredBatch] = useState(false); // Track if deck-wide batch has run
 
   // Magnetic cursor state - text follows mouse when active
   const [magneticCursor, setMagneticCursor] = useState<{ active: boolean; textRegion: TextRegion | null }>({
@@ -293,13 +298,20 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     }
 
     // Always clear these on any change (slide switch OR version update)
-    setCachedTextRegions([]);
     setClickedTextRegion(null);
 
     const preloadTextDetection = async () => {
       if (!currentSrc || creationModeInfo) return;
 
-      console.log('[Batch Detection] Pre-loading text regions for current slide:', currentSrc.substring(0, 50));
+      // FIRST: Check if slide already has textRegions from Firestore (instant!)
+      if (slide.textRegions && slide.textRegions.length > 0) {
+        console.log(`[Firestore Cache] Using ${slide.textRegions.length} regions from Firestore for slide ${slide.id}`);
+        setCachedTextRegions(slide.textRegions);
+        return; // Skip AI detection - use Firestore cache
+      }
+
+      // FALLBACK: No Firestore cache, run AI detection
+      console.log('[Batch Detection] No Firestore cache, detecting text regions:', currentSrc.substring(0, 50));
       setIsBatchDetecting(true);
 
       try {
@@ -317,8 +329,50 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
     };
 
     preloadTextDetection();
-  }, [currentSrc, creationModeInfo, slide.id]);
+  }, [currentSrc, creationModeInfo, slide.id, slide.textRegions]);
 
+  // Batch detect text regions for ALL slides and save to Firestore
+  const batchDetectAndSaveAllSlides = async (allSlides: Slide[], saveDeckId?: string) => {
+    if (!saveDeckId || !onSlidesUpdate) {
+      console.log('[Firestore Batch] Skipping - no deckId or onSlidesUpdate callback provided');
+      return;
+    }
+
+    console.log(`[Firestore Batch] Starting detection for ${allSlides.length} slides`);
+
+    // Parallel detection for all slides
+    const detectionPromises = allSlides.map(async (slideItem) => {
+      // Skip if already has textRegions from Firestore
+      if (slideItem.textRegions && slideItem.textRegions.length > 0) {
+        console.log(`[Firestore Batch] Skipping ${slideItem.id} - already has ${slideItem.textRegions.length} cached regions`);
+        return slideItem;
+      }
+
+      try {
+        const slideSrc = slideItem.history[slideItem.history.length - 1];
+        const base64 = await convertToBase64(slideSrc);
+        const regions = await detectAllTextRegions(base64);
+        console.log(`[Firestore Batch] Detected ${regions.length} regions for ${slideItem.id}`);
+        return { ...slideItem, textRegions: regions };
+      } catch (error) {
+        console.error(`[Firestore Batch] Failed for ${slideItem.id}:`, error);
+        return slideItem; // Return unchanged on error
+      }
+    });
+
+    const updatedSlides = await Promise.all(detectionPromises);
+
+    // Save to Firestore
+    try {
+      await updateDeckTextRegions(saveDeckId, updatedSlides);
+      console.log('[Firestore Batch] Saved all text regions to Firestore successfully');
+
+      // Update parent component with new slides
+      onSlidesUpdate(updatedSlides);
+    } catch (error) {
+      console.error('[Firestore Batch] Failed to save to Firestore:', error);
+    }
+  };
 
   const handleProgressUpdate = (message: string) => {
     setProgressSteps(prevSteps => {
@@ -1975,7 +2029,21 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
+                                const wasInactive = !isBatchEditMode;
+
                                 setIsBatchEditMode(!isBatchEditMode);
+
+                                // FIRST EDIT MODE ACTIVATION → Trigger batch detection for ALL slides
+                                if (wasInactive && !hasTriggeredBatch && deckId) {
+                                    console.log('[OPTIMIZATION] First Edit Mode click - batch detecting all slides');
+                                    setHasTriggeredBatch(true);
+
+                                    // Non-blocking background execution
+                                    batchDetectAndSaveAllSlides(slides, deckId).catch(error => {
+                                        console.error('[OPTIMIZATION] Batch detection failed:', error);
+                                    });
+                                }
+
                                 if (isBatchEditMode) {
                                     // Exiting Edit Mode - clear queue
                                     setEditQueue([]);
