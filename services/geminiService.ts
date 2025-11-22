@@ -1174,12 +1174,26 @@ export const generateDeckExecutionPlan = async (
     // Add slide images for vision-based analysis (if available)
     if (hasSlideImages) {
       console.log(`[Master Agent] 👁️ Using VISION mode: Analyzing ${slidesInfo.length} slides visually...`);
-      slidesInfo.forEach((slide, idx) => {
-        if (slide.src) {
-          contentParts.push({ text: `\n--- SLIDE ${idx + 1} (ID: ${slide.id}) ---` });
-          contentParts.push(fileToGenerativePart(slide.src));
-        }
+
+      // Convert all URLs to base64 first
+      const slideImageParts = await Promise.all(
+        slidesInfo.map(async (slide, idx) => {
+          if (slide.src) {
+            const base64Src = await urlToBase64(slide.src);
+            return [
+              { text: `\n--- SLIDE ${idx + 1} (ID: ${slide.id}) ---` },
+              fileToGenerativePart(base64Src)
+            ];
+          }
+          return [];
+        })
+      );
+
+      // Flatten and add to content parts
+      slideImageParts.forEach(parts => {
+        parts.forEach(part => contentParts.push(part));
       });
+
       console.log(`[Master Agent] Sending ${contentParts.length} content parts (system + prompt + ${slidesInfo.length * 2} slide parts) to Gemini 3 Pro...`);
     } else {
       console.log(`[Master Agent] 📝 Using TEXT mode: Planning based on slide names only (no images provided)...`);

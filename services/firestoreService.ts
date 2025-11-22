@@ -40,12 +40,50 @@ export const createOrUpdateUserProfile = async (
 
     if (userSnap.exists()) {
         // Update existing user
-        await updateDoc(userRef, {
+        const existingData = userSnap.data() as UserProfile;
+
+        // MIGRATION: Add plan and trial for old users who don't have it
+        const updates: any = {
             displayName,
             photoURL,
             lastLoginAt: now
-        });
-        return userSnap.data() as UserProfile;
+        };
+
+        if (!existingData.plan) {
+            console.log('[firestoreService] Migrating old user to trial plan:', uid);
+            const trialDays = 14;
+            const trialStartDate = now;
+            const trialEndDate = now + (trialDays * 24 * 60 * 60 * 1000);
+
+            updates.plan = 'trial';
+            updates.trial = {
+                isActive: true,
+                startDate: trialStartDate,
+                endDate: trialEndDate,
+                daysRemaining: trialDays
+            };
+
+            if (!existingData.usage) {
+                updates.usage = {
+                    slidesThisMonth: 0,
+                    decksThisMonth: 0,
+                    monthStart: now,
+                    lastUpdated: now
+                };
+            }
+
+            if (!existingData.subscription) {
+                updates.subscription = {
+                    status: 'trialing'
+                };
+            }
+        }
+
+        await updateDoc(userRef, updates);
+
+        // Return updated profile
+        const updatedSnap = await getDoc(userRef);
+        return updatedSnap.data() as UserProfile;
     } else {
         // Create new user with 14-day trial
         const plan: UserPlan = 'trial';

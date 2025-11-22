@@ -1577,10 +1577,7 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
 
   const renderStandardEditor = () => (
      <div className="w-full">
-        <div className="flex justify-between items-center mb-3">
-            <h3 className="font-display text-base font-semibold text-brand-text-primary truncate pr-2" title={slide.name}>
-                Editing: <span className="gradient-text">{slide.name}</span>
-            </h3>
+        <div className="flex justify-end items-center mb-3">
             <div className="flex items-center gap-2">
                 {hasHistory && (
                     <button onClick={() => onUndo(slide.id)} className="btn-icon group" disabled={isGenerating} title="Undo">

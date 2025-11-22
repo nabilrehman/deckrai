@@ -8,6 +8,7 @@ import LoginPage from './components/LoginPage';
 import AppPage from './pages/AppPage';
 import PricingPage from './components/PricingPage';
 import PaymentSuccessPage from './pages/PaymentSuccessPage';
+import ManageLibrariesPage from './pages/ManageLibrariesPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Slide, StyleLibraryItem } from './types';
@@ -112,6 +113,16 @@ const AppWrapper: React.FC = () => {
         element={
           <ProtectedRoute>
             <PaymentSuccessPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Manage Libraries Page - Upload and manage style library */}
+      <Route
+        path="/manage-libraries"
+        element={
+          <ProtectedRoute>
+            <ManageLibrariesPage />
           </ProtectedRoute>
         }
       />
