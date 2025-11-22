@@ -507,37 +507,37 @@ const Editor: React.FC<EditorProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '16px 32px',
+                padding: '12px 24px',
                 cursor: 'pointer',
                 borderBottom: isChatExpanded ? '1px solid var(--color-neutral-200)' : 'none',
                 background: isChatExpanded ? 'transparent' : 'linear-gradient(90deg, rgba(99, 102, 241, 0.03) 0%, rgba(168, 85, 247, 0.03) 100%)',
                 transition: 'all 0.2s ease'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div className="bg-gradient-brand" style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: 'var(--radius-xl)',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: 'var(--radius-lg)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: 'var(--shadow-md)'
+                  boxShadow: 'var(--shadow-sm)'
                 }}>
-                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2}>
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                 </div>
                 <div>
                   <div style={{
-                    fontSize: 'var(--text-base)',
+                    fontSize: 'var(--text-sm)',
                     fontWeight: 'var(--font-semibold)',
                     color: 'var(--color-neutral-900)'
                   }}>
                     AI Assistant
                   </div>
                   <div style={{
-                    fontSize: 'var(--text-sm)',
+                    fontSize: 'var(--text-xs)',
                     color: 'var(--color-neutral-500)'
                   }}>
                     {chatMessages.length > 0 ? `${chatMessages.length} message${chatMessages.length > 1 ? 's' : ''}` : 'Ready to help'}

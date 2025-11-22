@@ -352,7 +352,24 @@ const ChatWithArtifacts: React.FC<ChatWithArtifactsProps> = ({ user, onSignOut, 
           <ArtifactsPanel
             slides={artifactSlides}
             onSlideClick={(slide) => {
-              console.log('Slide clicked:', slide);
+              // Open in Design Editor mode with this slide active
+              if (onOpenInEditor && artifactSlides.length > 0) {
+                // Reorder slides so clicked slide is first (becomes active slide)
+                const clickedSlideIndex = artifactSlides.findIndex(s => s.id === slide.id);
+                if (clickedSlideIndex !== -1) {
+                  const reorderedSlides = [
+                    artifactSlides[clickedSlideIndex],
+                    ...artifactSlides.slice(0, clickedSlideIndex),
+                    ...artifactSlides.slice(clickedSlideIndex + 1)
+                  ];
+                  console.log(`Opening slide "${slide.name}" in Design Editor mode`);
+                  onOpenInEditor(reorderedSlides);
+                } else {
+                  console.warn('Clicked slide not found in artifactSlides');
+                }
+              } else {
+                console.warn('Cannot open in editor: no slides or callback not provided');
+              }
             }}
             onSlideEdit={(slide) => {
               // TODO: Implement inline editing or chat-based editing

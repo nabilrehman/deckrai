@@ -1308,7 +1308,10 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
 
           // Invalidate cache - new image will trigger automatic re-detection via useEffect
           console.log('[Cache Invalidation] Clearing stale cache after edit');
-          setCachedTextRegions([]);
+          // Delay cache clear to allow UI to update with new slide first
+          setTimeout(() => {
+            setCachedTextRegions([]);
+          }, 100);
 
           // Keep batch edit mode active - user can continue editing
           if (isBatchEditMode) {
@@ -1321,6 +1324,11 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
         } else {
           setVariants({ images, prompts: variationPrompts, context });
           onSuccessfulSingleSlideEdit(context);
+
+          // Delay cache clear to allow UI to update
+          setTimeout(() => {
+            setCachedTextRegions([]);
+          }, 100);
 
           // Keep batch edit mode active - user can continue editing
           if (isBatchEditMode) {
@@ -1356,6 +1364,12 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
   const handleCloseChat = () => {
     setAnchoredChatPosition(null);
     setClickedTextRegion(null); // Clear the text overlay
+    // Exit batch edit mode when closing the chat
+    if (isBatchEditMode) {
+      setIsBatchEditMode(false);
+      setEditQueue([]);
+      setSelectedTextForEdit(null);
+    }
   };
 
   // Batch Edit Mode: Queue management handlers

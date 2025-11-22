@@ -54,6 +54,7 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
     const [inputValue, setInputValue] = useState('');
     const [localHistory, setLocalHistory] = useState<ChatMessage[]>(conversationHistory);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false); // Local loading state
     const inputRef = useRef<HTMLInputElement>(null);
     const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -84,6 +85,9 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
 
         // In batch mode, convert queue to natural language prompt
         if (isBatchMode && editQueue.length > 0) {
+            // Set local loading state immediately to prevent multiple clicks
+            setIsSubmitting(true);
+
             const batchPrompt = editQueue.map(item => {
                 if (item.action === 'remove') {
                     return `remove "${item.originalText}"`;
@@ -135,6 +139,9 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
                         ? { ...msg, text: `✗ Error applying changes. Please try again.` }
                         : msg
                 ));
+            } finally {
+                // Always reset loading state when done
+                setIsSubmitting(false);
             }
             return;
         }
@@ -257,11 +264,11 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
 
                     {/* Conversation History */}
                     {localHistory.length > 0 && (
-                        <div className={`px-4 pt-4 pb-2 ${isAnchoredRight ? 'flex-1 overflow-y-auto' : 'max-h-64 overflow-y-auto'} bg-white`}>
+                        <div className={`px-3 pt-3 pb-2 ${isAnchoredRight ? 'flex-1 overflow-y-auto' : 'max-h-64 overflow-y-auto'} bg-white`}>
                             {localHistory.map((message) => (
                                 <div
                                     key={message.id}
-                                    className={`mb-3 ${message.sender === 'user' ? 'text-right' : 'text-left'}`}
+                                    className={`mb-2 ${message.sender === 'user' ? 'text-right' : 'text-left'}`}
                                 >
                                     <div
                                         className={`inline-block px-4 py-2 rounded-2xl text-sm max-w-[85%] ${
@@ -292,11 +299,11 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
                     )}
 
                     {/* Input Area - Chat Style */}
-                    <form onSubmit={handleSubmit} className="p-4 bg-white">
+                    <form onSubmit={handleSubmit} className="p-3 bg-white">
                         {/* Context Indicator */}
                         {(isBatchMode && editQueue.length > 0 && !inputValue.trim()) ? (
                             // Show batch summary when ready to submit
-                            <div className="mb-3 bg-purple-50 rounded-xl px-3 py-2 border border-purple-100">
+                            <div className="mb-2 bg-purple-50 rounded-xl px-3 py-1.5 border border-purple-100">
                                 <div className="flex items-center gap-2">
                                     <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
                                         <span className="text-white text-sm">✨</span>
@@ -309,14 +316,14 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
                             </div>
                         ) : regionText !== 'this area' && regionText !== 'Detecting...' ? (
                             // Show current editing context - prominent
-                            <div className="mb-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl px-3 py-2.5 border-2 border-purple-400 shadow-md">
+                            <div className="mb-2 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl px-3 py-2 border-2 border-purple-400 shadow-md">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm">
-                                        <span className="text-white text-base">✏️</span>
+                                    <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm">
+                                        <span className="text-white text-sm">✏️</span>
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-xs text-purple-600 font-bold uppercase tracking-wide">Now Editing</p>
-                                        <p className="text-base text-purple-900 font-bold truncate">"{regionText}"</p>
+                                        <p className="text-sm text-purple-900 font-bold truncate">"{regionText}"</p>
                                     </div>
                                 </div>
                             </div>
@@ -324,7 +331,7 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
 
                         {/* Edit Queue - Simple text with checkmarks */}
                         {isBatchMode && editQueue.length > 0 && (
-                            <div className="mb-3 space-y-1.5">
+                            <div className="mb-2 space-y-1">
                                 <div className="flex items-center justify-between px-1 mb-1">
                                     <p className="text-xs font-medium text-gray-500">Edit plan:</p>
                                     {onClearQueue && (
@@ -354,7 +361,7 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
 
                         {/* Suggestion pills - "change text" highlighted by default */}
                         {isBatchMode && localHistory.length === 0 && regionText !== 'this area' && regionText !== 'Detecting...' && (
-                            <div className="mb-3 flex flex-wrap gap-2">
+                            <div className="mb-2 flex flex-wrap gap-2">
                                 <button
                                     type="button"
                                     onClick={() => inputRef.current?.focus()}
@@ -449,14 +456,14 @@ const AnchoredChatBubble: React.FC<AnchoredChatBubbleProps> = ({
                                     e.preventDefault();
                                     handleSubmit(e);
                                 }}
-                                disabled={isLoading || showSuccess}
-                                className={`mt-3 w-full px-4 py-3 text-white rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-xl disabled:shadow-none text-sm font-bold ${
+                                disabled={isLoading || isSubmitting || showSuccess}
+                                className={`mt-2 w-full px-4 py-2.5 text-white rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-xl disabled:shadow-none text-sm font-bold ${
                                     showSuccess
                                         ? 'bg-gradient-to-r from-green-500 to-green-600'
                                         : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700'
                                 }`}
                             >
-                                {isLoading ? (
+                                {isLoading || isSubmitting ? (
                                     <>
                                         <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
