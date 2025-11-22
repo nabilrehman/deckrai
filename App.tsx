@@ -248,7 +248,11 @@ const App: React.FC = () => {
   const handleNewSlideVersion = useCallback((slideId: string, newSrc: string) => {
     setSlides(prevSlides =>
       prevSlides.map(slide =>
-        slide.id === slideId ? { ...slide, history: [...slide.history, newSrc] } : slide
+        slide.id === slideId ? {
+          ...slide,
+          history: [...slide.history, newSrc],
+          textRegions: undefined // Clear cached text regions when image changes
+        } : slide
       )
     );
   }, []);
@@ -265,7 +269,12 @@ const App: React.FC = () => {
     setSlides(prevSlides =>
         prevSlides.map(slide => {
             if (slide.id === slideId) {
-                return { ...slide, history: [...slide.history, newSrc], pendingPersonalization: undefined };
+                return {
+                  ...slide,
+                  history: [...slide.history, newSrc],
+                  pendingPersonalization: undefined,
+                  textRegions: undefined // Clear cached text regions when confirming personalization
+                };
             }
             return slide;
         })
@@ -325,7 +334,11 @@ const App: React.FC = () => {
         if (slide.id === slideId && slide.history.length > 1) {
           const newHistory = [...slide.history];
           newHistory.pop();
-          return { ...slide, history: newHistory };
+          return {
+            ...slide,
+            history: newHistory,
+            textRegions: undefined // Clear cached text regions when reverting to previous version
+          };
         }
         return slide;
       })
@@ -335,7 +348,11 @@ const App: React.FC = () => {
   const handleResetSlide = useCallback((slideId: string) => {
     setSlides(prevSlides =>
         prevSlides.map(slide =>
-            slide.id === slideId ? { ...slide, history: [slide.originalSrc] } : slide
+            slide.id === slideId ? {
+              ...slide,
+              history: [slide.originalSrc],
+              textRegions: undefined // Clear cached text regions when resetting to original
+            } : slide
         )
     );
   }, []);
