@@ -2027,18 +2027,44 @@ const ActiveSlideView: React.FC<ActiveSlideViewProps> = ({
                         isBatchEditMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                     }`}>
                         <button
-                            onClick={(e) => {
+                            onClick={async (e) => {
                                 e.stopPropagation();
                                 const wasInactive = !isBatchEditMode;
 
                                 setIsBatchEditMode(!isBatchEditMode);
+
+                                // AUTO-OPEN CHAT BUBBLE when entering Edit Mode
+                                if (wasInactive) {
+                                    const defaultPosition = {
+                                        x: window.innerWidth - 360,  // Right side position
+                                        y: 120                        // Standard top offset
+                                    };
+                                    setAnchoredChatPosition(defaultPosition);
+                                }
 
                                 // FIRST EDIT MODE ACTIVATION → Trigger batch detection for ALL slides
                                 if (wasInactive && !hasTriggeredBatch && deckId) {
                                     console.log('[OPTIMIZATION] First Edit Mode click - batch detecting all slides');
                                     setHasTriggeredBatch(true);
 
-                                    // Non-blocking background execution
+                                    // IMMEDIATE: Detect current slide's regions first for instant boxes
+                                    if (cachedTextRegions.length === 0 && !slide.textRegions) {
+                                        console.log('[OPTIMIZATION] Current slide has no cache - detecting immediately');
+                                        setIsBatchDetecting(true);
+                                        try {
+                                            const currentSrc = slide.history[slide.history.length - 1];
+                                            const base64Src = await convertToBase64(currentSrc);
+                                            const regions = await detectAllTextRegions(base64Src);
+                                            console.log(`[OPTIMIZATION] Detected ${regions.length} regions for current slide immediately`);
+                                            setCachedTextRegions(regions);
+                                        } catch (error) {
+                                            console.error('[OPTIMIZATION] Failed to detect current slide regions:', error);
+                                        } finally {
+                                            setIsBatchDetecting(false);
+                                        }
+                                    }
+
+                                    // BACKGROUND: Batch detect all slides for future use
                                     batchDetectAndSaveAllSlides(slides, deckId).catch(error => {
                                         console.error('[OPTIMIZATION] Batch detection failed:', error);
                                     });
