@@ -130,7 +130,7 @@ export const BookingWidget: React.FC = () => {
   );
 
   return (
-    <div className="bg-white w-full rounded-2xl p-8 shadow-lg border border-slate-200">
+    <div className="bg-white w-full rounded-2xl p-6 shadow-lg border border-slate-200">
        {/* Mobile branding header */}
        <div className="lg:hidden flex items-center gap-2 mb-6 pb-6 border-b border-slate-100">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-sm">D</div>
@@ -153,7 +153,7 @@ export const BookingWidget: React.FC = () => {
             <InlineWidget
               url="https://calendly.com/nabilrehman8"
               styles={{
-                height: '700px',
+                height: '600px',
                 width: '100%'
               }}
               pageSettings={{
