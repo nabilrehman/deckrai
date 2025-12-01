@@ -116,20 +116,20 @@ export const BookingWidget: React.FC = () => {
   );
 
   return (
-    <div className="bg-white h-full w-full rounded-2xl md:p-8 p-6 shadow-sm overflow-hidden flex flex-col relative">
+    <div className="bg-white h-full w-full rounded-2xl md:p-6 p-4 shadow-sm overflow-hidden flex flex-col relative">
        {/* Mobile branding header */}
-       <div className="lg:hidden flex items-center gap-2 mb-6 pb-6 border-b border-slate-100">
+       <div className="lg:hidden flex items-center gap-2 mb-4 pb-4 border-b border-slate-100">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-sm">D</div>
           <span className="font-bold text-xl tracking-tight text-slate-900">deckr.ai</span>
        </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 overflow-hidden flex flex-col">
         {showSuccess ? (
           renderSuccess()
         ) : (
-          <div className="h-full">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-slate-900 mb-1">Book Your Demo</h2>
+          <div className="h-full flex flex-col">
+            <div className="mb-4 flex-shrink-0">
+              <h2 className="text-xl font-bold text-slate-900 mb-1">Book Your Demo</h2>
               <div className="flex items-center gap-2 text-slate-500 text-sm">
                 <CalendarIcon className="w-4 h-4" />
                 <span>Select a time that works for you</span>
@@ -137,18 +137,19 @@ export const BookingWidget: React.FC = () => {
             </div>
 
             {/* Calendly Inline Widget */}
-            <div className="calendly-inline-widget-container" style={{ minHeight: '700px' }}>
+            <div className="calendly-inline-widget-container h-full">
               <InlineWidget
                 url="https://calendly.com/nabilrehman8"
                 styles={{
-                  height: '700px',
+                  height: '100%',
+                  minHeight: '600px',
                   width: '100%'
                 }}
                 pageSettings={{
                   backgroundColor: 'ffffff',
                   hideEventTypeDetails: false,
                   hideLandingPageDetails: false,
-                  primaryColor: '3b82f6',
+                  primaryColor: '2563eb',
                   textColor: '0f172a'
                 }}
               />
