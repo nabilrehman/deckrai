@@ -665,6 +665,7 @@ const App: React.FC = () => {
             }}
             onOpenDeckLibrary={handleOpenDeckLibrary}
             onStyleLibraryUpdated={loadStyleLibrary}
+            onClearStyleLibrary={handleDeleteAllStyleLibrary}
           />
         )}
       </main>

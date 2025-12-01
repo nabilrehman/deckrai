@@ -71,6 +71,7 @@ interface ChatLandingViewProps {
 
   // Props for style library
   onStyleLibraryUpdated?: () => void;  // Callback when style library changes
+  onClearStyleLibrary?: () => void;     // Callback to clear all style library items
 }
 
 /**
@@ -151,7 +152,8 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
   onSetPendingVariations,
   onSetVariationTargetSlide,
   onOpenDeckLibrary,
-  onStyleLibraryUpdated
+  onStyleLibraryUpdated,
+  onClearStyleLibrary
 }) => {
   // UI State
   const [inputValue, setInputValue] = useState('');
@@ -2059,6 +2061,7 @@ CONTENT FOCUS: ${customization.description}`;
         activeChatId={currentChatId}
         onOpenDeckLibrary={onOpenDeckLibrary}
         onUploadToStyleLibrary={handleUploadToStyleLibrary}
+        onClearStyleLibrary={onClearStyleLibrary}
         chatActive={chatActive}
       />
 

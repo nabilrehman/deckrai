@@ -14,6 +14,7 @@ interface ChatSidebarProps {
   activeChatId?: string;
   onOpenDeckLibrary?: () => void;
   onUploadToStyleLibrary?: (files: FileList) => Promise<void>;
+  onClearStyleLibrary?: () => void;
   chatActive?: boolean;
 }
 
@@ -25,6 +26,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   activeChatId,
   onOpenDeckLibrary,
   onUploadToStyleLibrary,
+  onClearStyleLibrary,
   chatActive
 }) => {
   const navigate = useNavigate();
@@ -186,6 +188,39 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                     className="hidden"
                   />
                 </div>
+
+                {/* Clear All Styles Button */}
+                {onClearStyleLibrary && (
+                  <div className="mb-4">
+                    <button
+                      onClick={() => {
+                        onClearStyleLibrary();
+                        setIsExpanded(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left group hover:bg-red-50"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="text-slate-600 group-hover:text-red-600 flex-shrink-0"
+                      >
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                      </svg>
+                      <span className="text-sm text-slate-700 group-hover:text-red-600 font-normal">
+                        Clear All Styles
+                      </span>
+                    </button>
+                  </div>
+                )}
 
                 {/* My Decks Button */}
                 {onOpenDeckLibrary && (
