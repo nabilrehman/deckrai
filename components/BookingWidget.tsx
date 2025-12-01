@@ -153,7 +153,7 @@ export const BookingWidget: React.FC = () => {
             <InlineWidget
               url="https://calendly.com/nabilrehman8"
               styles={{
-                height: '600px',
+                height: '520px',
                 width: '100%'
               }}
               pageSettings={{

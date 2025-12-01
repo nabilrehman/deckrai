@@ -5,14 +5,14 @@ import { BookingWidget } from '../components/BookingWidget';
 export const BookDemoPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 pattern-grid-lg p-0 md:p-4 flex items-center justify-center">
-      <div className="w-full max-w-[1400px] bg-white rounded-none md:rounded-3xl shadow-none md:shadow-2xl overflow-hidden flex flex-col lg:flex-row min-h-screen lg:min-h-[600px]">
+      <div className="w-full max-w-[1400px] bg-white rounded-none md:rounded-3xl shadow-none md:shadow-2xl overflow-hidden flex flex-col lg:flex-row min-h-screen lg:h-[90vh] lg:max-h-[850px]">
         {/* Left Marketing Panel - 33-40% width */}
         <div className="w-full lg:w-5/12 xl:w-1/3">
           <LeftPanel />
         </div>
 
         {/* Right Booking Widget - 60-67% width */}
-        <div className="w-full lg:w-7/12 xl:w-2/3 flex flex-col relative p-6 lg:p-8">
+        <div className="w-full lg:w-7/12 xl:w-2/3 flex flex-col relative p-6">
           {/* Login Link - Desktop Only */}
           <div className="hidden lg:flex justify-end mb-6">
             <a

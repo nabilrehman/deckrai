@@ -3,7 +3,7 @@ import { CheckCircle2, MessageSquareQuote } from 'lucide-react';
 
 export const LeftPanel: React.FC = () => {
   return (
-    <div className="hidden lg:flex flex-col justify-between p-12 bg-[#0f172a] text-white relative overflow-hidden h-full min-h-[600px]">
+    <div className="hidden lg:flex flex-col justify-between p-10 bg-[#0f172a] text-white relative overflow-hidden h-full">
 
       {/* Background decoration */}
       <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-blue-600 rounded-full blur-[100px] opacity-20"></div>
