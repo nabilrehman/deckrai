@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ChatInterface from './ChatInterface';
 import ThinkingSection, { ThinkingStep } from './ThinkingSection';
 import ActionSummary, { ActionItem } from './ActionSummary';
@@ -17,6 +18,7 @@ import { createSlideFromPrompt, findBestStyleReferenceFromPrompt, executeSlideTa
 import { saveChat, getUserChats, getChat, batchAddToStyleLibrary } from '../services/firestoreService';
 import { SavedChat } from '../types';
 import { useUsageValidation } from '../hooks/useUsageValidation';
+import { useAuth } from '../contexts/AuthContext';
 
 // PDF.js library type declaration (loaded via CDN in index.html)
 declare const pdfjsLib: any;
@@ -155,6 +157,19 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
   onStyleLibraryUpdated,
   onClearStyleLibrary
 }) => {
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+
+  // Handle sign out
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/');
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
   // UI State
   const [inputValue, setInputValue] = useState('');
   const [showUploadMenu, setShowUploadMenu] = useState(false);
@@ -2062,6 +2077,7 @@ CONTENT FOCUS: ${customization.description}`;
         onOpenDeckLibrary={onOpenDeckLibrary}
         onUploadToStyleLibrary={handleUploadToStyleLibrary}
         onClearStyleLibrary={onClearStyleLibrary}
+        onSignOut={handleSignOut}
         chatActive={chatActive}
       />
 

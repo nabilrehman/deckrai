@@ -15,6 +15,7 @@ interface ChatSidebarProps {
   onOpenDeckLibrary?: () => void;
   onUploadToStyleLibrary?: (files: FileList) => Promise<void>;
   onClearStyleLibrary?: () => void;
+  onSignOut?: () => void;
   chatActive?: boolean;
 }
 
@@ -27,6 +28,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   onOpenDeckLibrary,
   onUploadToStyleLibrary,
   onClearStyleLibrary,
+  onSignOut,
   chatActive
 }) => {
   const navigate = useNavigate();
@@ -349,7 +351,14 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                         </button>
 
                         {/* Logout */}
-                        <button className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-100/60 transition-all text-left border-t border-slate-100">
+                        <button
+                          onClick={() => {
+                            onSignOut?.();
+                            setIsUserMenuOpen(false);
+                            setIsExpanded(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-100/60 transition-all text-left border-t border-slate-100"
+                        >
                           <LogOut size={16} className="text-slate-600" strokeWidth={2} />
                           <span className="text-sm text-slate-700 font-normal">Log out</span>
                         </button>

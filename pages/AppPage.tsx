@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ChatWithArtifacts from '../components/ChatWithArtifacts';
 import DeckLibrary from '../components/DeckLibrary';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,8 +11,18 @@ interface AppPageProps {
 }
 
 export const AppPage: React.FC<AppPageProps> = ({ styleLibrary, onSlidesGenerated }) => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const [isDeckLibraryOpen, setIsDeckLibraryOpen] = useState(false);
+
+  const handleSignOut = useCallback(async () => {
+    try {
+      await signOut();
+      navigate('/');
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  }, [signOut, navigate]);
 
   const handleOpenDeckLibrary = useCallback(() => {
     setIsDeckLibraryOpen(true);
@@ -35,9 +46,7 @@ export const AppPage: React.FC<AppPageProps> = ({ styleLibrary, onSlidesGenerate
         <ChatWithArtifacts
           user={user}
           styleLibrary={styleLibrary}
-          onSignOut={() => {
-            console.log('Sign out requested from artifacts panel');
-          }}
+          onSignOut={handleSignOut}
           onOpenInEditor={(artifactSlides) => {
             console.log('Opening in classic editor with', artifactSlides.length, 'slides');
             onSlidesGenerated(artifactSlides);
