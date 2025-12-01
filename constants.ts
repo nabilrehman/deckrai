@@ -15,7 +15,7 @@ export const DEMO_PROMPT = "tailor our sales deck for the upcoming meeting with 
 
 export const PLAN_STEPS = [
   {
-    title: "Indexing Internal Library",
+    title: "Finding your best slides",
     description: "Scanning 400+ slides in 'Q3_Master_Deck.pptx' for layouts."
   },
   {

@@ -168,9 +168,9 @@ export const LandingPage = () => {
   };
 
   const workflowSteps = [
-    { icon: Layers, title: "1. Ingest your 'Master Deck'", desc: "Upload your best 50 slides. We index them to understand your specific layout preferences and design language." },
+    { icon: Layers, title: "1. SE prompts Deckr", desc: "Write prompt to customize meeting, generate demo data, add relevant info" },
     { icon: Database, title: "2. Paste discovery notes, call notes etc", desc: "Connect CRM notes or discovery calls. We identify pain points and map them to your existing solutions." },
-    { icon: Sparkles, title: "3. Deck ready in 30 seconds tailored to customer", desc: "We generate new slides that look exactly like your best designer made them, tailored to this specific deal." }
+    { icon: Sparkles, title: "3. Deck and Demo Data ready in 30 seconds tailored to your customer", desc: "We generate new slides that look exactly like your best designer made them, tailored to this specific deal." }
   ];
 
   return (
@@ -189,30 +189,41 @@ export const LandingPage = () => {
          <div className="max-w-6xl mx-auto text-center relative z-10">
             <motion.h1
                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}
-               className="text-6xl md:text-8xl font-bold tracking-tighter text-slate-900 mb-8 mt-10 leading-[0.9] relative"
+               className="text-5xl md:text-7xl font-bold tracking-tight text-slate-900 mb-8 leading-tight relative"
             >
-               <span className="relative inline-block mt-2">
+               Clone Your{' '}
+               <span className="relative inline-block">
                   <span className="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-blue-600/20 blur-3xl" />
                   <span className="relative text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600 animate-gradient-x">
-                     Don't Just Pitch.
+                     Best SE
                   </span>
                   {/* Technical HUD Element */}
                   <div className="absolute -bottom-2 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-blue-400 to-transparent opacity-50" />
                   <div className="absolute -bottom-2 left-[10%] w-1 h-1 bg-blue-500 rounded-full" />
                   <div className="absolute -bottom-2 right-[10%] w-1 h-1 bg-purple-500 rounded-full" />
                </span>
-               <br/>
-               <span className="text-4xl md:text-6xl text-slate-800 block mt-2">
-                   Prove You Understood.
-               </span>
+               , <br className="hidden md:block" />For every customer call
             </motion.h1>
 
             <motion.p
                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}
-               className="text-xl text-slate-500 max-w-2xl mx-auto mb-24 font-light leading-relaxed"
+               className="text-xl text-slate-600 max-w-3xl mx-auto mb-12 font-normal leading-relaxed"
             >
-               Move from transactional selling to trusted advising. Deckr instantly maps your discovery notes to your master slides, Tailoring a presentation that solves this customer's specific pain points.
+               Bridge the gap between "Generic" and "Expert." Deckr is the AI agent that clones your top performer's workflow—handling the Research & Slides (Prep), the Synthetic Data (Demo), and Automates Technical Followups.
             </motion.p>
+
+            {/* CTA Button */}
+            <motion.div
+               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}
+               className="flex justify-center mb-24"
+            >
+               <button
+                  onClick={() => demoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                  className="px-8 py-4 bg-slate-900 text-white rounded-full font-bold text-lg hover:scale-105 transition-transform shadow-xl hover:shadow-slate-900/30"
+               >
+                  Book a Demo
+               </button>
+            </motion.div>
 
             {/* Product Demo Frame */}
             <motion.div
@@ -235,9 +246,9 @@ export const LandingPage = () => {
       <section className="py-32 px-6 relative">
          <div className="max-w-6xl mx-auto">
             <div className="text-center mb-20">
-               <Badge className="bg-blue-50 text-blue-600 border-blue-100 mb-4">The Deckr Engine</Badge>
+               <Badge className="bg-blue-50 text-blue-600 border-blue-100 mb-4">Deckr, Presales Copilot</Badge>
                <h2 className="text-4xl font-bold text-slate-900 mb-4">Your Content + Deal Context = Magic</h2>
-               <p className="text-slate-500 max-w-2xl mx-auto">We don't hallucinate designs. We structurally adapt your approved assets to fit the customer's story.</p>
+               <p className="text-slate-500 max-w-2xl mx-auto">We generate same slides that you have in your library. We customize your approved assets to fit the customer's story.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
@@ -264,11 +275,11 @@ export const LandingPage = () => {
                            
                            {/* Orbiting Integrations */}
                            {[
-                              { icon: LayoutTemplate, color: "text-blue-500", label: "Q3 Master Deck" },
+                              { icon: LayoutTemplate, color: "text-blue-500", label: "Sales Master Deck" },
                               { icon: FileText, color: "text-orange-500", label: "Pricing Slides" },
                               { icon: Database, color: "text-purple-500", label: "Tech Specs" },
                               { icon: FileText, color: "text-slate-500", label: "Case Studies" },
-                              { icon: FileJson, color: "text-green-500", label: "Brand Tokens" }
+                              { icon: FileJson, color: "text-green-500", label: "Deep Research Customer" }
                            ].map((item, i) => (
                               <motion.div 
                                  key={i}
@@ -363,37 +374,68 @@ export const LandingPage = () => {
                            {/* Glow Background */}
                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
                            
-                           {/* The Deck Card */}
-                           <motion.div 
-                              className="relative w-72 aspect-[4/3] bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden group"
-                              initial={{ rotateY: 90 }}
-                              animate={{ rotateY: 0 }}
-                              transition={{ duration: 0.8, type: "spring" }}
-                           >
-                              {/* Shine Effect */}
-                              <motion.div 
-                                 className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/60 to-transparent z-20"
-                                 animate={{ x: ['-100%', '200%'] }}
-                                 transition={{ duration: 2, repeat: Infinity, delay: 1, repeatDelay: 3 }}
-                              />
-                              
-                              <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-600 to-purple-600" />
-                              
-                              <div className="p-6 flex flex-col h-full justify-between relative z-10">
-                                 <div>
-                                    <div className="text-xs font-bold text-slate-400 mb-4 uppercase tracking-wider">Customized for Vercel</div>
-                                    <div className="text-2xl font-bold text-slate-900 mb-2">Q4 Strategic<br/>Growth Plan</div>
-                                 </div>
-                                 <div className="flex justify-between items-end">
-                                    <div className="flex -space-x-2">
-                                       {[1,2].map(i => <div key={i} className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white" />)}
+                           {/* Two Asset Cards */}
+                           <div className="flex flex-col gap-4">
+                              {/* Deck Card */}
+                              <motion.div
+                                 className="relative w-72 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden p-4"
+                                 initial={{ x: -50, opacity: 0 }}
+                                 animate={{ x: 0, opacity: 1 }}
+                                 transition={{ duration: 0.6, type: "spring" }}
+                              >
+                                 {/* Shine Effect */}
+                                 <motion.div
+                                    className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/60 to-transparent z-20"
+                                    animate={{ x: ['-100%', '200%'] }}
+                                    transition={{ duration: 2, repeat: Infinity, delay: 1, repeatDelay: 3 }}
+                                 />
+
+                                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-purple-600" />
+
+                                 <div className="relative z-10 flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+                                       <FileText size={20} className="text-blue-600" />
                                     </div>
-                                    <div className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1">
-                                       <FileText size={10} /> PPTX
+                                    <div className="flex-1">
+                                       <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Customized for Nike.com</div>
+                                       <div className="text-sm font-bold text-slate-900">Custom Demo Deck</div>
+                                    </div>
+                                    <div className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-[10px] font-bold">
+                                       PPTX
                                     </div>
                                  </div>
-                              </div>
-                           </motion.div>
+                              </motion.div>
+
+                              {/* CSV Card */}
+                              <motion.div
+                                 className="relative w-72 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden p-4"
+                                 initial={{ x: -50, opacity: 0 }}
+                                 animate={{ x: 0, opacity: 1 }}
+                                 transition={{ duration: 0.6, delay: 0.2, type: "spring" }}
+                              >
+                                 {/* Shine Effect */}
+                                 <motion.div
+                                    className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/60 to-transparent z-20"
+                                    animate={{ x: ['-100%', '200%'] }}
+                                    transition={{ duration: 2, repeat: Infinity, delay: 1.5, repeatDelay: 3 }}
+                                 />
+
+                                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-600 to-emerald-600" />
+
+                                 <div className="relative z-10 flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center">
+                                       <Database size={20} className="text-green-600" />
+                                    </div>
+                                    <div className="flex-1">
+                                       <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Synthetic Data</div>
+                                       <div className="text-sm font-bold text-slate-900">Custom Demo Data</div>
+                                    </div>
+                                    <div className="bg-green-50 text-green-700 px-2 py-1 rounded text-[10px] font-bold">
+                                       CSV
+                                    </div>
+                                 </div>
+                              </motion.div>
+                           </div>
 
                            {/* Sparkles */}
                            {[...Array(6)].map((_, i) => (
@@ -442,32 +484,75 @@ export const LandingPage = () => {
                <p className="text-slate-500">We don't reinvent the wheel. We make your wheel spin faster.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[600px]">
-               <BentoCard 
+               <BentoCard
                   size="lg"
-                  title="Live Data Connections" 
-                  desc="Don't present stale data. Charts update in real-time when you open the deck."
+                  title="Solution Narratives"
+                  desc="Generate best-in-class solution narratives tailored to your customer's pain points."
                   className="bg-slate-50"
                >
-                  <div className="relative w-full max-w-md mx-auto h-48 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex gap-4 items-end overflow-hidden">
-                     <div className="absolute top-4 right-4 flex gap-2">
-                        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                        <span className="text-[10px] text-slate-400 font-mono">LIVE_STREAM</span>
+                  <div className="relative w-full h-48 flex items-center justify-center gap-6 px-8">
+                     {/* Input Elements */}
+                     <div className="flex flex-col gap-2">
+                        {[
+                           { label: "Architecture", color: "bg-purple-100 text-purple-600" },
+                           { label: "Solution", color: "bg-blue-100 text-blue-600" },
+                           { label: "Pain Mapping", color: "bg-orange-100 text-orange-600" },
+                           { label: "Customize", color: "bg-green-100 text-green-600" }
+                        ].map((item, i) => (
+                           <motion.div
+                              key={i}
+                              initial={{ x: -30, opacity: 0 }}
+                              whileInView={{ x: 0, opacity: 1 }}
+                              viewport={{ once: true }}
+                              transition={{ delay: i * 0.1, duration: 0.5 }}
+                              className={`px-3 py-2 rounded-lg text-xs font-bold ${item.color} shadow-sm`}
+                           >
+                              {item.label}
+                           </motion.div>
+                        ))}
                      </div>
-                     {[30, 45, 25, 60, 40, 70, 55].map((h, i) => (
-                        <motion.div 
-                           key={i} 
-                           initial={{ height: 0 }} 
-                           whileInView={{ height: `${h}%` }} 
-                           viewport={{ once: true }}
-                           transition={{ delay: i * 0.1, duration: 0.8, type: "spring" }}
-                           className="flex-1 bg-blue-500 rounded-t-md opacity-80 hover:opacity-100 transition-opacity"
+
+                     {/* Flow Arrow */}
+                     <motion.div
+                        initial={{ scale: 0 }}
+                        whileInView={{ scale: 1 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: 0.4, duration: 0.5 }}
+                        className="flex items-center"
+                     >
+                        <ArrowRight size={32} className="text-slate-300" />
+                     </motion.div>
+
+                     {/* Output Deck */}
+                     <motion.div
+                        initial={{ x: 30, opacity: 0 }}
+                        whileInView={{ x: 0, opacity: 1 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: 0.5, duration: 0.6, type: "spring" }}
+                        className="relative w-56 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden p-4"
+                     >
+                        <motion.div
+                           className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/60 to-transparent z-20"
+                           animate={{ x: ['-100%', '200%'] }}
+                           transition={{ duration: 2, repeat: Infinity, delay: 1, repeatDelay: 3 }}
                         />
-                     ))}
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-purple-600" />
+                        <div className="relative z-10 flex items-center gap-3">
+                           <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+                              <FileText size={20} className="text-blue-600" />
+                           </div>
+                           <div className="flex-1">
+                              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Output</div>
+                              <div className="text-sm font-bold text-slate-900">Custom Deck</div>
+                           </div>
+                           <div className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-[10px] font-bold">PPTX</div>
+                        </div>
+                     </motion.div>
                   </div>
                </BentoCard>
-               
-               <BentoCard 
-                  title="Brand Governance" 
+
+               <BentoCard
+                  title="Brand Governance"
                   desc="We enforce your fonts, colors, and spacing tokens. No AI hallucinations."
                >
                   <div className="flex flex-col gap-3 w-full max-w-[200px]">
@@ -484,31 +569,54 @@ export const LandingPage = () => {
                   </div>
                </BentoCard>
 
-               <BentoCard 
-                  title="Role-Based Access" 
-                  desc="Granular permissions for Sales, Marketing, and Engineering teams."
+               <BentoCard
+                  title="Demo Data Generation"
+                  desc="Generate synthetic demo data that matches your customer's use case."
                >
-                   <div className="flex -space-x-3">
-                      {[1,2,3,4].map(i => (
-                         <div key={i} className="w-10 h-10 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-xs font-bold text-slate-500 shadow-sm">
-                            U{i}
+                   <div className="flex flex-col gap-2">
+                      <div className="bg-white border border-slate-100 p-3 rounded-lg shadow-sm">
+                         <div className="flex items-center gap-2 mb-2">
+                            <Database size={16} className="text-green-600" />
+                            <span className="text-xs font-bold text-slate-700">customers.csv</span>
                          </div>
-                      ))}
-                      <div className="w-10 h-10 rounded-full bg-slate-900 text-white border-2 border-white flex items-center justify-center text-xs font-bold shadow-sm">+12</div>
+                         <div className="grid grid-cols-3 gap-1">
+                            {[1,2,3,4,5,6].map(i => <div key={i} className="h-1.5 bg-slate-100 rounded" />)}
+                         </div>
+                      </div>
+                      <div className="bg-white border border-slate-100 p-3 rounded-lg shadow-sm opacity-70">
+                         <div className="flex items-center gap-2 mb-2">
+                            <Database size={16} className="text-blue-600" />
+                            <span className="text-xs font-bold text-slate-700">metrics.csv</span>
+                         </div>
+                         <div className="grid grid-cols-3 gap-1">
+                            {[1,2,3,4,5,6].map(i => <div key={i} className="h-1.5 bg-slate-100 rounded" />)}
+                         </div>
+                      </div>
                    </div>
                </BentoCard>
 
-               <BentoCard 
-                  title="Ecosystem Integrations" 
-                  desc="Works with your existing revenue stack."
+               <BentoCard
+                  title="Revenue Stack Integrations"
+                  desc="Connects to Seismic, Gong, Chorus, Salesforce, and more."
                   size="lg"
                >
-                  <div className="flex gap-4 opacity-60">
-                     <IntegrationIcon icon={Database} color="text-blue-500" />
-                     <IntegrationIcon icon={Globe} color="text-green-500" />
-                     <IntegrationIcon icon={LayoutTemplate} color="text-orange-500" />
-                     <IntegrationIcon icon={Command} color="text-purple-500" />
-                     <IntegrationIcon icon={Share2} color="text-pink-500" />
+                  <div className="flex flex-wrap gap-4 justify-center">
+                     <div className="flex flex-col items-center gap-2">
+                        <div className="w-16 h-16 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center justify-center font-bold text-blue-600 text-xs">SFDC</div>
+                        <span className="text-xs text-slate-500">Salesforce</span>
+                     </div>
+                     <div className="flex flex-col items-center gap-2">
+                        <div className="w-16 h-16 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center justify-center font-bold text-purple-600 text-xs">GONG</div>
+                        <span className="text-xs text-slate-500">Gong</span>
+                     </div>
+                     <div className="flex flex-col items-center gap-2">
+                        <div className="w-16 h-16 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center justify-center font-bold text-green-600 text-xs">CHO</div>
+                        <span className="text-xs text-slate-500">Chorus</span>
+                     </div>
+                     <div className="flex flex-col items-center gap-2">
+                        <div className="w-16 h-16 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center justify-center font-bold text-orange-600 text-xs">SIS</div>
+                        <span className="text-xs text-slate-500">Seismic</span>
+                     </div>
                   </div>
                </BentoCard>
             </div>
@@ -521,16 +629,13 @@ export const LandingPage = () => {
              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-blue-500/30 blur-[120px] rounded-full" />
 
              <div className="relative z-10">
-                <h2 className="text-4xl md:text-6xl font-bold text-white mb-8 tracking-tight">Ready to automate your <br/> sales motions?</h2>
-                <div className="flex flex-col md:flex-row justify-center gap-4">
-                   <button onClick={handleNavigateToLogin} className="px-8 py-4 bg-white text-slate-900 rounded-full font-bold hover:scale-105 transition-transform shadow-xl hover:shadow-white/20">
-                      Get Started for Free
-                   </button>
-                   <button className="px-8 py-4 bg-transparent border border-white/20 text-white rounded-full font-bold hover:bg-white/10 transition-colors backdrop-blur-sm">
+                <h2 className="text-4xl md:text-6xl font-bold text-white mb-8 tracking-tight">Ready to scale your Presales?</h2>
+                <div className="flex justify-center">
+                   <button className="px-8 py-4 bg-white text-slate-900 rounded-full font-bold hover:scale-105 transition-transform shadow-xl hover:shadow-white/20">
                       Contact Sales
                    </button>
                 </div>
-                <p className="mt-8 text-slate-400 text-sm">No credit card required. 14-day free trial on Pro plans.</p>
+                <p className="mt-8 text-slate-400 text-sm">Schedule a personalized demo with our team.</p>
              </div>
          </div>
       </section>
