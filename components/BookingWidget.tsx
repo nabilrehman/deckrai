@@ -12,12 +12,26 @@ export const BookingWidget: React.FC = () => {
     if (event.data.event && event.data.event === 'calendly.event_scheduled') {
       // Extract booking details from Calendly
       const payload = event.data.payload;
+
+      // Debug: Log payload to understand structure
+      console.log('Calendly payload:', payload);
+
+      // Try multiple paths to extract email (Calendly structure varies)
+      const email = payload?.invitee?.email ||
+                    payload?.email ||
+                    payload?.invitee_email ||
+                    'your email';
+
+      const name = payload?.invitee?.name ||
+                   payload?.name ||
+                   'Guest';
+
       setBookingDetails({
-        name: payload?.invitee?.name || 'Guest',
-        email: payload?.invitee?.email || '',
-        eventName: payload?.event?.name || 'Demo Call',
-        startTime: payload?.event?.start_time || new Date().toISOString(),
-        endTime: payload?.event?.end_time || new Date().toISOString(),
+        name: name,
+        email: email,
+        eventName: payload?.event?.name || payload?.event_type_name || 'Demo Call',
+        startTime: payload?.event?.start_time || payload?.start_time || new Date().toISOString(),
+        endTime: payload?.event?.end_time || payload?.end_time || new Date().toISOString(),
       });
       setShowSuccess(true);
     }
@@ -124,9 +138,7 @@ export const BookingWidget: React.FC = () => {
        </div>
 
       {showSuccess ? (
-        <div className="py-8">
-          {renderSuccess()}
-        </div>
+        renderSuccess()
       ) : (
         <div>
           <div className="mb-6">
