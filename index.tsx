@@ -9,6 +9,7 @@ import AppPage from './pages/AppPage';
 import PricingPage from './components/PricingPage';
 import PaymentSuccessPage from './pages/PaymentSuccessPage';
 import ManageLibrariesPage from './pages/ManageLibrariesPage';
+import { BookDemoPage } from './pages/BookDemoPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Slide, StyleLibraryItem } from './types';
@@ -125,6 +126,12 @@ const AppWrapper: React.FC = () => {
             <ManageLibrariesPage />
           </ProtectedRoute>
         }
+      />
+
+      {/* Book a Demo Page - Calendar booking */}
+      <Route
+        path="/book-demo"
+        element={<BookDemoPage />}
       />
 
       {/* Catch-all redirect to landing */}

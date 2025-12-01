@@ -77,6 +77,8 @@ const Logo = ({ name, className }: { name: string, className?: string }) => (
 
 const Navbar = ({ onNavigateToLogin }: { onNavigateToLogin: () => void }) => {
   const [scrolled, setScrolled] = useState(false);
+  const navigate = useNavigate();
+
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handler);
@@ -102,8 +104,8 @@ const Navbar = ({ onNavigateToLogin }: { onNavigateToLogin: () => void }) => {
           <button onClick={onNavigateToLogin} className="text-sm font-medium text-slate-500 hover:text-slate-900 mr-2">
             Sign In
           </button>
-          <Button variant="primary" onClick={onNavigateToLogin}>
-            Start Free Trial
+          <Button variant="primary" onClick={() => navigate('/book-demo')}>
+            Book a Demo
           </Button>
         </div>
       </div>
