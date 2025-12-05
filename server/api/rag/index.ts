@@ -16,6 +16,7 @@ import express from 'express';
 import cors from 'cors';
 import { indexDeckHandler, indexSlideHandler } from './indexDeck';
 import { searchHandler, statsHandler } from './search';
+import { deleteDeck, getDeckSlides } from './vectorSearchService';
 
 const app = express();
 
@@ -42,6 +43,26 @@ app.post('/api/rag/index-deck', indexDeckHandler);
 app.post('/api/rag/index-slide', indexSlideHandler);
 app.post('/api/rag/search', searchHandler);
 app.get('/api/rag/stats', statsHandler);
+
+// Delete deck endpoint
+app.delete('/api/rag/deck/:deckId', async (req, res) => {
+  try {
+    const { deckId } = req.params;
+    console.log(`[RAG] Deleting deck: ${deckId}`);
+
+    const slides = await getDeckSlides(deckId);
+    await deleteDeck(deckId);
+
+    console.log(`[RAG] Deleted deck ${deckId} with ${slides.length} slides`);
+    res.json({ success: true, deletedSlides: slides.length });
+  } catch (error) {
+    console.error('[RAG] Delete deck error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
 
 // Info endpoint
 app.get('/api/rag', (req, res) => {

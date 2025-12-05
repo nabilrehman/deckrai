@@ -16,6 +16,7 @@ import type {
 import { analyzeReferenceSlide } from './deepReferenceAnalyzer';
 import { browserLogger } from './browserLogger';
 import { searchSlidesByText, isRAGServiceAvailable } from './ragService';
+import { selectReferenceSlidesForDeck, SlideSpec } from './slideSelectionAgent';
 
 // Handle both Node.js (backend) and browser (frontend) environments
 const apiKey = (typeof import.meta !== 'undefined' && import.meta.env)
@@ -438,4 +439,153 @@ export function getMatchingStats(matchMap: Map<number, MatchWithBlueprint>): {
     byCategory,
     byReference,
   };
+}
+
+/**
+ * Agent-based reference matching using the ADK Slide Selection Agent
+ *
+ * This is an alternative to matchReferencesToSlides that uses an intelligent
+ * agent with tools to search and select the best references. The agent can:
+ * - Search by semantic similarity (text descriptions)
+ * - Search by metadata filters (layout, content type, visual elements)
+ * - Visually analyze candidates with Gemini Vision
+ * - Iterate if initial results aren't satisfactory
+ *
+ * Use this when:
+ * - You have a large library indexed in RAG with rich classification metadata
+ * - You want more intelligent, iterative matching
+ * - The simple RAG pre-filter + Gemini matching isn't finding good matches
+ *
+ * @param slideSpecs - Array of slide specifications from Master Agent
+ * @param options - Optional configuration
+ * @returns Map of slideNumber → MatchWithBlueprint
+ */
+export async function matchReferencesWithAgent(
+  slideSpecs: SlideSpecification[],
+  options: {
+    maxIterationsPerSlide?: number;
+    concurrency?: number;
+  } = {}
+): Promise<Map<number, MatchWithBlueprint>> {
+  const { maxIterationsPerSlide = 3, concurrency = 2 } = options;
+
+  if (slideSpecs.length === 0) {
+    browserLogger.error('No slide specifications provided');
+    throw new Error('No slide specifications provided');
+  }
+
+  browserLogger.info(`[AgentMatching] Starting agent-based matching for ${slideSpecs.length} slides`);
+
+  try {
+    // Convert SlideSpecification to SlideSpec format for the agent
+    const agentSlideSpecs: SlideSpec[] = slideSpecs.map(spec => ({
+      slideNumber: spec.slideNumber,
+      slideType: spec.slideType,
+      headline: spec.headline,
+      content: spec.content,
+      visualDescription: spec.visualDescription,
+      dataVisualization: spec.dataVisualization,
+      brandContext: spec.brandContext,
+    }));
+
+    // Run the agent to select references
+    const agentResults = await selectReferenceSlidesForDeck(agentSlideSpecs, {
+      maxIterationsPerSlide,
+      concurrency,
+    });
+
+    // Convert agent results to MatchWithBlueprint format
+    const matchMap = new Map<number, MatchWithBlueprint>();
+
+    for (const [slideNumber, result] of agentResults) {
+      const slideSpec = slideSpecs.find(s => s.slideNumber === slideNumber);
+      if (!slideSpec) continue;
+
+      // Get the selected slide reference
+      const selectedSlide = result.selectedSlide;
+
+      // Analyze the reference to get deep blueprint
+      const slideContext = `This reference will be used for: ${slideSpec.slideType} - "${slideSpec.headline}". Content: ${slideSpec.content.substring(0, 300)}`;
+      const blueprint = await analyzeReferenceSlide(selectedSlide.imageUrl, slideContext);
+
+      // Create the match result
+      const referenceMatch: ReferenceMatch = {
+        slideNumber,
+        referenceSrc: selectedSlide.imageUrl,
+        referenceName: selectedSlide.deckName || `Slide ${selectedSlide.slideIndex}`,
+        matchScore: result.matchScore,
+        matchReason: result.matchReason,
+        category: selectedSlide.classification?.contentType || 'content',
+      };
+
+      matchMap.set(slideNumber, {
+        match: referenceMatch,
+        blueprint,
+      });
+
+      browserLogger.info(`[AgentMatching] Matched slide ${slideNumber}`, {
+        score: result.matchScore,
+        iterations: result.searchIterations,
+        toolCalls: result.toolCallsUsed.length,
+      });
+    }
+
+    browserLogger.info(`[AgentMatching] Completed: ${matchMap.size}/${slideSpecs.length} slides matched`);
+    return matchMap;
+  } catch (error) {
+    console.error('[AgentMatching] Error:', error);
+    browserLogger.error('[AgentMatching] Error', { error: error instanceof Error ? error.message : 'Unknown error' });
+    throw new Error(
+      `Agent-based matching failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Determines which matching strategy to use based on context
+ *
+ * Decision factors:
+ * - Library size: Large libraries benefit more from agent-based matching
+ * - RAG availability: Agent requires RAG service to be available
+ * - Complexity: Complex slide types benefit from agent's iterative approach
+ *
+ * @param referenceCount - Number of references in the library
+ * @param slideSpecs - The slide specifications to match
+ * @returns 'agent' | 'standard' - Recommended matching strategy
+ */
+export async function recommendMatchingStrategy(
+  referenceCount: number,
+  slideSpecs: SlideSpecification[]
+): Promise<'agent' | 'standard'> {
+  // Check if RAG is available (required for agent-based matching)
+  const ragAvailable = await isRAGServiceAvailable();
+
+  if (!ragAvailable) {
+    browserLogger.info('[Strategy] RAG not available, using standard matching');
+    return 'standard';
+  }
+
+  // Use agent for large libraries (where RAG pre-filtering helps most)
+  if (referenceCount > 50) {
+    browserLogger.info(`[Strategy] Large library (${referenceCount} refs), recommending agent`);
+    return 'agent';
+  }
+
+  // Check for complex slide types that benefit from iterative matching
+  const complexTypes = ['technical', 'comparison', 'data-viz', 'timeline', 'architecture'];
+  const hasComplexSlides = slideSpecs.some(spec =>
+    complexTypes.some(type =>
+      spec.slideType.toLowerCase().includes(type) ||
+      spec.visualDescription?.toLowerCase().includes(type)
+    )
+  );
+
+  if (hasComplexSlides) {
+    browserLogger.info('[Strategy] Complex slides detected, recommending agent');
+    return 'agent';
+  }
+
+  // Default to standard for smaller, simpler cases
+  browserLogger.info('[Strategy] Using standard matching');
+  return 'standard';
 }

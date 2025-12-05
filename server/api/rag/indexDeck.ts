@@ -11,7 +11,8 @@
 
 import { Request, Response } from 'express';
 import { generateImageEmbedding, generateBatchImageEmbeddings } from './embeddingService';
-import { upsertSlide, upsertSlides, upsertDeck, SlideRecord } from './vectorSearchService';
+import { upsertSlide, upsertSlides, upsertDeck, SlideRecord, SlideClassificationData } from './vectorSearchService';
+import { classifySlides, getClassificationSummary } from './slideClassificationService';
 
 /**
  * Request body for indexing a deck
@@ -79,7 +80,20 @@ export async function indexDeckHandler(req: Request, res: Response): Promise<voi
     const imageUrls = slides.map(s => s.imageUrl);
     const embeddings = await generateBatchImageEmbeddings(imageUrls);
 
-    // Create slide records
+    // Classify slides using Gemini Vision
+    console.log(`[RAG] Classifying ${slides.length} slides with Gemini Vision...`);
+    let classifications: SlideClassificationData[] = [];
+    try {
+      classifications = await classifySlides(imageUrls) as unknown as SlideClassificationData[];
+      console.log(`[RAG] Classification complete. Sample:`,
+        classifications[0] ? getClassificationSummary(classifications[0] as any) : 'No classification'
+      );
+    } catch (classifyError) {
+      console.warn(`[RAG] Classification failed, continuing without metadata:`, classifyError);
+      // Continue without classification - slides will still be indexed
+    }
+
+    // Create slide records with classification
     const slideRecords: SlideRecord[] = slides.map((slide, index) => ({
       slideId: generateId(),
       deckId,
@@ -90,6 +104,7 @@ export async function indexDeckHandler(req: Request, res: Response): Promise<voi
       visibility,
       embedding: embeddings[index],
       createdAt: Date.now(),
+      classification: classifications[index] || undefined,
     }));
 
     // Store deck metadata

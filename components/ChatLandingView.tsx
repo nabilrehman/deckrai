@@ -16,7 +16,8 @@ import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationConte
 import { detectVibeFromNotes, getDesignerStylesForVibe, getDesignerStyleById, generateStylePromptModifier, PresentationVibe } from '../services/vibeDetection';
 import { createSlideFromPrompt, findBestStyleReferenceFromPrompt, executeSlideTask } from '../services/geminiService';
 import { saveChat, getUserChats, getChat, batchAddToStyleLibrary } from '../services/firestoreService';
-import { indexDeckToRAG } from '../services/ragService';
+import { indexDeckToRAG, isRAGServiceAvailable } from '../services/ragService';
+import { selectReferenceSlidesForDeck, SlideSpec } from '../services/slideSelectionAgent';
 import { SavedChat } from '../types';
 import { useUsageValidation } from '../hooks/useUsageValidation';
 import { useAuth } from '../contexts/AuthContext';
@@ -1533,6 +1534,107 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
         ? generateStylePromptModifier(designerStyle)
         : '';
 
+      // Step 3.5: Use intelligent agent to select references from RAG
+      let agentReferenceMap: Map<number, string> = new Map();
+
+      if (plan.mode === 'template' && styleLibraryForScout.length > 0) {
+        console.log('🔍 Checking RAG service availability for agent matching...');
+        const ragAvailable = await isRAGServiceAvailable();
+        console.log(`🔍 RAG service available: ${ragAvailable}`);
+
+        if (ragAvailable) {
+          const agentStep: ThinkingStep = {
+            id: 'step-agent-matching',
+            title: 'AI Agent selecting best references from library',
+            status: 'active',
+            type: 'thinking'
+          };
+          addThinkingStep(agentStep);
+
+          try {
+            console.log('🤖 Starting AGENT-BASED reference matching (RAG + ADK)...');
+
+            // Convert slide descriptions to SlideSpec format
+            const slideSpecs: SlideSpec[] = slideDescriptions.slice(0, plan.slideCount).map((desc, idx) => ({
+              slideNumber: idx + 1,
+              slideType: desc.split('\n')[0] || 'content',
+              headline: desc.split('\n')[0] || '',
+              content: desc,
+              visualDescription: desc,
+            }));
+
+            // Run intelligent agent to select references
+            const agentResults = await selectReferenceSlidesForDeck(slideSpecs, {
+              maxIterationsPerSlide: 3,
+              concurrency: 2,
+            });
+
+            // Build reference map - use fresh URLs from style library when possible
+            // RAG URLs may have expired tokens, so we match by path and use fresh style library URLs
+            const getFreshUrl = (ragUrl: string): string => {
+              // Extract the path portion from the RAG URL (before ?alt=media)
+              const ragPathMatch = ragUrl.match(/\/o\/([^?]+)/);
+              if (!ragPathMatch) return ragUrl;
+              const ragPath = decodeURIComponent(ragPathMatch[1]);
+
+              // Find matching URL in style library by path
+              for (const item of styleLibraryForScout) {
+                const itemPathMatch = item.src.match(/\/o\/([^?]+)/);
+                if (itemPathMatch) {
+                  const itemPath = decodeURIComponent(itemPathMatch[1]);
+                  if (itemPath === ragPath) {
+                    console.log(`🔄 Refreshed URL for: ${ragPath.split('/').pop()}`);
+                    return item.src; // Fresh URL with valid token
+                  }
+                }
+              }
+
+              // No match found - use original (may fail if token expired)
+              console.log(`⚠️ No fresh URL found for: ${ragPath.split('/').pop()}`);
+              return ragUrl;
+            };
+
+            for (const [slideNum, result] of agentResults) {
+              const ragUrl = result.selectedSlide.imageUrl;
+              // Skip invalid URLs (like "No suitable slide found")
+              if (!ragUrl || !ragUrl.startsWith('http')) {
+                console.log(`⚠️ Slide ${slideNum}: Invalid RAG URL, will use Style Scout`);
+                continue;
+              }
+              const freshUrl = getFreshUrl(ragUrl);
+              // Only use if we found a fresh URL (not the stale RAG URL)
+              if (freshUrl !== ragUrl) {
+                agentReferenceMap.set(slideNum, freshUrl);
+              } else {
+                console.log(`⚠️ Slide ${slideNum}: No fresh URL match, will use Style Scout`);
+              }
+            }
+
+            const matchedCount = agentReferenceMap.size;
+            const totalCount = slideDescriptions.slice(0, plan.slideCount).length;
+            const fallbackCount = totalCount - matchedCount;
+
+            console.log(`✅ Agent matched ${matchedCount}/${totalCount} slides to references`);
+            if (fallbackCount > 0) {
+              console.log(`📋 ${fallbackCount} slides will use Style Scout fallback`);
+            }
+
+            updateThinkingStep('step-agent-matching', {
+              status: 'completed',
+              content: matchedCount === totalCount
+                ? `AI agent selected ${matchedCount} optimal references`
+                : `AI agent matched ${matchedCount}/${totalCount} slides (${fallbackCount} will use Style Scout)`
+            });
+          } catch (agentError) {
+            console.warn('⚠️ Agent matching completely failed, falling back to Style Scout:', agentError);
+            updateThinkingStep('step-agent-matching', {
+              status: 'completed',
+              content: 'Using Style Scout fallback for all slides'
+            });
+          }
+        }
+      }
+
       // Step 4: Generate actual slides with AI
       const generatedSlides: Slide[] = [];
       const totalSlides = Math.min(slideDescriptions.length, plan.slideCount);
@@ -1553,14 +1655,20 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
           addThinkingStep(step);
 
           try {
-            // Use AI Style Scout to pick the best reference for this specific slide
+            // Get reference: prefer agent selection, fallback to Style Scout
             let referenceSrc: string | null = null;
-            if (styleLibraryForScout.length > 0) {
+            if (agentReferenceMap.has(slideNumber)) {
+              // Use agent-selected reference from RAG
+              referenceSrc = agentReferenceMap.get(slideNumber)!;
+              console.log(`🤖 Slide ${slideNumber}: Using agent-selected reference`);
+            } else if (styleLibraryForScout.length > 0) {
+              // Fallback to Style Scout
               const bestReference = await findBestStyleReferenceFromPrompt(
                 description,
                 styleLibraryForScout
               );
               referenceSrc = bestReference?.src || null;
+              console.log(`🔍 Slide ${slideNumber}: Using Style Scout reference`);
             }
 
             // Apply designer style modifier to prompt

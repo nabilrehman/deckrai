@@ -22,6 +22,42 @@ const SLIDES_COLLECTION = 'rag_slides';
 const DECKS_COLLECTION = 'rag_decks';
 
 /**
+ * Slide classification metadata (from slideClassificationService)
+ */
+export interface SlideClassificationData {
+  // Sales/business context
+  salesStage: string;
+  persona: string;
+  contentType: string;
+
+  // Visual characteristics
+  visualElements: string[];
+  layout: string;
+  visualStyle: string;
+
+  // Content hints (boolean flags for fast filtering)
+  contentHints: {
+    hasMetrics: boolean;
+    hasQuote: boolean;
+    hasLogo: boolean;
+    hasProductUI: boolean;
+    hasPeople: boolean;
+    hasProcess: boolean;
+    hasBullets: boolean;
+    hasCallToAction: boolean;
+  };
+
+  // Quality indicators
+  confidence: number;
+  dominantColors: string[];
+  textDensity: string;
+
+  // Extracted text
+  extractedTitle?: string;
+  extractedKeywords?: string[];
+}
+
+/**
  * Slide record stored in Firestore
  */
 export interface SlideRecord {
@@ -34,6 +70,9 @@ export interface SlideRecord {
   visibility: 'public' | 'private';
   embedding: number[];
   createdAt: number;
+
+  // Classification metadata (optional for backward compatibility)
+  classification?: SlideClassificationData;
 }
 
 /**
@@ -47,6 +86,9 @@ export interface SearchResult {
   imageUrl: string;
   score: number;
   visibility: 'public' | 'private';
+
+  // Classification metadata (when available)
+  classification?: SlideClassificationData;
 }
 
 /**
@@ -121,7 +163,7 @@ export async function upsertSlides(slides: SlideRecord[]): Promise<void> {
   // Batch write metadata to Firestore
   for (const slide of slides) {
     const docRef = db.collection(SLIDES_COLLECTION).doc(slide.slideId);
-    batch.set(docRef, {
+    const slideData: Record<string, any> = {
       slideId: slide.slideId,
       deckId: slide.deckId,
       deckName: slide.deckName,
@@ -130,7 +172,25 @@ export async function upsertSlides(slides: SlideRecord[]): Promise<void> {
       userId: slide.userId,
       visibility: slide.visibility,
       createdAt: slide.createdAt,
-    });
+    };
+
+    // Add classification metadata if available
+    if (slide.classification) {
+      slideData.classification = slide.classification;
+      // Also store top-level fields for easier Firestore queries
+      slideData.contentType = slide.classification.contentType;
+      slideData.layout = slide.classification.layout;
+      slideData.visualStyle = slide.classification.visualStyle;
+      slideData.persona = slide.classification.persona;
+      slideData.salesStage = slide.classification.salesStage;
+      slideData.visualElements = slide.classification.visualElements;
+      slideData.hasMetrics = slide.classification.contentHints?.hasMetrics || false;
+      slideData.hasScreenshots = slide.classification.contentHints?.hasProductUI || false;
+      slideData.hasCharts = slide.classification.visualElements?.includes('charts') || false;
+      slideData.hasIcons = slide.classification.visualElements?.includes('icons') || false;
+    }
+
+    batch.set(docRef, slideData);
   }
 
   await batch.commit();
@@ -500,12 +560,15 @@ export async function getSlide(slideId: string): Promise<SlideRecord | null> {
  */
 export async function getDeckSlides(deckId: string): Promise<SlideRecord[]> {
   const db = await getFirestoreDb();
+  // Note: removed orderBy to avoid composite index requirement
   const snapshot = await db.collection(SLIDES_COLLECTION)
     .where('deckId', '==', deckId)
-    .orderBy('slideIndex')
     .get();
 
-  return snapshot.docs.map(doc => doc.data() as SlideRecord);
+  // Sort in memory
+  const slides = snapshot.docs.map(doc => doc.data() as SlideRecord);
+  slides.sort((a, b) => (a.slideIndex || 0) - (b.slideIndex || 0));
+  return slides;
 }
 
 /**
@@ -567,6 +630,129 @@ export async function deleteDeck(deckId: string): Promise<void> {
       }),
     });
   }
+}
+
+/**
+ * Search slides by metadata filters (Firestore-based, no embeddings)
+ * This is fast and efficient for filtering by classification attributes
+ */
+export async function searchSlidesByMetadata(
+  filters: {
+    contentType?: string | string[];
+    layout?: string | string[];
+    visualStyle?: string | string[];
+    persona?: string | string[];
+    salesStage?: string | string[];
+    visualElements?: string[];
+    hasMetrics?: boolean;
+    hasScreenshots?: boolean;
+    hasCharts?: boolean;
+    hasIcons?: boolean;
+    userId?: string;
+    deckId?: string;
+    visibility?: 'public' | 'private';
+  },
+  topK: number = 20
+): Promise<SearchResult[]> {
+  const db = await getFirestoreDb();
+  let query: FirebaseFirestore.Query = db.collection(SLIDES_COLLECTION);
+
+  // Apply equality filters (Firestore can only have one inequality filter)
+  if (filters.deckId) {
+    query = query.where('deckId', '==', filters.deckId);
+  }
+
+  if (filters.visibility) {
+    query = query.where('visibility', '==', filters.visibility);
+  }
+
+  if (filters.userId) {
+    query = query.where('userId', '==', filters.userId);
+  }
+
+  // Apply classification filters
+  if (filters.contentType) {
+    const types = Array.isArray(filters.contentType) ? filters.contentType : [filters.contentType];
+    if (types.length === 1) {
+      query = query.where('contentType', '==', types[0]);
+    } else if (types.length <= 10) {
+      query = query.where('contentType', 'in', types);
+    }
+  }
+
+  if (filters.layout) {
+    const layouts = Array.isArray(filters.layout) ? filters.layout : [filters.layout];
+    if (layouts.length === 1) {
+      query = query.where('layout', '==', layouts[0]);
+    } else if (layouts.length <= 10) {
+      query = query.where('layout', 'in', layouts);
+    }
+  }
+
+  if (filters.visualStyle) {
+    const styles = Array.isArray(filters.visualStyle) ? filters.visualStyle : [filters.visualStyle];
+    if (styles.length === 1) {
+      query = query.where('visualStyle', '==', styles[0]);
+    } else if (styles.length <= 10) {
+      query = query.where('visualStyle', 'in', styles);
+    }
+  }
+
+  if (filters.persona) {
+    const personas = Array.isArray(filters.persona) ? filters.persona : [filters.persona];
+    if (personas.length === 1) {
+      query = query.where('persona', '==', personas[0]);
+    } else if (personas.length <= 10) {
+      query = query.where('persona', 'in', personas);
+    }
+  }
+
+  // Boolean filters
+  if (filters.hasMetrics !== undefined) {
+    query = query.where('hasMetrics', '==', filters.hasMetrics);
+  }
+
+  if (filters.hasScreenshots !== undefined) {
+    query = query.where('hasScreenshots', '==', filters.hasScreenshots);
+  }
+
+  if (filters.hasCharts !== undefined) {
+    query = query.where('hasCharts', '==', filters.hasCharts);
+  }
+
+  if (filters.hasIcons !== undefined) {
+    query = query.where('hasIcons', '==', filters.hasIcons);
+  }
+
+  // Limit results
+  query = query.limit(topK);
+
+  const snapshot = await query.get();
+
+  // Post-filter for array-contains (visualElements)
+  let docs = snapshot.docs;
+  if (filters.visualElements && filters.visualElements.length > 0) {
+    docs = docs.filter(doc => {
+      const data = doc.data();
+      const slideElements = data.visualElements || [];
+      return filters.visualElements!.some(el => slideElements.includes(el));
+    });
+  }
+
+  // Map to SearchResult
+  return docs.map(doc => {
+    const data = doc.data();
+    return {
+      slideId: data.slideId,
+      deckId: data.deckId,
+      deckName: data.deckName,
+      slideIndex: data.slideIndex,
+      imageUrl: data.imageUrl,
+      score: 1.0, // Metadata match has perfect score
+      visibility: data.visibility,
+      classification: data.classification,
+    };
+  });
 }
 
 /**

@@ -9,7 +9,7 @@ import { createSlideFromPrompt, generateDeckExecutionPlan } from '../services/ge
 import { createTitleSlideFromTemplate } from '../services/titleSlideGenerator';
 import { autoSaveSession } from '../services/sessionLogger';
 import type { DesignerGenerationProgress } from '../types/designerMode';
-import { matchReferencesToSlides } from '../services/referenceMatchingEngine';
+import { matchReferencesToSlides, matchReferencesWithAgent } from '../services/referenceMatchingEngine';
 import { decideGenerationStrategy } from '../services/referenceStrategyDecider';
 import type { MatchWithBlueprint, StrategyDecision } from '../types/referenceMatching';
 import { browserLogger } from '../services/browserLogger';
@@ -476,10 +476,23 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
             brandContext: context.myCompany,
           }));
 
-          // Run intelligent matching
-          console.log('🤖 Starting intelligent reference matching...');
-          matchMap = await matchReferencesToSlides(slideSpecsForMatching, styleLibrary);
-          console.log(`✅ Matched ${matchMap.size} slides to references`);
+          // Always use intelligent agent-based matching (RAG + ADK)
+          console.log('🤖 Starting AGENT-BASED reference matching (RAG + ADK)...');
+          setProgressMessage(`🤖 AI Agent selecting best references from ${styleLibrary.length} slides...`);
+
+          try {
+            matchMap = await matchReferencesWithAgent(slideSpecsForMatching, {
+              maxIterationsPerSlide: 3,
+              concurrency: 2,
+            });
+            console.log(`✅ Agent matched ${matchMap.size} slides to references`);
+          } catch (agentError) {
+            // Fallback to standard matching if agent fails (e.g., RAG unavailable)
+            console.warn('⚠️ Agent matching failed, falling back to standard:', agentError);
+            setProgressMessage(`🔄 Falling back to standard matching...`);
+            matchMap = await matchReferencesToSlides(slideSpecsForMatching, styleLibrary);
+            console.log(`✅ Standard matched ${matchMap.size} slides to references`);
+          }
 
           // Decide generation strategy for each matched slide
           setProgressMessage('🧠 Analyzing generation strategies (modify vs recreate)...');
