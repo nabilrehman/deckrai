@@ -3,6 +3,8 @@
  *
  * Intelligently matches slide specifications to reference slides using Gemini 2.5 Pro.
  * Uses a single API call to analyze all slides and references together for optimal matching.
+ *
+ * Enhanced with RAG (Retrieval-Augmented Generation) for pre-filtering large libraries.
  */
 
 import { GoogleGenAI } from '@google/genai';
@@ -13,6 +15,7 @@ import type {
 } from '../types/referenceMatching';
 import { analyzeReferenceSlide } from './deepReferenceAnalyzer';
 import { browserLogger } from './browserLogger';
+import { searchSlidesByText, isRAGServiceAvailable } from './ragService';
 
 // Handle both Node.js (backend) and browser (frontend) environments
 const apiKey = (typeof import.meta !== 'undefined' && import.meta.env)
@@ -131,10 +134,57 @@ export async function matchReferencesToSlides(
 
   browserLogger.info(`Starting reference matching: ${slideSpecs.length} slides, ${references.length} references`);
 
+  // RAG Pre-filtering: If library is large, use RAG to narrow down candidates
+  // Note: For smaller libraries, visual layout matching is better done by Gemini seeing all options
+  let filteredReferences = references;
+  const RAG_THRESHOLD = 50; // Only use RAG if more than 50 references
+
+  if (references.length > RAG_THRESHOLD) {
+    try {
+      const ragAvailable = await isRAGServiceAvailable();
+      if (ragAvailable) {
+        browserLogger.info(`[RAG] Pre-filtering ${references.length} references...`);
+        const matchedUrls = new Set<string>();
+
+        // Search RAG for each slide specification
+        for (const spec of slideSpecs) {
+          const query = [spec.slideType, spec.headline, spec.content?.substring(0, 100)]
+            .filter(Boolean)
+            .join(' ');
+
+          if (query.trim()) {
+            const searchResult = await searchSlidesByText(query, { topK: 5 });
+            if (searchResult.success && searchResult.results) {
+              for (const result of searchResult.results) {
+                matchedUrls.add(result.imageUrl);
+              }
+            }
+          }
+        }
+
+        if (matchedUrls.size > 0) {
+          // Filter references to only RAG-matched ones
+          filteredReferences = references.filter(ref => matchedUrls.has(ref.src));
+          browserLogger.info(`[RAG] ✅ Filtered from ${references.length} to ${filteredReferences.length} relevant references`);
+
+          // Fall back to full list if RAG filtered too aggressively
+          if (filteredReferences.length < 3) {
+            browserLogger.warn(`[RAG] Too few matches, using full library`);
+            filteredReferences = references;
+          }
+        } else {
+          browserLogger.warn(`[RAG] No matches found, using full library`);
+        }
+      }
+    } catch (ragError) {
+      browserLogger.warn(`[RAG] Pre-filter failed, using full library:`, ragError);
+    }
+  }
+
   try {
     // Step 1: Prepare reference descriptions with visual analysis
     const referenceDescriptions = await Promise.all(
-      references.map(async (ref, index) => {
+      filteredReferences.map(async (ref, index) => {
         // Quick visual analysis to categorize reference
         const category = await quickCategorizeReference(ref.src);
         return {
@@ -205,7 +255,7 @@ ${spec.brandContext ? `- Brand Context: ${spec.brandContext}` : ''}
         .trim();
 
       // Find the reference by name (also clean the reference name for comparison)
-      const reference = references.find(ref => {
+      const reference = filteredReferences.find(ref => {
         const cleanRefName = ref.name
           .replace(/\.png$/i, '')
           .replace(/\s*\([^)]+\)\s*$/, '')
@@ -216,7 +266,7 @@ ${spec.brandContext ? `- Brand Context: ${spec.brandContext}` : ''}
       if (!reference) {
         const message = `Reference ${match.referenceName} (cleaned: ${cleanReferenceName}) not found, skipping slide ${match.slideNumber}`;
         console.warn(message);
-        console.warn(`Available references: ${references.map(r => r.name).join(', ')}`);
+        console.warn(`Available references: ${filteredReferences.map(r => r.name).join(', ')}`);
         browserLogger.warn(message);
         continue;
       }

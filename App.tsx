@@ -25,6 +25,7 @@ import {
     deleteAllStyleLibraryItems
 } from './services/firestoreService';
 import { exportToGoogleSlides, handleOAuthCallback } from './services/googleSlidesService';
+import { indexDeckToRAG } from './services/ragService';
 
 
 declare const jspdf: any;
@@ -190,7 +191,7 @@ const App: React.FC = () => {
     }
   }, [user, styleLibrary]);
 
-  const handleLibraryUpload = useCallback(async (newItems: StyleLibraryItem[]) => {
+  const handleLibraryUpload = useCallback(async (newItems: StyleLibraryItem[], deckName?: string) => {
     console.log(`🔍 DEBUG: handleLibraryUpload called with ${newItems.length} items`);
     const existingSrcs = new Set(styleLibrary.map(item => item.src));
     const trulyNewItems = newItems.filter(item => !existingSrcs.has(item.src));
@@ -207,8 +208,22 @@ const App: React.FC = () => {
       if (user) {
         try {
           console.log(`📤 Uploading ${trulyNewItems.length} reference slides to Firebase Storage...`);
-          await batchAddToStyleLibrary(user.uid, trulyNewItems);
+          const uploadedItems = await batchAddToStyleLibrary(user.uid, trulyNewItems);
           console.log(`✅ Successfully uploaded ${trulyNewItems.length} reference slides to Storage + Firestore`);
+
+          // Index to RAG for semantic search
+          console.log(`🧠 Indexing ${uploadedItems.length} slides to RAG...`);
+          const ragResult = await indexDeckToRAG(
+            deckName || `upload-${Date.now()}`,
+            uploadedItems.map(item => ({ imageUrl: item.src, name: item.name })),
+            user.uid,
+            'private'
+          );
+          if (ragResult.success) {
+            console.log(`✅ RAG indexing complete: ${ragResult.deckId}`);
+          } else {
+            console.warn(`⚠️ RAG indexing failed (non-blocking): ${ragResult.error}`);
+          }
         } catch (error) {
           console.error('❌ Error batch uploading to style library:', error);
           alert(`Failed to upload reference slides: ${error instanceof Error ? error.message : 'Unknown error'}. Please try uploading fewer slides at once.`);

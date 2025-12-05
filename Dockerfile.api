@@ -1,0 +1,36 @@
+# Dockerfile for Deckr API Server
+FROM node:20-slim
+
+# Install dependencies for PDF processing
+RUN apt-get update && apt-get install -y \
+    poppler-utils \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    librsvg2-dev \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --legacy-peer-deps --omit=dev
+
+# Copy source code
+COPY . .
+
+# Set environment to production
+ENV NODE_ENV=production
+
+# Expose port
+ENV PORT=8080
+EXPOSE 8080
+
+# Start API server
+CMD ["npm", "run", "api:start"]

@@ -9,6 +9,55 @@ import { allTools } from './tools/index';
 
 const ai = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY || '' });
 
+// RAG API URL for pre-filtering style library
+const RAG_API_URL = process.env.RAG_API_URL || 'http://localhost:8081';
+
+/**
+ * Search RAG for relevant slides based on slide specifications
+ * Returns imageUrls of matched slides for filtering styleLibrary
+ */
+async function searchRAGForSlides(
+  slideSpecs: Array<{ slideType?: string; headline?: string; content?: string }>,
+  topKPerSlide: number = 3
+): Promise<Set<string>> {
+  const matchedUrls = new Set<string>();
+
+  try {
+    // Build search queries from slide specs
+    for (const spec of slideSpecs) {
+      const query = [spec.slideType, spec.headline, spec.content]
+        .filter(Boolean)
+        .join(' ')
+        .substring(0, 200); // Limit query length
+
+      if (!query.trim()) continue;
+
+      const response = await fetch(`${RAG_API_URL}/api/rag/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, topK: topKPerSlide }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.results) {
+          for (const result of data.results) {
+            if (result.imageUrl) {
+              matchedUrls.add(result.imageUrl);
+            }
+          }
+        }
+      }
+    }
+
+    console.log(`[RAG] Pre-filtered to ${matchedUrls.size} unique reference slides`);
+  } catch (error) {
+    console.warn('[RAG] Pre-filter failed, falling back to full library:', error);
+  }
+
+  return matchedUrls;
+}
+
 /**
  * Retry helper for transient Gemini API errors
  */
@@ -922,12 +971,37 @@ async function executeTool(
   console.log(`[masterAgent] Arguments:`, JSON.stringify(toolArgs, null, 2));
 
   // NOTE: Auto-injection of ALL style library references was removed to prevent token explosion.
-  // The agent should use matchSlidesToReferencesTool first, then pass only the matched reference.
+  // We now use RAG to pre-filter to only the most relevant references.
   // See MASTER_AGENT_PROMPT for the correct workflow.
 
-  // Auto-inject styleLibrary for matchSlidesToReferencesTool
+  // Auto-inject styleLibrary for matchSlidesToReferencesTool (with RAG pre-filtering)
   if (toolName === 'matchSlidesToReferencesTool' && context?.styleLibrary && context.styleLibrary.length > 0) {
-    toolArgs.styleLibraryItems = context.styleLibrary.map(item => ({
+    const slideSpecs = toolArgs.slideSpecifications as Array<{ slideType?: string; headline?: string; content?: string }> || [];
+
+    // Use RAG to pre-filter style library to only relevant slides
+    let filteredLibrary = context.styleLibrary;
+
+    if (slideSpecs.length > 0 && context.styleLibrary.length > 10) {
+      console.log(`[RAG] Pre-filtering ${context.styleLibrary.length} style library items for ${slideSpecs.length} slides...`);
+
+      const ragMatchedUrls = await searchRAGForSlides(slideSpecs, 3);
+
+      if (ragMatchedUrls.size > 0) {
+        // Filter to only RAG-matched items
+        filteredLibrary = context.styleLibrary.filter(item => ragMatchedUrls.has(item.src));
+        console.log(`[RAG] ✅ Filtered from ${context.styleLibrary.length} to ${filteredLibrary.length} relevant references`);
+
+        // If RAG filtered too aggressively, fall back to full library
+        if (filteredLibrary.length === 0) {
+          console.log(`[RAG] ⚠️ No matches found, using full library`);
+          filteredLibrary = context.styleLibrary;
+        }
+      } else {
+        console.log(`[RAG] ⚠️ RAG returned no results, using full library`);
+      }
+    }
+
+    toolArgs.styleLibraryItems = filteredLibrary.map(item => ({
       name: item.name,
       src: item.src
     }));

@@ -578,7 +578,7 @@ export const deleteAllStyleLibraryItems = async (userId: string): Promise<void> 
 export const batchAddToStyleLibrary = async (
     userId: string,
     items: StyleLibraryItem[]
-): Promise<void> => {
+): Promise<StyleLibraryItem[]> => {
     const now = Date.now();
     console.log(`📤 Uploading ${items.length} reference slides to Firebase Storage...`);
 
@@ -622,6 +622,13 @@ export const batchAddToStyleLibrary = async (
 
     await batch.commit();
     console.log(`✅ Successfully saved ${items.length} items to Firestore`);
+
+    // Return uploaded items with Firebase Storage URLs (for RAG indexing)
+    return uploadedItems.map(item => ({
+        id: item.id,
+        name: item.name,
+        src: item.src,
+    }));
 };
 
 // ============================================================================

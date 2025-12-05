@@ -16,6 +16,7 @@ import { analyzeNotesAndAskQuestions, generateSlidesWithContext, GenerationConte
 import { detectVibeFromNotes, getDesignerStylesForVibe, getDesignerStyleById, generateStylePromptModifier, PresentationVibe } from '../services/vibeDetection';
 import { createSlideFromPrompt, findBestStyleReferenceFromPrompt, executeSlideTask } from '../services/geminiService';
 import { saveChat, getUserChats, getChat, batchAddToStyleLibrary } from '../services/firestoreService';
+import { indexDeckToRAG } from '../services/ragService';
 import { SavedChat } from '../types';
 import { useUsageValidation } from '../hooks/useUsageValidation';
 import { useAuth } from '../contexts/AuthContext';
@@ -625,8 +626,25 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
           throw new Error(`${invalidItems.length} items have invalid image data`);
         }
 
-        await batchAddToStyleLibrary(user.uid, newItems);
+        const uploadedItems = await batchAddToStyleLibrary(user.uid, newItems);
         console.log(`✅ Successfully uploaded ${newItems.length} items`);
+
+        // Index to RAG for semantic search (non-blocking)
+        console.log(`🧠 Indexing ${uploadedItems.length} slides to RAG...`);
+        indexDeckToRAG(
+          `upload-${Date.now()}`,
+          uploadedItems.map(item => ({ imageUrl: item.src, name: item.name })),
+          user.uid,
+          'private'
+        ).then(ragResult => {
+          if (ragResult.success) {
+            console.log(`✅ RAG indexing complete: ${ragResult.deckId}`);
+          } else {
+            console.warn(`⚠️ RAG indexing failed (non-blocking): ${ragResult.error}`);
+          }
+        }).catch(err => {
+          console.warn(`⚠️ RAG indexing error (non-blocking):`, err);
+        });
 
         // Notify parent to refresh style library
         onStyleLibraryUpdated?.();

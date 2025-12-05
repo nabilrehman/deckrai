@@ -2,6 +2,7 @@
 
 import { GoogleGenAI, Modality, Type, Schema } from "@google/genai";
 import { DeckAiExecutionPlan, StyleLibraryItem, Slide, DebugLog, DebugSession, CompanyTheme, PersonalizationAction, TextReplacementAction, ImageReplacementAction, DeckAiTask, EditSlideTask, AddSlideTask, BrandProfile, SlideContent } from '../types';
+import { searchSlidesByText, isRAGServiceAvailable } from './ragService';
 
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
@@ -921,9 +922,43 @@ export const findBestStyleReferenceFromPrompt = async (
 
     logs.push({ title: "Style Scout (Text-to-Style): Starting Analysis", content: "Analyzing user prompt to find the best style match from the library." });
 
-    // Convert Firebase Storage URLs to base64 data URLs
+    // RAG Pre-filtering: If library is large, use RAG to narrow down candidates
+    // Note: For smaller libraries (< 50), visual layout matching is better done by Gemini seeing all options
+    // RAG is text-based and may filter out visually diverse slides from single-topic decks
+    let filteredLibrary = styleLibrary;
+    const RAG_THRESHOLD = 50; // Only use RAG if more than 50 references
+
+    if (styleLibrary.length > RAG_THRESHOLD) {
+        try {
+            const ragAvailable = await isRAGServiceAvailable();
+            if (ragAvailable) {
+                console.log(`[RAG] Pre-filtering ${styleLibrary.length} references for prompt: "${prompt.substring(0, 50)}..."`);
+                const searchResult = await searchSlidesByText(prompt.substring(0, 200), { topK: 10 });
+
+                if (searchResult.success && searchResult.results && searchResult.results.length > 0) {
+                    const matchedUrls = new Set(searchResult.results.map(r => r.imageUrl));
+                    const ragFiltered = styleLibrary.filter(item => matchedUrls.has(item.src));
+
+                    if (ragFiltered.length >= 3) {
+                        filteredLibrary = ragFiltered;
+                        console.log(`[RAG] ✅ Filtered from ${styleLibrary.length} to ${filteredLibrary.length} relevant references`);
+                        logs.push({
+                            title: "RAG Pre-filter Applied",
+                            content: `Narrowed ${styleLibrary.length} references to ${filteredLibrary.length} most relevant using semantic search.`
+                        });
+                    } else {
+                        console.log(`[RAG] Too few matches (${ragFiltered.length}), using full library`);
+                    }
+                }
+            }
+        } catch (ragError) {
+            console.warn('[RAG] Pre-filter failed, using full library:', ragError);
+        }
+    }
+
+    // Convert Firebase Storage URLs to base64 data URLs (using filtered library)
     const referenceImageParts = await Promise.all(
-        styleLibrary.map(async (item) => {
+        filteredLibrary.map(async (item) => {
             const base64Src = await urlToBase64(item.src);
             return { ...fileToGenerativePart(base64Src), itemName: item.name };
         })
@@ -960,7 +995,7 @@ Analyze the user's prompt to understand the INTENDED layout and content structur
     });
 
     const bestMatchName = response.text.trim();
-    const bestMatch = styleLibrary.find(item => item.name === bestMatchName);
+    const bestMatch = filteredLibrary.find(item => item.name === bestMatchName);
 
     if (bestMatch) {
         logs.push({ title: "Style Scout (Text-to-Style): Match Found", content: `The best matching style reference is: "${bestMatch.name}"` });
@@ -968,7 +1003,7 @@ Analyze the user's prompt to understand the INTENDED layout and content structur
     }
 
     logs.push({ title: "Style Scout (Text-to-Style): Match Failed", content: `Could not find a library item named "${bestMatchName}". Falling back to the first item.` });
-    return styleLibrary[0];
+    return filteredLibrary[0];
 };
 
 export const remakeSlideWithStyleReference = async (

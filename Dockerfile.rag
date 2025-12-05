@@ -1,0 +1,39 @@
+# Dockerfile for Slide RAG Engine
+# Deploy to: bq-demos-469816
+
+FROM node:20-slim
+
+# Install dependencies for canvas (if needed for image processing)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    librsvg2-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy source code
+COPY server/ ./server/
+COPY tsconfig.json ./
+
+# Build TypeScript (if needed)
+# RUN npm run build
+
+# Expose port
+EXPOSE 8080
+
+# Set environment variables
+ENV PORT=8080
+ENV NODE_ENV=production
+
+# Start the RAG server
+CMD ["npx", "tsx", "server/api/rag/index.ts"]

@@ -1,0 +1,11 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/deckr-477706/deckr-api'
+      - '-f'
+      - 'Dockerfile.api'
+      - '.'
+images:
+  - 'gcr.io/deckr-477706/deckr-api'
