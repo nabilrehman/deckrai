@@ -865,12 +865,18 @@ Analyze the target slide to understand its fundamental layout and content struct
     const bestMatchName = response.text.trim();
     const bestMatch = styleLibrary.find(item => item.name === bestMatchName);
 
+    // Log the selection for debugging
+    console.log(`[Style Scout Image] 📋 Library size: ${styleLibrary.length} slides`);
+    console.log(`[Style Scout Image] 🎯 Selected reference: "${bestMatchName}"`);
+
     if (bestMatch) {
         logs.push({ title: "Style Scout: Match Found", content: `The best matching style reference is: "${bestMatch.name}"` });
+        console.log(`[Style Scout Image] ✅ Match found: ${bestMatch.name}`);
         return bestMatch;
     }
 
     logs.push({ title: "Style Scout: Match Failed", content: `Could not find a library item named "${bestMatchName}". Falling back to the first item.` });
+    console.log(`[Style Scout Image] ⚠️ No match for "${bestMatchName}", falling back to: ${styleLibrary[0]?.name}`);
     // Fallback if the model hallucinates a name
     return styleLibrary[0];
 };
@@ -967,12 +973,25 @@ export const findBestStyleReferenceFromPrompt = async (
     const systemPrompt = `You are a "Style Scout" AI agent, an expert in presentation design and visual analysis. Your task is to find the single best style reference for a new slide based on a user's text prompt.
 
 **Your Goal:**
-Analyze the user's prompt to understand the INTENDED layout and content structure for a NEW slide (e.g., "a 3-column feature comparison", "an agenda slide", "an architecture diagram"). Then, examine each reference slide in the library and select the ONE whose layout is the closest structural match to the user's intent.
+Match the user's prompt to the BEST reference slide by considering BOTH the slide type AND the content structure.
+
+**SLIDE TYPE MATCHING (CRITICAL - Match Type First!):**
+1. **Title Slides**: If the prompt starts with "Title:" or describes an opening/cover slide → ONLY match to title slides (large centered text, minimal content, hero images)
+2. **Diagram/Architecture Slides**: If the prompt mentions "diagram", "architecture", "flow", "process", "pipeline" → match to slides with visual diagrams, flowcharts, or technical illustrations
+3. **Comparison Slides**: If the prompt mentions "vs", "comparison", "before/after", "challenge vs solution" → match to slides with side-by-side layouts, NOT tables
+4. **Table/Data Slides**: If the prompt explicitly mentions "table", "data grid", "matrix" → match to table layouts
+5. **Bullet Point Slides**: If the prompt describes features, benefits, or lists → match to bullet/list layouts
+6. **Case Study Slides**: If the prompt mentions "customer", "case study", "use case" → match to case study layouts
+
+**CRITICAL RULES:**
+- Title slides should ONLY be matched with title slides
+- Never use a table layout for a diagram or comparison (unless explicitly requested)
+- Content slides with visual diagrams are different from content slides with text tables
 
 **Your Process:**
-1. You will be given one "User Prompt".
-2. You will be given a "Reference Library" containing multiple slides with their names.
-3. Compare the user's intended structure to each slide in the Reference Library.
+1. First, identify the SLIDE TYPE from the user's prompt
+2. Filter references to only those matching the slide type
+3. Among matching types, select the one with the best structural layout match
 4. Return a single line of text containing ONLY the name of the best matching reference slide. For example: "Page 3". Do not add any other explanation.`;
 
     const allRefParts = referenceImageParts.flatMap(part => {
@@ -997,12 +1016,19 @@ Analyze the user's prompt to understand the INTENDED layout and content structur
     const bestMatchName = response.text.trim();
     const bestMatch = filteredLibrary.find(item => item.name === bestMatchName);
 
+    // Log the selection for debugging
+    console.log(`[Style Scout] 🔍 Prompt: "${prompt.substring(0, 60)}..."`);
+    console.log(`[Style Scout] 📋 Library size: ${filteredLibrary.length} slides`);
+    console.log(`[Style Scout] 🎯 Selected reference: "${bestMatchName}"`);
+
     if (bestMatch) {
         logs.push({ title: "Style Scout (Text-to-Style): Match Found", content: `The best matching style reference is: "${bestMatch.name}"` });
+        console.log(`[Style Scout] ✅ Match found: ${bestMatch.name}`);
         return bestMatch;
     }
 
     logs.push({ title: "Style Scout (Text-to-Style): Match Failed", content: `Could not find a library item named "${bestMatchName}". Falling back to the first item.` });
+    console.log(`[Style Scout] ⚠️ No exact match for "${bestMatchName}", falling back to: ${filteredLibrary[0]?.name}`);
     return filteredLibrary[0];
 };
 
@@ -1325,7 +1351,8 @@ export const createSlideFromPrompt = async (
     onProgress?: (message: string) => void,
     theme?: CompanyTheme | null,
     logoImage?: string | null,
-    customImage?: string | null
+    customImage?: string | null,
+    brandGuidelinesPrompt?: string | null  // Brand guidelines from style library for deck consistency
 ): Promise<{ images: string[], prompts: string[], logs: DebugLog[] }> => {
     console.log(`\n[createSlideFromPrompt] 📝 FUNCTION CALLED`);
     console.log(`[createSlideFromPrompt] Reference Image: ${referenceSlideImage ? 'YES' : 'NO'}`);
@@ -1333,6 +1360,7 @@ export const createSlideFromPrompt = async (
     console.log(`[createSlideFromPrompt] Deep Mode: ${deepMode}`);
     console.log(`[createSlideFromPrompt] Theme: ${theme ? 'YES' : 'NO'}`);
     console.log(`[createSlideFromPrompt] Logo: ${logoImage ? 'YES' : 'NO'}`);
+    console.log(`[createSlideFromPrompt] Brand Guidelines: ${brandGuidelinesPrompt ? 'YES (' + brandGuidelinesPrompt.length + ' chars)' : 'NO'}`);
 
     // Convert Firebase Storage URL to base64 if needed
     if (referenceSlideImage && !referenceSlideImage.startsWith('data:image/')) {
@@ -1347,6 +1375,13 @@ export const createSlideFromPrompt = async (
     let themeInstructions = '';
     if (theme) {
         themeInstructions = `\n\n**THEME INSTRUCTIONS:**\n- Primary Color: ${theme.primaryColor}\n- Secondary Color: ${theme.secondaryColor}\n- Accent Color: ${theme.accentColor}\n- Font Style: ${theme.fontStyle}\n- Visual Style: ${theme.visualStyle}`;
+    }
+
+    // Brand guidelines extracted from style library (for deck-wide consistency)
+    let brandGuidelinesSection = '';
+    if (brandGuidelinesPrompt) {
+        brandGuidelinesSection = `\n\n${brandGuidelinesPrompt}`;
+        logs.push({ title: "Brand Guidelines (Deck Consistency)", content: brandGuidelinesPrompt });
     }
 
     let logoInstructions = '';
@@ -1388,8 +1423,8 @@ export const createSlideFromPrompt = async (
 
 
     const designerSystemPrompt = referenceSlideImage
-        ? `You are a "Creative Slide Designer" AI. Your task is to create a brand new slide from scratch based on a detailed prompt.\n\n**CRITICAL RULES:**\n1.  **Reference Style:** You are provided with a reference slide image. The new slide you create MUST perfectly match the visual style, aesthetics, color palette, font choices, and general layout principles of this reference slide.\n2.  **Follow Prompt:** Create the content of the new slide based *only* on the detailed prompt.\n3.  **Aspect Ratio:** The new slide you create MUST be in a 16:9 aspect ratio.\n---\n**Detailed Prompt:** "${detailedPrompt}"${themeInstructions}${logoInstructions}${customImageInstructions}`
-        : `You are a "Creative Slide Designer" AI. Your task is to create a brand new slide from scratch based on a detailed prompt.\n\n**CRITICAL RULES:**\n1. **Design Style:** Since no reference image is provided, create a clean, professional, and visually appealing design. Use a modern, minimalist aesthetic with good typography and layout principles.\n2.  **Follow Prompt:** Create the content of the new slide based *only* on the detailed prompt.\n3.  **Aspect Ratio:** The new slide you create MUST be in a 16:9 aspect ratio.\n---\n**Detailed Prompt:** "${detailedPrompt}"${themeInstructions}${logoInstructions}${customImageInstructions}`;
+        ? `You are a "Creative Slide Designer" AI. Your task is to create a brand new slide from scratch based on a detailed prompt.\n\n**CRITICAL RULES:**\n1.  **Reference Style:** You are provided with a reference slide image. The new slide you create MUST perfectly match the visual style, aesthetics, color palette, font choices, and general layout principles of this reference slide.\n2.  **Follow Prompt:** Create the content of the new slide based *only* on the detailed prompt.\n3.  **Aspect Ratio:** The new slide you create MUST be in a 16:9 aspect ratio.\n---\n**Detailed Prompt:** "${detailedPrompt}"${themeInstructions}${logoInstructions}${customImageInstructions}${brandGuidelinesSection}`
+        : `You are a "Creative Slide Designer" AI. Your task is to create a brand new slide from scratch based on a detailed prompt.\n\n**CRITICAL RULES:**\n1. **Design Style:** Since no reference image is provided, create a clean, professional, and visually appealing design. Use a modern, minimalist aesthetic with good typography and layout principles.\n2.  **Follow Prompt:** Create the content of the new slide based *only* on the detailed prompt.\n3.  **Aspect Ratio:** The new slide you create MUST be in a 16:9 aspect ratio.\n---\n**Detailed Prompt:** "${detailedPrompt}"${themeInstructions}${logoInstructions}${customImageInstructions}${brandGuidelinesSection}`;
     
     
     // Generate only 1 variation to save time and cost

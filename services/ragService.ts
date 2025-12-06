@@ -352,3 +352,39 @@ export async function isRAGServiceAvailable(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Delete all RAG slides for a user (used when clearing style library)
+ */
+export async function deleteUserSlidesFromRAG(userId: string): Promise<{
+  success: boolean;
+  deletedSlides?: number;
+  error?: string;
+}> {
+  try {
+    console.log(`[RAG] Deleting all slides for user: ${userId}`);
+
+    const response = await fetch(`${RAG_API_URL}/api/rag/user/${userId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('[RAG] Delete user slides failed:', data);
+      return { success: false, error: data.error || 'Failed to delete slides' };
+    }
+
+    console.log(`[RAG] Successfully deleted ${data.deletedSlides} slides for user ${userId}`);
+    return { success: true, deletedSlides: data.deletedSlides };
+  } catch (error) {
+    console.error('[RAG] Delete user slides error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}

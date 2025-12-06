@@ -18,6 +18,7 @@ import { createSlideFromPrompt, findBestStyleReferenceFromPrompt, executeSlideTa
 import { saveChat, getUserChats, getChat, batchAddToStyleLibrary } from '../services/firestoreService';
 import { indexDeckToRAG, isRAGServiceAvailable } from '../services/ragService';
 import { selectReferenceSlidesForDeck, SlideSpec } from '../services/slideSelectionAgent';
+import { extractDeckStyle } from '../services/deckStyleExtractor';
 import { SavedChat } from '../types';
 import { useUsageValidation } from '../hooks/useUsageValidation';
 import { useAuth } from '../contexts/AuthContext';
@@ -1635,6 +1636,34 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
         }
       }
 
+      // Step 3.5: Extract brand guidelines from style library for deck-wide consistency
+      let brandGuidelinesPrompt: string | null = null;
+      if (styleLibraryForScout.length > 0) {
+        try {
+          addThinkingStep({
+            id: 'step-brand-guidelines',
+            title: 'Extracting brand guidelines from style library',
+            status: 'active',
+            type: 'generating'
+          });
+
+          const deckStyle = await extractDeckStyle(styleLibraryForScout);
+          brandGuidelinesPrompt = deckStyle.promptSection;
+          console.log('[ChatLandingView] Extracted brand guidelines for deck consistency');
+
+          updateThinkingStep('step-brand-guidelines', {
+            status: 'completed',
+            content: 'Brand guidelines extracted for consistent styling'
+          });
+        } catch (guidelinesError) {
+          console.warn('[ChatLandingView] Brand guidelines extraction failed, continuing without:', guidelinesError);
+          updateThinkingStep('step-brand-guidelines', {
+            status: 'completed',
+            content: 'Continuing without brand guidelines'
+          });
+        }
+      }
+
       // Step 4: Generate actual slides with AI
       const generatedSlides: Slide[] = [];
       const totalSlides = Math.min(slideDescriptions.length, plan.slideCount);
@@ -1682,7 +1711,8 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
               undefined,
               brandTheme,  // theme - use researched brand colors
               null,  // logoImage
-              currentAttachedImages.length > 0 ? currentAttachedImages[0] : null  // customImage - use first uploaded image
+              currentAttachedImages.length > 0 ? currentAttachedImages[0] : null,  // customImage - use first uploaded image
+              brandGuidelinesPrompt  // brand guidelines for deck-wide consistency
             );
 
             const finalImage = await launderImageSrc(images[0]);

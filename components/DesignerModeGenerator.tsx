@@ -9,10 +9,11 @@ import { createSlideFromPrompt, generateDeckExecutionPlan } from '../services/ge
 import { createTitleSlideFromTemplate } from '../services/titleSlideGenerator';
 import { autoSaveSession } from '../services/sessionLogger';
 import type { DesignerGenerationProgress } from '../types/designerMode';
-import { matchReferencesToSlides, matchReferencesWithAgent } from '../services/referenceMatchingEngine';
+import { matchReferencesToSlides, matchReferencesWithAgent, selectDeckBaseTemplates, type DeckBaseTemplates } from '../services/referenceMatchingEngine';
 import { decideGenerationStrategy } from '../services/referenceStrategyDecider';
 import type { MatchWithBlueprint, StrategyDecision } from '../types/referenceMatching';
 import { browserLogger } from '../services/browserLogger';
+import { extractDeckStyle, formatPromptSection, formatTitleSlidePromptSection, type DeckStyleExtraction } from '../services/deckStyleExtractor';
 
 declare const pdfjsLib: any;
 
@@ -521,13 +522,49 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
         }
       }
 
+      // Step 3.6: Extract brand guidelines from style library (for deck-wide consistency)
+      let deckStyleExtraction: DeckStyleExtraction | null = null;
+      let brandGuidelinesPrompt: string | null = null;
+
+      if (effectiveMode === 'template' && styleLibrary && styleLibrary.length > 0) {
+        try {
+          setProgressMessage('🎨 Extracting brand guidelines from style library...');
+          console.log('[DeckConsistency] Extracting brand guidelines from style library...');
+
+          // Convert StyleLibraryItem[] to expected format
+          const styleLibraryForExtraction = styleLibrary.map(item => ({
+            id: item.id,
+            src: item.src,
+            name: item.name,
+            uploadedAt: item.uploadedAt,
+          }));
+
+          deckStyleExtraction = await extractDeckStyle(styleLibraryForExtraction);
+
+          console.log('[DeckConsistency] Brand guidelines extracted:');
+          console.log('  - Typography:', deckStyleExtraction.brandGuidelines.typography.headlineFont);
+          console.log('  - Primary color:', deckStyleExtraction.brandGuidelines.colorPalette.primary);
+          console.log('  - Logo position:', deckStyleExtraction.consistencyRules.contentSlide.logoPosition);
+          console.log('  - Page number:', deckStyleExtraction.consistencyRules.contentSlide.pageNumberPosition);
+
+          browserLogger.info('[DeckConsistency] Brand guidelines extracted', {
+            primaryColor: deckStyleExtraction.brandGuidelines.colorPalette.primary,
+            logoPosition: deckStyleExtraction.consistencyRules.contentSlide.logoPosition,
+            pageNumberPosition: deckStyleExtraction.consistencyRules.contentSlide.pageNumberPosition,
+          });
+        } catch (error) {
+          console.error('[DeckConsistency] Brand guidelines extraction failed:', error);
+          console.warn('[DeckConsistency] Will generate without brand guidelines');
+        }
+      }
+
       // Step 4: Generate ALL slides in PARALLEL
+      const slideSpecs = result.outline.slideSpecifications;
+
       setCurrentPhase('parallel');
       setProgressMessage(`Generating ALL ${slideSpecs.length} slides in parallel...`);
       setCurrentSlideProgress(0);
       setTotalSlides(slideSpecs.length);
-
-      const slideSpecs = result.outline.slideSpecifications;
 
       console.log(`🚀 Starting parallel generation of ${slideSpecs.length} slides`);
 
@@ -584,6 +621,26 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
             // Use current generation approach for content slides
             console.log(`🎨 Content Slide Mode - Slide ${slideNumber} - Using generation-based approach`);
 
+            // Generate brand guidelines prompt for this slide (if available)
+            let slideBrandPrompt: string | null = null;
+            if (deckStyleExtraction) {
+              const isTitleSlideForBrand = slideNumber === 1;
+              if (isTitleSlideForBrand) {
+                slideBrandPrompt = formatTitleSlidePromptSection(
+                  deckStyleExtraction.brandGuidelines,
+                  deckStyleExtraction.consistencyRules
+                );
+              } else {
+                slideBrandPrompt = formatPromptSection(
+                  deckStyleExtraction.brandGuidelines,
+                  deckStyleExtraction.consistencyRules,
+                  slideNumber,
+                  slideSpecs.length
+                );
+              }
+              console.log(`[DeckConsistency] Slide ${slideNumber} - Brand guidelines prompt added (${slideBrandPrompt?.length || 0} chars)`);
+            }
+
             const { images } = await createSlideFromPrompt(
               styleRef,
               prompt,
@@ -592,7 +649,8 @@ ${context.audienceCompany ? `Presenting to: ${context.audienceCompany} - Persona
               undefined,
               theme,
               customerLogo,   // Pass customer logo
-              customImage     // Pass custom image
+              customImage,    // Pass custom image
+              slideBrandPrompt  // Pass brand guidelines for deck consistency
             );
 
             finalImage = await launderImageSrc(images[0]);

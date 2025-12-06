@@ -16,7 +16,7 @@ import express from 'express';
 import cors from 'cors';
 import { indexDeckHandler, indexSlideHandler } from './indexDeck';
 import { searchHandler, statsHandler } from './search';
-import { deleteDeck, getDeckSlides } from './vectorSearchService';
+import { deleteDeck, getDeckSlides, deleteUserSlides } from './vectorSearchService';
 
 const app = express();
 
@@ -57,6 +57,25 @@ app.delete('/api/rag/deck/:deckId', async (req, res) => {
     res.json({ success: true, deletedSlides: slides.length });
   } catch (error) {
     console.error('[RAG] Delete deck error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Delete all slides for a user (used when clearing style library)
+app.delete('/api/rag/user/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    console.log(`[RAG] Deleting all slides for user: ${userId}`);
+
+    const result = await deleteUserSlides(userId);
+
+    console.log(`[RAG] Deleted ${result.deletedCount} slides for user ${userId}`);
+    res.json({ success: true, deletedSlides: result.deletedCount });
+  } catch (error) {
+    console.error('[RAG] Delete user slides error:', error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

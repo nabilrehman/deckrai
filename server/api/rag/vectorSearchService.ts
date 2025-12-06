@@ -633,6 +633,66 @@ export async function deleteDeck(deckId: string): Promise<void> {
 }
 
 /**
+ * Delete all slides for a user (used when clearing style library)
+ */
+export async function deleteUserSlides(userId: string): Promise<{ deletedCount: number }> {
+  const db = await getFirestoreDb();
+
+  // Get all slides for this user
+  const snapshot = await db.collection(SLIDES_COLLECTION)
+    .where('userId', '==', userId)
+    .get();
+
+  if (snapshot.empty) {
+    console.log(`[RAG] No slides found for user ${userId}`);
+    return { deletedCount: 0 };
+  }
+
+  const slideIds = snapshot.docs.map(doc => doc.id);
+  console.log(`[RAG] Found ${slideIds.length} slides to delete for user ${userId}`);
+
+  // Delete from Firestore in batches (max 500 per batch)
+  const batchSize = 500;
+  for (let i = 0; i < slideIds.length; i += batchSize) {
+    const batch = db.batch();
+    const batchIds = slideIds.slice(i, i + batchSize);
+    for (const slideId of batchIds) {
+      batch.delete(db.collection(SLIDES_COLLECTION).doc(slideId));
+    }
+    await batch.commit();
+  }
+
+  // Delete from Vector Search if configured
+  if (INDEX_ENDPOINT_ID && slideIds.length > 0) {
+    try {
+      const token = await getAccessToken();
+      const endpoint = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/indexEndpoints/${INDEX_ENDPOINT_ID}:removeDatapoints`;
+
+      // Delete in batches of 100 (Vector Search limit)
+      for (let i = 0; i < slideIds.length; i += 100) {
+        const batchIds = slideIds.slice(i, i + 100);
+        await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            datapointIds: batchIds,
+          }),
+        });
+      }
+      console.log(`[RAG] Deleted ${slideIds.length} datapoints from Vector Search`);
+    } catch (error) {
+      console.error('[RAG] Error deleting from Vector Search:', error);
+      // Continue even if Vector Search delete fails - Firestore is already cleaned
+    }
+  }
+
+  return { deletedCount: slideIds.length };
+}
+
+/**
  * Search slides by metadata filters (Firestore-based, no embeddings)
  * This is fast and efficient for filtering by classification attributes
  */

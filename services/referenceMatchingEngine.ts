@@ -589,3 +589,233 @@ export async function recommendMatchingStrategy(
   browserLogger.info('[Strategy] Using standard matching');
   return 'standard';
 }
+
+/**
+ * Result of base template selection
+ */
+export interface DeckBaseTemplates {
+  titleTemplate: {
+    imageUrl: string;
+    name: string;
+    matchScore: number;
+    matchReason: string;
+  } | null;
+  contentTemplate: {
+    imageUrl: string;
+    name: string;
+    matchScore: number;
+    matchReason: string;
+  } | null;
+}
+
+/**
+ * Selects the best base templates for a deck from the style library.
+ *
+ * This ensures visual consistency across all slides by:
+ * 1. Finding the best TITLE slide template (for slide 1)
+ * 2. Finding the best CONTENT slide template (for slides 2-N)
+ *
+ * These templates define the consistent layout elements:
+ * - Logo position
+ * - Page number position
+ * - Header position and styling
+ * - Footer layout
+ *
+ * @param styleLibrary - Array of style library items
+ * @param deckContext - Brief description of the deck being created
+ * @returns DeckBaseTemplates with selected title and content templates
+ */
+export async function selectDeckBaseTemplates(
+  styleLibrary: StyleLibraryItem[],
+  deckContext?: string
+): Promise<DeckBaseTemplates> {
+  browserLogger.info(`[BaseTemplates] Selecting base templates from ${styleLibrary.length} items`);
+
+  if (styleLibrary.length === 0) {
+    browserLogger.warn('[BaseTemplates] No style library items, returning null templates');
+    return { titleTemplate: null, contentTemplate: null };
+  }
+
+  // If only 1-2 slides, use them directly
+  if (styleLibrary.length <= 2) {
+    browserLogger.info('[BaseTemplates] Small library, using first item(s) directly');
+    const titleTemplate = styleLibrary[0] ? {
+      imageUrl: styleLibrary[0].src,
+      name: styleLibrary[0].name,
+      matchScore: 100,
+      matchReason: 'Only template available in style library',
+    } : null;
+
+    const contentTemplate = styleLibrary[1] || styleLibrary[0] ? {
+      imageUrl: (styleLibrary[1] || styleLibrary[0]).src,
+      name: (styleLibrary[1] || styleLibrary[0]).name,
+      matchScore: 100,
+      matchReason: 'Only template available in style library',
+    } : null;
+
+    return { titleTemplate, contentTemplate };
+  }
+
+  try {
+    // Try to use RAG for intelligent template selection
+    const ragAvailable = await isRAGServiceAvailable();
+
+    if (ragAvailable) {
+      browserLogger.info('[BaseTemplates] Using RAG for template selection');
+      return await selectTemplatesWithRAG(styleLibrary, deckContext);
+    } else {
+      browserLogger.info('[BaseTemplates] RAG unavailable, using Gemini classification');
+      return await selectTemplatesWithGemini(styleLibrary, deckContext);
+    }
+  } catch (error) {
+    console.error('[BaseTemplates] Error selecting templates:', error);
+    browserLogger.error('[BaseTemplates] Error', { error: error instanceof Error ? error.message : 'Unknown' });
+
+    // Fallback: categorize locally and pick first of each type
+    return await selectTemplatesWithGemini(styleLibrary, deckContext);
+  }
+}
+
+/**
+ * Select templates using RAG search
+ */
+async function selectTemplatesWithRAG(
+  styleLibrary: StyleLibraryItem[],
+  deckContext?: string
+): Promise<DeckBaseTemplates> {
+  // Search for title templates
+  const titleQuery = `title slide cover slide opening slide ${deckContext || ''}`.trim();
+  const titleResults = await searchSlidesByText(titleQuery, { topK: 3 });
+
+  // Search for content templates
+  const contentQuery = `content slide body slide information slide bullets ${deckContext || ''}`.trim();
+  const contentResults = await searchSlidesByText(contentQuery, { topK: 3 });
+
+  let titleTemplate: DeckBaseTemplates['titleTemplate'] = null;
+  let contentTemplate: DeckBaseTemplates['contentTemplate'] = null;
+
+  // Find best title template from results
+  if (titleResults.success && titleResults.results && titleResults.results.length > 0) {
+    const best = titleResults.results[0];
+    // Match to style library item
+    const libraryItem = styleLibrary.find(item => item.src === best.imageUrl);
+    titleTemplate = {
+      imageUrl: best.imageUrl,
+      name: libraryItem?.name || best.deckName || 'Title Template',
+      matchScore: Math.round((1 - (best.distance || 0)) * 100),
+      matchReason: `Selected via RAG search as best title/cover slide match${deckContext ? ` for ${deckContext}` : ''}`,
+    };
+  }
+
+  // Find best content template from results
+  if (contentResults.success && contentResults.results && contentResults.results.length > 0) {
+    // Try to avoid selecting the same template as title
+    const candidates = contentResults.results.filter(r => r.imageUrl !== titleTemplate?.imageUrl);
+    const best = candidates[0] || contentResults.results[0];
+    const libraryItem = styleLibrary.find(item => item.src === best.imageUrl);
+    contentTemplate = {
+      imageUrl: best.imageUrl,
+      name: libraryItem?.name || best.deckName || 'Content Template',
+      matchScore: Math.round((1 - (best.distance || 0)) * 100),
+      matchReason: `Selected via RAG search as best content slide template${deckContext ? ` for ${deckContext}` : ''}`,
+    };
+  }
+
+  // Fallback to Gemini if RAG didn't return results
+  if (!titleTemplate || !contentTemplate) {
+    browserLogger.warn('[BaseTemplates] RAG returned incomplete results, supplementing with Gemini');
+    const geminiTemplates = await selectTemplatesWithGemini(styleLibrary, deckContext);
+    titleTemplate = titleTemplate || geminiTemplates.titleTemplate;
+    contentTemplate = contentTemplate || geminiTemplates.contentTemplate;
+  }
+
+  browserLogger.info('[BaseTemplates] Selected templates via RAG', {
+    title: titleTemplate?.name,
+    content: contentTemplate?.name,
+  });
+
+  return { titleTemplate, contentTemplate };
+}
+
+/**
+ * Select templates using Gemini visual analysis
+ */
+async function selectTemplatesWithGemini(
+  styleLibrary: StyleLibraryItem[],
+  deckContext?: string
+): Promise<DeckBaseTemplates> {
+  // Categorize all slides first
+  const categorized: Array<{
+    item: StyleLibraryItem;
+    category: string;
+  }> = [];
+
+  // Process in batches to avoid rate limits
+  const batchSize = 5;
+  for (let i = 0; i < styleLibrary.length && categorized.length < 10; i += batchSize) {
+    const batch = styleLibrary.slice(i, i + batchSize);
+    const results = await Promise.all(
+      batch.map(async item => {
+        const category = await quickCategorizeReference(item.src);
+        return { item, category };
+      })
+    );
+    categorized.push(...results);
+  }
+
+  // Find title slides
+  const titleSlides = categorized.filter(c => c.category === 'title');
+  const contentSlides = categorized.filter(c =>
+    c.category === 'content' || c.category === 'data-viz' || c.category === 'image-content'
+  );
+
+  let titleTemplate: DeckBaseTemplates['titleTemplate'] = null;
+  let contentTemplate: DeckBaseTemplates['contentTemplate'] = null;
+
+  // Pick best title
+  if (titleSlides.length > 0) {
+    titleTemplate = {
+      imageUrl: titleSlides[0].item.src,
+      name: titleSlides[0].item.name,
+      matchScore: 90,
+      matchReason: `Classified as title slide via Gemini vision analysis`,
+    };
+  } else if (categorized.length > 0) {
+    // Use first slide as title template
+    titleTemplate = {
+      imageUrl: categorized[0].item.src,
+      name: categorized[0].item.name,
+      matchScore: 70,
+      matchReason: `Fallback: First slide in library (no explicit title slide found)`,
+    };
+  }
+
+  // Pick best content template (different from title)
+  const contentCandidates = contentSlides.filter(c => c.item.src !== titleTemplate?.imageUrl);
+  if (contentCandidates.length > 0) {
+    contentTemplate = {
+      imageUrl: contentCandidates[0].item.src,
+      name: contentCandidates[0].item.name,
+      matchScore: 90,
+      matchReason: `Classified as content slide via Gemini vision analysis`,
+    };
+  } else if (categorized.length > 1) {
+    // Use second slide as content template
+    const secondSlide = categorized.find(c => c.item.src !== titleTemplate?.imageUrl);
+    if (secondSlide) {
+      contentTemplate = {
+        imageUrl: secondSlide.item.src,
+        name: secondSlide.item.name,
+        matchScore: 70,
+        matchReason: `Fallback: Second distinct slide in library`,
+      };
+    }
+  }
+
+  browserLogger.info('[BaseTemplates] Selected templates via Gemini classification', {
+    title: titleTemplate?.name,
+    content: contentTemplate?.name,
+  });
+
+  return { titleTemplate, contentTemplate };
+}

@@ -19,6 +19,7 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage
 import { db, storage } from '../config/firebase';
 import { UserProfile, UserPlan, UserUsage, SavedDeck, Slide, StyleLibraryItem, SavedChat, StoredChatMessage, TrialInfo } from '../types';
 import { SUBSCRIPTION_PLANS } from '../config/subscriptionPlans';
+import { deleteUserSlidesFromRAG } from './ragService';
 
 // ============================================================================
 // USER PROFILE OPERATIONS
@@ -560,6 +561,20 @@ export const deleteAllStyleLibraryItems = async (userId: string): Promise<void> 
         });
 
         await Promise.all(deletePromises);
+
+        // Step 3: Also clear from RAG index
+        console.log('🗑️ Clearing RAG index for user...');
+        try {
+            const ragResult = await deleteUserSlidesFromRAG(userId);
+            if (ragResult.success) {
+                console.log(`✅ Cleared ${ragResult.deletedSlides || 0} slides from RAG index`);
+            } else {
+                console.warn(`⚠️ Failed to clear RAG index: ${ragResult.error}`);
+            }
+        } catch (ragError) {
+            // Don't fail the whole operation if RAG delete fails
+            console.warn('⚠️ RAG index clear failed (non-fatal):', ragError);
+        }
 
         console.log('✅ Successfully deleted all style library items');
     } catch (error) {
