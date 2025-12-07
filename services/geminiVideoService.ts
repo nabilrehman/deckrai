@@ -222,8 +222,8 @@ export function secondsToTimestamp(seconds: number): string {
 }
 
 /**
- * Analyzes a demo video using Gemini 3.0 Pro Preview
- * Returns features with timestamps, descriptions, and sentiment
+ * Analyzes a demo video using Gemini 2.0 Flash
+ * Returns features with timestamps and descriptions for screenshot extraction
  */
 export async function analyzeDemoVideo(
   video: VideoAsset,
@@ -232,40 +232,40 @@ export async function analyzeDemoVideo(
 ): Promise<VideoAnalysisResult> {
   onProgress?.('Preparing video for analysis...');
 
-  const prompt = `You are an expert at analyzing product demo videos and sales calls.
-Watch this entire video carefully and identify each distinct feature or capability being demonstrated.
+  const prompt = `You are an expert at analyzing product demo videos to identify the best moments for screenshots.
 
-${userContext ? `**User Context:** ${userContext}\n` : ''}
+Watch this video and identify each distinct feature or screen being demonstrated.
+
+${userContext ? `**Context:** ${userContext}\n` : ''}
 
 **Your Task:**
-1. Watch the full video and identify every main feature/capability being shown
-2. For each feature, note the EXACT timestamp when it's clearly visible on screen (one screenshot per main activity, not button clicks)
-3. Listen to the audio - detect customer/viewer reactions:
-   - LIKED: "I love this", "this is exactly what we need", "amazing", excited tone
-   - NEUTRAL: No clear reaction, just observing
-   - DISMISSED: "nah", "skip this", "we don't need", "not important for us"
-4. Describe what problem each feature solves
+1. Identify each main feature, view, or screen shown in the demo
+2. For each feature, find the BEST timestamp for a clean screenshot:
+   - Screen should be FULLY loaded (not mid-transition)
+   - Feature should be clearly visible
+   - No mouse cursors blocking important content
+   - One screenshot per distinct feature/view
+3. Describe what the feature does and how it helps users
 
-**Return ONLY valid JSON in this exact format:**
+**Return ONLY valid JSON:**
 {
   "features": [
     {
       "timestamp": "MM:SS",
-      "featureName": "Feature Name",
-      "description": "What the feature does",
-      "problemSolved": "How this helps the customer",
-      "sentiment": "liked" | "neutral" | "dismissed"
+      "featureName": "Name of the feature/view",
+      "description": "What this screen shows",
+      "problemSolved": "How this helps users"
     }
   ],
-  "summary": "Brief summary of the demo",
+  "summary": "Brief summary of what's being demoed",
   "totalDuration": "MM:SS"
 }
 
-**Important:**
-- Only include features where there's a clear, clean screenshot moment (not during transitions)
-- Focus on the PRODUCT being demoed, not the call interface (Zoom, Teams, etc.)
-- If you can't detect sentiment from audio, default to "neutral"
-- Return only features with "liked" or "neutral" sentiment (skip dismissed ones)`;
+**Guidelines:**
+- Focus on the SOFTWARE being demoed, ignore video call UI (Zoom, Teams, etc.)
+- Pick timestamps where the screen is STABLE, not during scrolling or animations
+- Use the actual product terminology visible on screen
+- Each feature should represent a distinct view or capability`;
 
   try {
     onProgress?.('Sending video to Gemini for analysis...');
@@ -335,18 +335,13 @@ ${userContext ? `**User Context:** ${userContext}\n` : ''}
 
     const analysisResult: VideoAnalysisResult = JSON.parse(jsonMatch[1]);
 
-    // Filter to only liked/neutral features
-    analysisResult.features = analysisResult.features.filter(
-      f => f.sentiment === 'liked' || f.sentiment === 'neutral'
-    );
-
-    // Add timestamp in seconds
+    // Add timestamp in seconds to each feature
     analysisResult.features = analysisResult.features.map(f => ({
       ...f,
       timestampSeconds: timestampToSeconds(f.timestamp),
     }));
 
-    onProgress?.(`Found ${analysisResult.features.length} relevant features`);
+    onProgress?.(`Found ${analysisResult.features.length} features`);
 
     return analysisResult;
 

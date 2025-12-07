@@ -18,7 +18,18 @@
 import { GoogleGenAI } from '@google/genai';
 import type { ToolResult } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY || '' });
+// Lazy initialization of AI client (to allow env vars to be loaded first)
+let ai: GoogleGenAI | null = null;
+function getAI(): GoogleGenAI {
+  if (!ai) {
+    const apiKey = process.env.VITE_GEMINI_API_KEY || '';
+    if (!apiKey) {
+      throw new Error('VITE_GEMINI_API_KEY environment variable is not set');
+    }
+    ai = new GoogleGenAI({ apiKey });
+  }
+  return ai;
+}
 
 // Maximum file size for inline upload (20MB)
 const MAX_INLINE_SIZE = 20 * 1024 * 1024;
@@ -32,7 +43,6 @@ export interface DemoFeature {
   featureName: string;
   description: string;
   problemSolved: string;
-  sentiment: 'liked' | 'neutral' | 'dismissed';
   screenshot?: string; // base64 image extracted from video
 }
 
@@ -51,8 +61,7 @@ export interface DemoVideoAnalysisResult {
  */
 export interface AnalyzeDemoVideoParams {
   videoSource: string; // base64 data URL or URL (including YouTube URLs)
-  userContext?: string; // Additional context about what the customer cares about
-  includeNeutral?: boolean; // Whether to include neutral sentiment features (default: true)
+  userContext?: string; // Additional context about what to focus on in the demo
 }
 
 /**
@@ -97,13 +106,13 @@ function getVideoMimeType(url: string): string {
 }
 
 /**
- * Analyzes a demo video to extract features with sentiment and timestamps
+ * Analyzes a demo video to extract features and timestamps for screenshots
  */
 export async function analyzeDemoVideo(
   params: AnalyzeDemoVideoParams
 ): Promise<ToolResult<DemoVideoAnalysisResult>> {
   const startTime = Date.now();
-  const { videoSource, userContext, includeNeutral = true } = params;
+  const { videoSource, userContext } = params;
 
   try {
     console.log('[analyzeDemoVideo] Starting video analysis...');
@@ -150,10 +159,10 @@ export async function analyzeDemoVideo(
       console.log(`[analyzeDemoVideo] Using ${isYT ? 'YouTube' : 'video'} URL: ${videoSource.substring(0, 60)}...`);
     }
 
-    console.log('[analyzeDemoVideo] Sending to Gemini 3.0 Pro Preview for analysis...');
+    console.log('[analyzeDemoVideo] Sending to Gemini 2.0 Flash for analysis...');
 
-    // Call Gemini 3.0 Pro Preview with video
-    const response = await ai.models.generateContent({
+    // Call Gemini 2.0 Flash with video (supports video + audio analysis)
+    const response = await getAI().models.generateContent({
       model: 'gemini-2.0-flash', // Using 2.0-flash for video support - 3.0 preview doesn't support video yet
       contents: [{
         role: 'user',
@@ -188,12 +197,7 @@ export async function analyzeDemoVideo(
       timestampSeconds: timestampToSeconds(f.timestamp),
     }));
 
-    // Filter based on sentiment
-    if (!includeNeutral) {
-      features = features.filter(f => f.sentiment === 'liked');
-    } else {
-      features = features.filter(f => f.sentiment !== 'dismissed');
-    }
+    // No filtering - include all features
 
     const result: DemoVideoAnalysisResult = {
       features,
@@ -236,44 +240,40 @@ export async function analyzeDemoVideo(
  * Build the video analysis prompt
  */
 function buildVideoAnalysisPrompt(userContext?: string): string {
-  return `You are an expert at analyzing product demo videos and sales calls.
-Watch this entire video carefully and identify each distinct feature or capability being demonstrated.
+  return `You are an expert at analyzing product demo videos to identify the best moments for screenshots.
 
-${userContext ? `**User Context:** ${userContext}\n` : ''}
+Watch this video and identify each distinct feature or screen being demonstrated.
+
+${userContext ? `**Context:** ${userContext}\n` : ''}
 
 **Your Task:**
-1. Watch the full video and identify every main feature/capability being shown
-2. For each feature, note the EXACT timestamp when it's clearly visible on screen
-   - ONE screenshot moment per main activity (not button clicks or transitions)
-   - Choose moments where the feature is fully visible and clear
-3. Listen to the audio - detect customer/viewer reactions:
-   - **liked**: "I love this", "this is exactly what we need", "amazing", excited tone, asking follow-up questions
-   - **neutral**: No clear reaction, just observing, "okay", "I see"
-   - **dismissed**: "nah", "skip this", "we don't need", "not important for us", "let's move on"
-4. Describe what problem each feature solves for the customer
+1. Identify each main feature, view, or screen shown in the demo
+2. For each feature, find the BEST timestamp for a clean screenshot:
+   - Screen should be FULLY loaded (not mid-transition)
+   - Feature should be clearly visible
+   - No mouse cursors blocking important content
+   - One screenshot per distinct feature/view
+3. Describe what the feature does and how it helps users
 
-**Return ONLY valid JSON in this exact format:**
+**Return ONLY valid JSON:**
 {
   "features": [
     {
       "timestamp": "MM:SS",
-      "featureName": "Feature Name",
-      "description": "Brief description of what the feature does",
-      "problemSolved": "How this feature helps solve a customer problem",
-      "sentiment": "liked" | "neutral" | "dismissed"
+      "featureName": "Name of the feature/view",
+      "description": "What this screen shows",
+      "problemSolved": "How this helps users"
     }
   ],
-  "summary": "Brief 1-2 sentence summary of the demo",
+  "summary": "Brief summary of what's being demoed",
   "totalDuration": "MM:SS"
 }
 
-**Critical Guidelines:**
-- Focus on the PRODUCT/SOFTWARE being demonstrated, not the call interface (Zoom, Teams, etc.)
-- If there's a screen share, analyze what's being shown in the shared screen
-- Choose timestamps where the feature is FULLY visible and the screen is STABLE (not during scrolling or transitions)
-- If you can't clearly detect sentiment from audio, default to "neutral"
-- Be specific about feature names - use the actual product terminology if visible
-- For problemSolved, connect to business value (save time, reduce cost, improve efficiency, etc.)`;
+**Guidelines:**
+- Focus on the SOFTWARE being demoed, ignore video call UI (Zoom, Teams, etc.)
+- Pick timestamps where the screen is STABLE, not during scrolling or animations
+- Use the actual product terminology visible on screen
+- Each feature should represent a distinct view or capability`;
 }
 
 /**
@@ -281,21 +281,17 @@ ${userContext ? `**User Context:** ${userContext}\n` : ''}
  */
 export const analyzeDemoVideoTool = {
   name: 'analyzeDemoVideoTool',
-  description: 'Analyze a demo video to extract features shown, detect customer sentiment from audio, and identify timestamps for screenshots. Use this when creating follow-up decks with demo shots.',
+  description: 'Analyze a demo video to identify features and find the best timestamps for screenshots. Returns a list of features with timestamps that can be used to extract frames for demo slides.',
   parameters: {
     type: 'object',
     properties: {
       videoSource: {
         type: 'string',
-        description: 'The video source - either a base64 data URL (data:video/mp4;base64,...) or a URL to the video'
+        description: 'The video source - either a base64 data URL (data:video/mp4;base64,...) or a URL (including YouTube URLs)'
       },
       userContext: {
         type: 'string',
-        description: 'Optional context about what the customer cares about or what to focus on in the analysis'
-      },
-      includeNeutral: {
-        type: 'boolean',
-        description: 'Whether to include features with neutral sentiment (default: true). Set to false to only include features the customer clearly liked.'
+        description: 'Optional context about what to focus on in the demo (e.g., "focus on reporting features")'
       }
     },
     required: ['videoSource']

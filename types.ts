@@ -315,7 +315,6 @@ export interface DemoFeature {
   featureName: string;
   description: string;
   problemSolved: string;
-  sentiment: 'liked' | 'neutral' | 'dismissed';
   screenshot?: string; // base64 image extracted from video
 }
 
