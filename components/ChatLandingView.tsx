@@ -1572,10 +1572,10 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
 
             // Build reference map - use fresh URLs from style library when possible
             // RAG URLs may have expired tokens, so we match by path and use fresh style library URLs
-            const getFreshUrl = (ragUrl: string): string => {
+            const getFreshUrl = (ragUrl: string): { url: string; found: boolean } => {
               // Extract the path portion from the RAG URL (before ?alt=media)
               const ragPathMatch = ragUrl.match(/\/o\/([^?]+)/);
-              if (!ragPathMatch) return ragUrl;
+              if (!ragPathMatch) return { url: ragUrl, found: false };
               const ragPath = decodeURIComponent(ragPathMatch[1]);
 
               // Find matching URL in style library by path
@@ -1584,15 +1584,15 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
                 if (itemPathMatch) {
                   const itemPath = decodeURIComponent(itemPathMatch[1]);
                   if (itemPath === ragPath) {
-                    console.log(`🔄 Refreshed URL for: ${ragPath.split('/').pop()}`);
-                    return item.src; // Fresh URL with valid token
+                    console.log(`🔄 Matched URL for: ${ragPath.split('/').pop()}`);
+                    return { url: item.src, found: true }; // Fresh URL with valid token
                   }
                 }
               }
 
               // No match found - use original (may fail if token expired)
               console.log(`⚠️ No fresh URL found for: ${ragPath.split('/').pop()}`);
-              return ragUrl;
+              return { url: ragUrl, found: false };
             };
 
             for (const [slideNum, result] of agentResults) {
@@ -1602,9 +1602,10 @@ const ChatLandingView: React.FC<ChatLandingViewProps> = ({
                 console.log(`⚠️ Slide ${slideNum}: Invalid RAG URL, will use Style Scout`);
                 continue;
               }
-              const freshUrl = getFreshUrl(ragUrl);
-              // Only use if we found a fresh URL (not the stale RAG URL)
-              if (freshUrl !== ragUrl) {
+              const { url: freshUrl, found } = getFreshUrl(ragUrl);
+              // Use if we found a matching URL in style library
+              if (found) {
+                console.log(`✅ Slide ${slideNum}: Using RAG-matched reference`);
                 agentReferenceMap.set(slideNum, freshUrl);
               } else {
                 console.log(`⚠️ Slide ${slideNum}: No fresh URL match, will use Style Scout`);
