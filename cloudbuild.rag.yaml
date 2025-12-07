@@ -17,14 +17,14 @@ steps:
       - '-f'
       - 'Dockerfile.rag'
       - '-t'
-      - 'gcr.io/${PROJECT_ID}/slide-rag-api'
+      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/deckr-ai-repo/slide-rag-api'
       - '.'
 
-  # Push the Docker image to Container Registry
+  # Push the Docker image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/${PROJECT_ID}/slide-rag-api'
+      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/deckr-ai-repo/slide-rag-api'
 
   # Deploy to Cloud Run
   - name: 'gcr.io/cloud-builders/gcloud'
@@ -32,7 +32,7 @@ steps:
       - 'run'
       - 'deploy'
       - 'slide-rag-api'
-      - '--image=gcr.io/${PROJECT_ID}/slide-rag-api'
+      - '--image=us-central1-docker.pkg.dev/${PROJECT_ID}/deckr-ai-repo/slide-rag-api'
       - '--region=us-central1'
       - '--platform=managed'
       - '--allow-unauthenticated'
@@ -47,7 +47,7 @@ substitutions:
   _VECTOR_SEARCH_DEPLOYED_INDEX: 'slide_rag_multimodal'
 
 images:
-  - 'gcr.io/${PROJECT_ID}/slide-rag-api'
+  - 'us-central1-docker.pkg.dev/${PROJECT_ID}/deckr-ai-repo/slide-rag-api'
 
 # Build options
 options:
