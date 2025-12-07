@@ -287,3 +287,44 @@ export interface LogEntry {
   message: string;
   type: 'info' | 'success' | 'process';
 }
+
+// ============================================================================
+// DEMO SHOTS VIDEO TYPES
+// ============================================================================
+
+/**
+ * Represents an uploaded or linked video asset for demo analysis
+ */
+export interface VideoAsset {
+  id: string;
+  name: string;
+  type: 'file' | 'url';
+  mimeType: string;
+  size?: number; // in bytes
+  source: string; // base64 data URL for files, URL string for URLs
+  duration?: number; // in seconds
+  thumbnail?: string; // base64 thumbnail
+}
+
+/**
+ * Represents a feature identified from a demo video
+ */
+export interface DemoFeature {
+  timestamp: string; // "MM:SS" format
+  timestampSeconds: number;
+  featureName: string;
+  description: string;
+  problemSolved: string;
+  sentiment: 'liked' | 'neutral' | 'dismissed';
+  screenshot?: string; // base64 image extracted from video
+}
+
+/**
+ * Result of analyzing a demo video
+ */
+export interface VideoAnalysisResult {
+  features: DemoFeature[];
+  summary: string;
+  totalDuration: string;
+  error?: string;
+}

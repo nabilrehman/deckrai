@@ -11,7 +11,8 @@
  * 1. Vision & Analysis (Phase 2) ✅
  * 2. Slide Generation & Editing (Phase 3) ✅
  * 3. Research & Brand (Phase 4) - In Progress
- * 4. Infrastructure (Phase 5)
+ * 4. Demo Shots / Video Analysis ✅
+ * 5. Infrastructure (Phase 5)
  */
 
 // ============================================================================
@@ -22,6 +23,14 @@ import { analyzeSlideTool } from './analyzeSlide';
 import { analyzeDeckTool } from './analyzeDeck';
 
 export { analyzeSlideTool, analyzeDeckTool };
+
+// ============================================================================
+// Demo Shots: Video Analysis Tools ✅
+// ============================================================================
+
+import { analyzeDemoVideoTool } from './analyzeDemoVideo';
+
+export { analyzeDemoVideoTool };
 
 // ============================================================================
 // Phase 3: Slide Generation & Editing Tools ✅ COMPLETE
@@ -71,6 +80,8 @@ export const allTools = [
   redesignSlideTool,
   // Research & Brand
   fetchCompanyLogoTool,
+  // Demo Shots / Video Analysis
+  analyzeDemoVideoTool,
   // Note: researchCompanyTool, analyzeBrandTool, extractPainPointsTool are TODO
   // Note: uploadFileTool is TODO
 ].filter(Boolean); // Filter out any null tools
