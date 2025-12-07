@@ -1392,27 +1392,34 @@ export const createSlideFromPrompt = async (
         imageParts.push(fileToGenerativePart(referenceSlideImage));
     }
      if (logoImage) {
-        logoInstructions = `\n\n**LOGO PLACEMENT INSTRUCTION:** A company logo has been provided as a reference image.
+        logoInstructions = `\n\n**CUSTOMER/TARGET LOGO PLACEMENT:**
+The provided logo is for the TARGET CUSTOMER or partner company. This is typically used for:
+- Customer-facing presentations (showing "we're presenting TO them")
+- Partnership slides (showing collaboration between companies)
+- Title slides for customer meetings
 
-**CRITICAL: PRESERVE EXISTING LOGOS**
-- If the original slide already contains logos (e.g., Google Cloud, AWS, Microsoft, etc.), you MUST keep them exactly as they are
-- The new logo should be ADDED to the slide, not replace existing logos
-- If there's already a logo in the top-right corner, place the new logo in a different position (top-left, bottom-right, or bottom-left)
-- If the top-right is empty, place the new logo there
+**PLACEMENT APPROACH:**
+Use your judgment based on the slide context:
 
-**Logo Specifications:**
-- Position: Top-right corner preferred (if available), otherwise top-left or bottom corner
-- Size: Approximately 120-180px width (scale proportionally to match existing logos)
-- Padding: 40-60px from edges
-- Style: Recreate the logo's colors, shapes, and design elements as faithfully as possible
-- Background: Ensure the logo has proper contrast against the slide background
-- Quality: Make the logo clear, sharp, and professional
+FOR TITLE SLIDES (Customer Presentations):
+- Arrange logos to suggest PARTNERSHIP/COLLABORATION
+- Both presenter's logo and customer's logo should be visible
+- Consider side-by-side placement, opposite corners, or creative arrangements
+- The overall impression should be "we're working together"
+- Use appropriate sizing based on the slide's purpose and visual balance
 
-**Layout Guidance:**
-- If multiple logos exist, arrange them in a clean, balanced way
-- Maintain visual hierarchy - don't let logos compete for attention
-- The new logo should establish brand identity without overwhelming the slide content or removing existing branding`;
-        imageParts.push({ text: "--- COMPANY LOGO (ADD this while preserving existing logos) ---" });
+FOR OTHER SLIDES:
+- Position the logo appropriately based on the slide's purpose
+- Top-right or top-left corners are common placements
+- Size: ~120-180px width, scale proportionally
+- Ensure good contrast with the background
+
+**GENERAL GUIDELINES:**
+- Preserve any existing logos on reference slides
+- Maintain visual hierarchy - logos shouldn't dominate content
+- Make logos clear, sharp, and professional
+- Use 40-60px padding from edges`;
+        imageParts.push({ text: "--- TARGET CUSTOMER LOGO (for partnership/collaboration visual) ---" });
         imageParts.push(fileToGenerativePart(logoImage));
     }
     if (customImage) {

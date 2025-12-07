@@ -1,6 +1,6 @@
 /**
  * Deckr ADK Tools
- * 10 atomic tools for slide generation and editing
+ * Atomic tools for slide generation and editing
  *
  * Architecture:
  * - Each tool wraps existing services (lift & shift)
@@ -9,8 +9,8 @@
  *
  * Tool Organization:
  * 1. Vision & Analysis (Phase 2) ✅
- * 2. Slide Generation & Editing (Phase 3)
- * 3. Research & Brand (Phase 4)
+ * 2. Slide Generation & Editing (Phase 3) ✅
+ * 3. Research & Brand (Phase 4) - In Progress
  * 4. Infrastructure (Phase 5)
  */
 
@@ -18,29 +18,35 @@
 // Phase 2: Vision & Analysis Tools ✅ COMPLETE
 // ============================================================================
 
-export { analyzeSlideTool } from './analyzeSlide';
-export { analyzeDeckTool } from './analyzeDeck';
+import { analyzeSlideTool } from './analyzeSlide';
+import { analyzeDeckTool } from './analyzeDeck';
+
+export { analyzeSlideTool, analyzeDeckTool };
 
 // ============================================================================
 // Phase 3: Slide Generation & Editing Tools ✅ COMPLETE
 // ============================================================================
 
-export { createSlideTool } from './createSlide';
-export { minorEditSlideTool } from './minorEditSlide';
-export { redesignSlideTool } from './redesignSlide';
+import { createSlideTool } from './createSlide';
+import { minorEditSlideTool } from './minorEditSlide';
+import { redesignSlideTool } from './redesignSlide';
+
+export { createSlideTool, minorEditSlideTool, redesignSlideTool };
 
 // ============================================================================
-// Phase 4: Research & Brand Tools (TODO)
+// Phase 4: Research & Brand Tools
 // ============================================================================
+
+import { fetchCompanyLogoTool } from './fetchCompanyLogo';
+
+export { fetchCompanyLogoTool };
 
 // TODO: researchCompanyTool - Google Search + Gemini synthesis
 // TODO: analyzeBrandTool - wraps generateThemeFromWebsite
-// TODO: fetchCompanyLogoTool - Cloud Run API (fallback after Gemini search)
 // TODO: extractPainPointsTool - NLP extraction from notes
 
 export const researchCompanyTool = null;
 export const analyzeBrandTool = null;
-export const fetchCompanyLogoTool = null;
 export const extractPainPointsTool = null;
 
 // ============================================================================
@@ -50,6 +56,24 @@ export const extractPainPointsTool = null;
 // TODO: uploadFileTool - PDF extraction, Firebase Storage upload
 
 export const uploadFileTool = null;
+
+// ============================================================================
+// All Tools Array (for ADK agent)
+// ============================================================================
+
+export const allTools = [
+  // Vision & Analysis
+  analyzeSlideTool,
+  analyzeDeckTool,
+  // Slide Generation & Editing
+  createSlideTool,
+  minorEditSlideTool,
+  redesignSlideTool,
+  // Research & Brand
+  fetchCompanyLogoTool,
+  // Note: researchCompanyTool, analyzeBrandTool, extractPainPointsTool are TODO
+  // Note: uploadFileTool is TODO
+].filter(Boolean); // Filter out any null tools
 
 /**
  * Tool Implementation Guidelines:
