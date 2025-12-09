@@ -1,113 +1,78 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  subscribeToNotifications,
+  subscribeToUnreadCount,
+  markAsRead,
+  markAllAsRead,
+  deleteNotification,
+  formatNotificationTime,
+  Notification as ServiceNotification
+} from '../services/notificationService';
 
 interface NotificationCenterProps {
-  onNotificationClick?: (notification: Notification) => void;
+  onNotificationClick?: (notification: ServiceNotification) => void;
 }
 
-interface Notification {
-  id: string;
-  type: 'view' | 'comment' | 'share' | 'system' | 'upgrade';
-  title: string;
-  message: string;
-  timestamp: string;
-  isRead: boolean;
-  actionUrl?: string;
-  metadata?: {
-    deckName?: string;
-    userName?: string;
-    avatar?: string;
-  };
+// UI Notification type (augmenting service type with display fields if needed)
+interface UINotification extends ServiceNotification {
+  displayTime: string;
 }
 
 const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNotificationClick }) => {
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'view',
-      title: 'New deck view',
-      message: 'Sarah Johnson viewed "Q4 Sales Pitch"',
-      timestamp: '5 minutes ago',
-      isRead: false,
-      metadata: {
-        deckName: 'Q4 Sales Pitch',
-        userName: 'Sarah Johnson',
-        avatar: 'SJ'
-      }
-    },
-    {
-      id: '2',
-      type: 'comment',
-      title: 'New comment',
-      message: 'Michael Chen left feedback on slide 3',
-      timestamp: '1 hour ago',
-      isRead: false,
-      metadata: {
-        deckName: 'Product Roadmap 2024',
-        userName: 'Michael Chen',
-        avatar: 'MC'
-      }
-    },
-    {
-      id: '3',
-      type: 'share',
-      title: 'Deck shared',
-      message: 'Your deck was shared with 5 new people',
-      timestamp: '3 hours ago',
-      isRead: false,
-      metadata: {
-        deckName: 'Investor Pitch v3'
-      }
-    },
-    {
-      id: '4',
-      type: 'upgrade',
-      title: 'Upgrade available',
-      message: 'Unlock unlimited decks with Pro',
-      timestamp: '1 day ago',
-      isRead: true
-    },
-    {
-      id: '5',
-      type: 'system',
-      title: 'Feature update',
-      message: 'New AI personalization features are now live',
-      timestamp: '2 days ago',
-      isRead: true
-    },
-    {
-      id: '6',
-      type: 'view',
-      title: 'High engagement',
-      message: 'Your deck has reached 100 views!',
-      timestamp: '3 days ago',
-      isRead: true,
-      metadata: {
-        deckName: 'Marketing Strategy 2024'
-      }
-    }
-  ]);
-
+  const [notifications, setNotifications] = useState<UINotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  // Subscribe to unread count (always active while component is mounted)
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubscribe = subscribeToUnreadCount(user.uid, (count) => {
+      setUnreadCount(count);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Subscribe to notifications list (only when open or for pre-fetching if desired)
+  // We'll keep it simple and subscribe always for now to avoid loading states on open
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubscribe = subscribeToNotifications(user.uid, (serviceNotifications) => {
+      const uiNotifications = serviceNotifications.map(n => ({
+        ...n,
+        displayTime: formatNotificationTime(n.createdAt)
+      }));
+      setNotifications(uiNotifications);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
 
   const filteredNotifications = filter === 'unread'
     ? notifications.filter(n => !n.isRead)
     : notifications;
 
-  const markAsRead = (id: string) => {
-    setNotifications(notifications.map(n =>
-      n.id === id ? { ...n, isRead: true } : n
-    ));
+  const handleMarkAsRead = async (id: string) => {
+    if (user) {
+      await markAsRead(user.uid, id);
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, isRead: true })));
+  const handleMarkAllAsRead = async () => {
+    if (user) {
+      await markAllAsRead(user.uid);
+    }
   };
 
-  const deleteNotification = (id: string) => {
-    setNotifications(notifications.filter(n => n.id !== id));
+  const handleDeleteNotification = async (id: string) => {
+    if (user) {
+      await deleteNotification(user.uid, id);
+    }
   };
 
   const getNotificationIcon = (type: string) => {
@@ -158,6 +123,8 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNotificationC
     }
   };
 
+  if (!user) return null;
+
   return (
     <div className="relative">
       {/* Bell Button */}
@@ -201,7 +168,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNotificationC
 
                 {unreadCount > 0 && (
                   <button
-                    onClick={markAllAsRead}
+                    onClick={handleMarkAllAsRead}
                     className="text-xs font-semibold text-brand-primary-500 hover:text-brand-primary-600 transition-colors"
                   >
                     Mark all read
@@ -257,7 +224,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNotificationC
                           : 'hover:bg-gray-50'
                       }`}
                       onClick={() => {
-                        markAsRead(notification.id);
+                        handleMarkAsRead(notification.id);
                         onNotificationClick?.(notification);
                       }}
                     >
@@ -280,7 +247,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNotificationC
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2 mb-1">
                             <div className="font-semibold text-sm text-brand-text-primary">{notification.title}</div>
-                            <div className="text-xs text-brand-text-tertiary whitespace-nowrap">{notification.timestamp}</div>
+                            <div className="text-xs text-brand-text-tertiary whitespace-nowrap">{notification.displayTime}</div>
                           </div>
                           <div className="text-sm text-brand-text-secondary mb-2">{notification.message}</div>
 
@@ -298,7 +265,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNotificationC
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            deleteNotification(notification.id);
+                            handleDeleteNotification(notification.id);
                           }}
                           className="flex items-center justify-center w-7 h-7 rounded-lg text-brand-text-tertiary hover:text-red-500 hover:bg-red-50 transition-all duration-200 opacity-0 group-hover:opacity-100"
                         >
@@ -329,3 +296,4 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ onNotificationC
 };
 
 export default NotificationCenter;
+

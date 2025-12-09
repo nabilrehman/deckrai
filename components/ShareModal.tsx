@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createMagicLink, getMagicLinkByDeckId } from '../services/magicLinkService';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -8,14 +10,64 @@ interface ShareModalProps {
 }
 
 const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, deckTitle, deckId }) => {
-  const [shareLink, setShareLink] = useState(`https://deckr.ai/share/${deckId}`);
+  const { user } = useAuth();
+  const [shareLink, setShareLink] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
+
+  // Settings state (Visual only for MVP unless specified)
   const [permission, setPermission] = useState<'view' | 'comment' | 'edit'>('view');
   const [hasPassword, setHasPassword] = useState(false);
   const [password, setPassword] = useState('');
   const [hasExpiration, setHasExpiration] = useState(false);
   const [expirationDays, setExpirationDays] = useState(7);
   const [trackAnalytics, setTrackAnalytics] = useState(true);
+
+  // Generate or fetch magic link on open
+  useEffect(() => {
+    console.log('[ShareModal useEffect] Checking conditions:', { isOpen, hasUser: !!user, deckId });
+
+    if (isOpen && user && deckId) {
+      const initLink = async () => {
+        console.log('[ShareModal] Starting initLink for deck:', deckId);
+        setLoading(true);
+        setError(null);
+        try {
+          // Check for existing link first
+          console.log('[ShareModal] Checking for existing link...');
+          const existing = await getMagicLinkByDeckId(deckId);
+          console.log('[ShareModal] getMagicLinkByDeckId result:', existing);
+
+          if (existing) {
+            const link = `${window.location.origin}/view/${existing.magicLinkId}`;
+            console.log('[ShareModal] Found existing link:', link);
+            setShareLink(link);
+          } else {
+            console.log('[ShareModal] Creating new link for deck:', deckId, 'user:', user.uid);
+            // Create new link
+            const result = await createMagicLink(deckId, user.uid);
+            console.log('[ShareModal] Created new link result:', result);
+            setShareLink(result.shareUrl);
+          }
+        } catch (err: any) {
+          console.error('[ShareModal] Error generating share link:', err);
+          console.error('[ShareModal] Error details:', err.message, err.code);
+          setError(`Failed to generate link: ${err.message || 'Please try again.'}`);
+        } finally {
+          setLoading(false);
+          console.log('[ShareModal] initLink finished, shareLink will be set');
+        }
+      };
+
+      initLink();
+    } else {
+      console.log('[ShareModal] Conditions not met - not starting initLink');
+      if (!isOpen) console.log('[ShareModal] - isOpen is false');
+      if (!user) console.log('[ShareModal] - user is null/undefined');
+      if (!deckId) console.log('[ShareModal] - deckId is null/undefined');
+    }
+  }, [isOpen, deckId, user]);
 
   if (!isOpen) return null;
 
@@ -35,6 +87,8 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, deckTitle, dec
     { value: 'edit' as const, label: 'Can Edit', icon: '✏️', description: 'Recipients can make changes to the deck' }
   ];
 
+  console.log('[ShareModal Render] State:', { isOpen, loading, error, shareLink: shareLink || '(empty)', isCopied, deckId, hasUser: !!user });
+
   return (
     <>
       {/* Backdrop */}
@@ -46,7 +100,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, deckTitle, dec
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="bg-white rounded-3xl shadow-premium border border-brand-border/50 w-full max-w-2xl pointer-events-auto animate-scale-in overflow-hidden"
+          className="bg-white rounded-3xl shadow-premium border border-brand-border/50 w-full max-w-2xl pointer-events-auto animate-scale-in overflow-hidden max-h-[90vh] flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header with gradient accent */}
@@ -77,8 +131,33 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, deckTitle, dec
             </div>
           </div>
 
-          {/* Content */}
-          <div className="p-8 space-y-6">
+          {/* Content - Scrollable */}
+          <div
+            className="p-8 space-y-6 overflow-y-auto flex-1 share-modal-scroll"
+            style={{ maxHeight: 'calc(90vh - 200px)' }}
+          >
+            <style>{`
+              .share-modal-scroll::-webkit-scrollbar {
+                display: block !important;
+                width: 8px !important;
+              }
+              .share-modal-scroll::-webkit-scrollbar-track {
+                background: #f1f1f1;
+                border-radius: 4px;
+              }
+              .share-modal-scroll::-webkit-scrollbar-thumb {
+                background: #c1c1c1;
+                border-radius: 4px;
+              }
+              .share-modal-scroll::-webkit-scrollbar-thumb:hover {
+                background: #a1a1a1;
+              }
+              .share-modal-scroll {
+                scrollbar-width: thin !important;
+                -ms-overflow-style: auto !important;
+              }
+            `}</style>
+
             {/* Share Link with Copy Button */}
             <div className="space-y-3">
               <label className="flex items-center gap-2 text-sm font-semibold text-brand-text-primary">
@@ -89,37 +168,49 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, deckTitle, dec
               </label>
 
               <div className="relative group">
-                <input
-                  type="text"
-                  value={shareLink}
-                  readOnly
-                  className="w-full px-4 py-3 pr-32 bg-gradient-to-br from-gray-50 to-slate-50 border-2 border-brand-border/50 rounded-xl text-sm text-brand-text-primary font-mono focus:outline-none focus:border-brand-primary-300 focus:ring-4 focus:ring-brand-primary-500/10 transition-all"
-                />
-                <button
-                  onClick={handleCopyLink}
-                  className={`absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 rounded-lg font-semibold text-sm transition-all duration-300 ${
-                    isCopied
-                      ? 'bg-green-500 text-white shadow-lg'
-                      : 'bg-gradient-to-r from-brand-primary-500 to-brand-accent-500 text-white shadow-btn hover:shadow-btn-hover'
-                  }`}
-                >
-                  {isCopied ? (
-                    <span className="flex items-center gap-1.5">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Copied!
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1.5">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-                        <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
-                      </svg>
-                      Copy
-                    </span>
-                  )}
-                </button>
+                {loading ? (
+                  <div className="w-full px-4 py-3 bg-gray-50 border-2 border-brand-border/50 rounded-xl flex items-center gap-2 text-brand-text-tertiary">
+                    <div className="w-4 h-4 border-2 border-brand-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                    Generating magic link...
+                  </div>
+                ) : error ? (
+                  <div className="w-full px-4 py-3 bg-red-50 border-2 border-red-200 rounded-xl text-red-500 text-sm">
+                    {error}
+                  </div>
+                ) : (
+                  <>
+                        <input
+                          type="text"
+                          value={shareLink}
+                          readOnly
+                          className="w-full px-4 py-3 pr-32 bg-gradient-to-br from-gray-50 to-slate-50 border-2 border-brand-border/50 rounded-xl text-sm text-brand-text-primary font-mono focus:outline-none focus:border-brand-primary-300 focus:ring-4 focus:ring-brand-primary-500/10 transition-all"
+                        />
+                        <button
+                          onClick={handleCopyLink}
+                          className={`absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 rounded-lg font-semibold text-sm transition-all duration-300 ${isCopied
+                            ? 'bg-green-500 text-white shadow-lg'
+                            : 'bg-gradient-to-r from-brand-primary-500 to-brand-accent-500 text-white shadow-btn hover:shadow-btn-hover'
+                            }`}
+                        >
+                          {isCopied ? (
+                            <span className="flex items-center gap-1.5">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                              Copied!
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1.5">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                                <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                              </svg>
+                              Copy
+                            </span>
+                          )}
+                        </button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -292,6 +383,28 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, deckTitle, dec
                     {['twitter', 'linkedin', 'facebook', 'email'].map((platform) => (
                       <button
                         key={platform}
+                        onClick={() => {
+                          const url = encodeURIComponent(shareLink);
+                          const text = encodeURIComponent(`Check out this pitch deck: ${deckTitle}`);
+                          let shareUrl = '';
+
+                          switch (platform) {
+                            case 'twitter':
+                              shareUrl = `https://twitter.com/intent/tweet?text=${text}&url=${url}`;
+                              break;
+                            case 'linkedin':
+                              shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${url}`;
+                              break;
+                            case 'facebook':
+                              shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${url}`;
+                              break;
+                            case 'email':
+                              shareUrl = `mailto:?subject=${text}&body=Here is the link to the deck: ${shareLink}`;
+                              break;
+                          }
+
+                          if (shareUrl) window.open(shareUrl, '_blank', 'width=600,height=400');
+                        }}
                         className="flex items-center justify-center w-8 h-8 rounded-lg bg-white border border-brand-border/50 hover:border-brand-primary-300 hover:shadow-md transition-all duration-200 group"
                         title={`Share on ${platform}`}
                       >

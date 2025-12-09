@@ -35,13 +35,79 @@ service cloud.firestore {
           allow write: if isOwner(userId);
         }
       }
+
+      // User's notifications subcollection (Digital Sales Room)
+      match /notifications/{notificationId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId);
+        // Allow system to create notifications (for view tracking)
+        allow create: if true;
+      }
     }
 
-    // Decks collection - users can only access their own decks
+    // Decks collection - public read for DSR embedding, owner-only write
     match /decks/{deckId} {
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // Allow public read (needed for DSR workspace viewing by buyers)
+      allow read: if true;
+      // Only owner can create/update/delete
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // Workspaces collection (DSR 1.0 - Digital Sales Rooms)
+    match /workspaces/{workspaceId} {
+      // Public read access for viewing sales rooms (buyers don't need to sign in)
+      allow read: if true;
+      // Only authenticated owners can create/update/delete
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      // Allow owner to update anything, OR allow anyone to update only analytics field
+      allow update: if (isSignedIn() && resource.data.ownerId == request.auth.uid) ||
+                       (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['analytics']));
+      allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+
+      // Comments subcollection - anyone can comment (buyers + sellers)
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if true; // Allow anonymous comments from buyers
+        allow update, delete: if isSignedIn(); // Only signed in users can edit/delete
+      }
+
+      // Activity/analytics subcollection - track buyer engagement
+      match /activities/{activityId} {
+        allow read: if isSignedIn() && get(/databases/$(database)/documents/workspaces/$(workspaceId)).data.ownerId == request.auth.uid;
+        allow create: if true; // Allow anonymous activity tracking
+      }
+    }
+
+    // Slide view analytics collection (for time tracking per slide)
+    match /slideViewEvents/{eventId} {
+      allow read: if isSignedIn();
+      allow create: if true; // Allow anonymous tracking
+    }
+
+    // Shared Decks collection - Digital Sales Room (public read access)
+    match /sharedDecks/{magicLinkId} {
+      // Anyone can read shared decks (public viewing)
+      allow read: if true;
+      // Only authenticated users can create shared links for their own decks
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      // Allow public updates to view counts only, owner can update anything
+      allow update: if (
+        // Owner can update anything
+        (isSignedIn() && resource.data.userId == request.auth.uid) ||
+        // Anyone can increment view counts (for anonymous viewing)
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalViews', 'uniqueViewers']))
+      );
+      // Only the deck owner can delete shared links
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      // Views subcollection - track who viewed the deck
+      match /views/{viewId} {
+        // Anyone can write views (to record anonymous/identified views)
+        allow create: if true;
+        // Only deck owner can read views
+        allow read: if isSignedIn() && get(/databases/$(database)/documents/sharedDecks/$(magicLinkId)).data.userId == request.auth.uid;
+      }
     }
 
     // Stripe customers collection - Required for Firebase Stripe Extension

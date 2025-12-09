@@ -327,3 +327,261 @@ export interface VideoAnalysisResult {
   totalDuration: string;
   error?: string;
 }
+
+// ============================================================================
+// DSR 1.0 - WORKSPACE & WIDGET ENGINE TYPES
+// ============================================================================
+
+export type WorkspaceStatus = 'draft' | 'published' | 'archived';
+export type BlockType = 'deck' | 'video' | 'pdf' | 'embed' | 'map' | 'text';
+
+export interface BaseBlock {
+  id: string; // Unique block ID
+  type: BlockType;
+  title?: string; // Optional header for the block
+  isVisible: boolean;
+}
+
+// 1. Existing Deck Widget
+export interface DeckBlock extends BaseBlock {
+  type: 'deck';
+  deckId: string; // Reference to the saved deck
+  startSlide?: number; // Optional starting slide
+}
+
+// 2. Video Widget (Loom/Mux)
+export interface VideoBlock extends BaseBlock {
+  type: 'video';
+  source: 'url' | 'upload';
+  url: string; // Youtube/Loom/Mux URL
+  thumbnailUrl?: string;
+}
+
+// 3. PDF/Document Widget
+export interface PDFBlock extends BaseBlock {
+  type: 'pdf';
+  storageUrl: string; // Firebase Storage URL
+  fileName: string;
+  allowDownload: boolean; // Security requirement
+}
+
+// 4. Universal Embed (Figma, Airtable)
+export interface EmbedBlock extends BaseBlock {
+  type: 'embed';
+  url: string;
+  provider: 'figma' | 'airtable' | 'pandadoc' | 'google_slides' | 'other';
+  height?: number; // Custom height for iframe
+}
+
+// 5. Mutual Action Plan (MAP)
+export interface MAPTask {
+  id: string;
+  title: string;
+  assignedTo: 'buyer' | 'seller'; // Role-based assignment
+  assigneeEmail?: string; // Specific email (optional)
+  dueDate?: number;
+  status: 'pending' | 'in_progress' | 'completed';
+  completedBy?: string; // Email of completer
+  completedAt?: number;
+}
+
+export interface MAPBlock extends BaseBlock {
+  type: 'map';
+  tasks: MAPTask[];
+}
+
+// 6. Rich Text Block
+export interface TextBlock extends BaseBlock {
+  type: 'text';
+  content: string; // HTML or Markdown
+}
+
+export type WorkspaceBlock = DeckBlock | VideoBlock | PDFBlock | EmbedBlock | MAPBlock | TextBlock;
+
+export interface Workspace {
+  id: string; // "ws_..."
+  ownerId: string; // Rep's UID
+  templateId?: string; // If cloned from a master template
+  title: string; // e.g., "Acme Corp Deal Room"
+  slug?: string; // For friendly URLs (e.g., /room/acme-corp) -> maps to ID (optional for MVP)
+
+  // Customization
+  branding?: {
+    logoUrl?: string; // Viewer's logo (CRM injected)
+    primaryColor?: string;
+    backgroundImageUrl?: string;
+  };
+
+  // Layout Engine
+  blocks: WorkspaceBlock[]; // Ordered list of content blocks
+  layout: 'single-column' | 'grid'; // Simplified layout for MVP
+
+  // State
+  status: WorkspaceStatus;
+  createdAt: number;
+  updatedAt: number;
+}
+
+// ============================================================================
+// DSR 1.0 - COLLABORATION & ANALYTICS TYPES
+// ============================================================================
+
+/**
+ * Comment on a workspace or specific block
+ */
+export interface WorkspaceComment {
+  id: string;
+  workspaceId: string;
+  blockId?: string; // Optional - if comment is on a specific block
+  parentId?: string; // For threaded replies
+  authorId: string;
+  authorName: string;
+  authorEmail: string;
+  authorAvatar?: string;
+  authorRole: 'buyer' | 'seller';
+  content: string;
+  mentions?: string[]; // Array of mentioned user emails
+  createdAt: number;
+  updatedAt?: number;
+  isResolved?: boolean;
+}
+
+/**
+ * Live presence indicator for real-time collaboration
+ */
+export interface WorkspacePresence {
+  workspaceId: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  userAvatar?: string;
+  userRole: 'buyer' | 'seller' | 'viewer';
+  lastSeen: number; // Timestamp
+  currentBlockId?: string; // Which block they're viewing
+  isOnline: boolean;
+}
+
+/**
+ * Activity event for workspace analytics and notifications
+ */
+export type ActivityType =
+  | 'workspace_viewed'
+  | 'workspace_shared'
+  | 'block_viewed'
+  | 'document_downloaded'
+  | 'video_played'
+  | 'video_completed'
+  | 'map_task_completed'
+  | 'comment_added'
+  | 'proposal_signed'
+  | 'stakeholder_added';
+
+export interface WorkspaceActivity {
+  id: string;
+  workspaceId: string;
+  type: ActivityType;
+  actorId?: string; // User who performed action (may be anonymous)
+  actorEmail?: string;
+  actorName?: string;
+  actorCompany?: string;
+  metadata?: Record<string, any>; // Additional context (blockId, taskId, etc.)
+  timestamp: number;
+  ipAddress?: string; // For zombie lead detection
+  userAgent?: string;
+}
+
+/**
+ * Stakeholder identified through workspace engagement
+ */
+export interface WorkspaceStakeholder {
+  id: string;
+  workspaceId: string;
+  email: string;
+  name?: string;
+  company?: string;
+  jobTitle?: string;
+  avatarUrl?: string;
+  role: 'champion' | 'decision_maker' | 'influencer' | 'unknown';
+  firstSeenAt: number;
+  lastSeenAt: number;
+  totalViews: number;
+  totalTimeSpent: number; // In seconds
+  engagementScore: number; // 0-100 calculated score
+  viewedBlocks: string[]; // Array of block IDs they've viewed
+}
+
+/**
+ * Notification for sellers about buyer activity
+ */
+export type NotificationType =
+  | 'new_view'
+  | 'return_visit'
+  | 'stakeholder_discovered'
+  | 'high_engagement'
+  | 'document_download'
+  | 'video_watch'
+  | 'task_completed'
+  | 'comment_mention'
+  | 'proposal_signed'
+  | 'zombie_reactivated';
+
+export interface WorkspaceNotification {
+  id: string;
+  workspaceId: string;
+  recipientId: string; // Seller's UID
+  type: NotificationType;
+  title: string;
+  message: string;
+  metadata?: Record<string, any>;
+  isRead: boolean;
+  createdAt: number;
+  link?: string; // Deep link to relevant content
+}
+
+/**
+ * Slide-level analytics for tracking time spent per slide
+ */
+export interface SlideViewEvent {
+  id: string;
+  workspaceId: string;
+  blockId: string; // The deck/document block
+  slideIndex: number;
+  viewerId?: string; // User ID if authenticated
+  viewerEmail?: string;
+  viewerName?: string;
+  viewerCompany?: string;
+  sessionId: string; // Unique per viewing session
+  startTime: number; // When they started viewing
+  endTime: number; // When they left
+  durationMs: number; // Total time in milliseconds
+  isFullscreen: boolean;
+  deviceType: 'desktop' | 'tablet' | 'mobile';
+  timestamp: number;
+}
+
+export interface SlideAnalytics {
+  slideIndex: number;
+  thumbnailUrl?: string;
+  totalViews: number;
+  uniqueViewers: number;
+  totalTimeSpentMs: number;
+  avgTimeSpentMs: number;
+  maxTimeSpentMs: number;
+  completionRate: number; // Percentage who viewed this slide
+}
+
+export interface ContentEngagementAnalytics {
+  blockId: string;
+  blockType: 'deck' | 'pdf';
+  contentName: string;
+  totalSlides: number;
+  totalViews: number;
+  uniqueViewers: number;
+  avgCompletionRate: number; // % of slides viewed on average
+  totalTimeSpentMs: number;
+  avgTimeSpentMs: number;
+  slideAnalytics: SlideAnalytics[];
+  hotspots: number[]; // Slide indices with highest engagement
+  dropoffs: number[]; // Slide indices where viewers leave
+  lastUpdated: number;
+}

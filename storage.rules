@@ -40,5 +40,25 @@ service firebase.storage {
       allow write: if isOwner(userId);
       allow delete: if isOwner(userId);
     }
+
+    // Workspace PDFs - public read (for buyers), owner write
+    match /workspaces/{userId}/{workspaceId}/pdfs/{allPaths=**} {
+      allow read: if true;  // Public read access for buyers viewing workspaces
+      allow write: if isOwner(userId);  // Only owner can upload
+      allow delete: if isOwner(userId);
+    }
+
+    // POD docs - public read, authenticated write
+    match /pod/docs/{allPaths=**} {
+      allow read: if true;  // Public read for DSR viewing
+      allow write: if isSignedIn();  // Any authenticated user can upload
+      allow delete: if isSignedIn();
+    }
+
+    // Fallback PDFs (when workspaceId/userId not available)
+    match /pdfs/{allPaths=**} {
+      allow read: if true;  // Public read
+      allow write: if isSignedIn();  // Any authenticated user can upload
+    }
   }
 }

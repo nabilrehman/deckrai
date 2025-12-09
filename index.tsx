@@ -4,12 +4,20 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import App from './App';
 import LandingPage from './pages/LandingPage';
-import LoginPage from './components/LoginPage';
+import './styles/design-tokens.css'; // Import global design tokens
+// import LoginPage from './components/LoginPage'; // Replaced by AuthPageV2
 import AppPage from './pages/AppPage';
 import PricingPage from './components/PricingPage';
 import PaymentSuccessPage from './pages/PaymentSuccessPage';
 import ManageLibrariesPage from './pages/ManageLibrariesPage';
 import { BookDemoPage } from './pages/BookDemoPage';
+import AuthPageV2 from './pages/AuthPageV2';
+import SharedDeckView from './pages/SharedDeckView';
+import WorkspaceEditor from './pages/WorkspaceEditor';
+import WorkspaceViewer from './pages/WorkspaceViewer';
+import WorkspaceViewerV2 from './pages/WorkspaceViewerV2';
+import WorkspacesListPage from './pages/WorkspacesListPage';
+import WorkspaceAnalyticsPage from './pages/WorkspaceAnalyticsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Slide, StyleLibraryItem } from './types';
@@ -75,7 +83,7 @@ const AppWrapper: React.FC = () => {
       <Route
         path="/login"
         element={
-          user ? <Navigate to="/app" replace /> : <LoginPage />
+          user ? <Navigate to="/app" replace /> : <AuthPageV2 />
         }
       />
 
@@ -132,6 +140,62 @@ const AppWrapper: React.FC = () => {
       <Route
         path="/book-demo"
         element={<BookDemoPage />}
+      />
+
+      {/* New Auth Page V2 (Hume Style) */}
+      <Route
+        path="/signup-new"
+        element={
+          user ? <Navigate to="/app" replace /> : <AuthPageV2 />
+        }
+      />
+
+      {/* Shared Deck View - Public route (Digital Sales Room) */}
+      <Route
+        path="/view/:magicLinkId"
+        element={<SharedDeckView />}
+      />
+
+      {/* Workspaces List - Digital Sales Rooms Dashboard */}
+      <Route
+        path="/workspaces"
+        element={
+          <ProtectedRoute>
+            <WorkspacesListPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Workspace Editor - DSR 1.0 */}
+      <Route
+        path="/workspace/:workspaceId/edit"
+        element={
+          <ProtectedRoute>
+            <WorkspaceEditor />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Workspace Analytics - DSR Engagement Dashboard */}
+      <Route
+        path="/workspace/:workspaceId/analytics"
+        element={
+          <ProtectedRoute>
+            <WorkspaceAnalyticsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Workspace Viewer V2 - Enhanced Public DSR view (no auth required) */}
+      <Route
+        path="/room/:workspaceId"
+        element={<WorkspaceViewerV2 />}
+      />
+
+      {/* Workspace Viewer V1 - Legacy simple view */}
+      <Route
+        path="/room/:workspaceId/simple"
+        element={<WorkspaceViewer />}
       />
 
       {/* Catch-all redirect to landing */}
